@@ -1,0 +1,103 @@
+import json
+import queue
+import threading
+import logging
+import sys
+from pathlib import Path
+
+from flask import Flask, jsonify
+from flask_sock import Sock
+
+sys.path.insert(0, str(Path(__file__).parent))
+
+from engine import TradingEngine
+
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+logger = logging.getLogger(__name__)
+
+app = Flask(__name__, static_folder="../frontend", static_url_path="")
+sock = Sock(app)
+
+engine = TradingEngine()
+_ws_queues: list[queue.Queue] = []
+_ws_lock = threading.Lock()
+
+
+def _broadcast(state: dict):
+    payload = json.dumps(state)
+    with _ws_lock:
+        dead = []
+        for q in _ws_queues:
+            try:
+                q.put_nowait(payload)
+            except queue.Full:
+                dead.append(q)
+        for q in dead:
+            _ws_queues.remove(q)
+
+
+# ------------------------------------------------------------------
+# REST endpoints
+# ------------------------------------------------------------------
+
+@app.route("/")
+def index():
+    return app.send_static_file("index.html")
+
+
+@app.route("/api/state")
+def get_state():
+    return jsonify(engine.get_state())
+
+
+@app.route("/api/battle")
+def get_battle():
+    return jsonify(engine.get_battle_info())
+
+
+@app.route("/api/trader/<int:trader_id>")
+def get_trader(trader_id: int):
+    data = engine.get_trader(trader_id)
+    if data is None:
+        return jsonify({"error": "Trader not found"}), 404
+    return jsonify(data)
+
+
+# ------------------------------------------------------------------
+# WebSocket endpoint
+# ------------------------------------------------------------------
+
+@sock.route("/ws")
+def websocket(ws):
+    q: queue.Queue = queue.Queue(maxsize=20)
+    with _ws_lock:
+        _ws_queues.append(q)
+    # Push current state immediately on connect
+    ws.send(json.dumps(engine.get_state()))
+    try:
+        while True:
+            # Block until a tick update arrives; timeout keeps the loop alive
+            try:
+                msg = q.get(timeout=30)
+                ws.send(msg)
+            except queue.Empty:
+                # Send a heartbeat so the client knows we're still alive
+                ws.send(json.dumps({"type": "heartbeat"}))
+    except Exception:
+        pass
+    finally:
+        with _ws_lock:
+            if q in _ws_queues:
+                _ws_queues.remove(q)
+
+
+# ------------------------------------------------------------------
+# Entry point
+# ------------------------------------------------------------------
+
+if __name__ == "__main__":
+    engine.set_tick_callback(_broadcast)
+    engine_thread = threading.Thread(target=engine.run, daemon=True)
+    engine_thread.start()
+    logger.info("Server starting on http://0.0.0.0:5000")
+    app.run(host="0.0.0.0", port=5000, debug=False)
