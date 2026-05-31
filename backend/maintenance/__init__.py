@@ -1,7 +1,6 @@
 """Service maintenance informatique — santé du système King Fund."""
 
 import os
-import sqlite3
 import logging
 from datetime import datetime
 from pathlib import Path
@@ -41,11 +40,15 @@ def get_health(engine, db_path: Path, ws_clients: int = 0) -> dict[str, Any]:
 
     # ── Base de données SQLite ────────────────────────────────────
     try:
+        from engine import db_connect
         size_kb = round(os.path.getsize(db_path) / 1024, 1) if Path(db_path).exists() else 0
-        with sqlite3.connect(db_path) as conn:
+        conn = db_connect()
+        try:
             trades = conn.execute("SELECT COUNT(*) FROM trades").fetchone()[0]
             snaps  = conn.execute("SELECT COUNT(*) FROM snapshots").fetchone()[0]
             last_t = conn.execute("SELECT MAX(timestamp) FROM trades").fetchone()[0]
+        finally:
+            conn.close()
         checks["database"] = {
             "status":     "ok",
             "size_kb":    size_kb,

@@ -1,3 +1,4 @@
+import random
 import time
 import sqlite3
 import json
@@ -15,6 +16,89 @@ from config import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
 
+# ---------------------------------------------------------------------------
+# SQLite helpers — WAL mode + retry with exponential backoff
+# ---------------------------------------------------------------------------
+
+_DB_MAX_RETRIES = 5
+_DB_BASE_DELAY  = 0.05   # 50 ms — doubles each attempt
+
+
+def db_connect() -> sqlite3.Connection:
+    """Open a WAL-mode connection with a 30-second busy-timeout."""
+    conn = sqlite3.connect(str(DB_PATH), check_same_thread=False, timeout=30)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.execute("PRAGMA busy_timeout=10000")   # ms — SQLite-level wait before error
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def _write_with_retry(fn):
+    """Execute fn(conn) inside a single transaction, retrying on 'database is locked'."""
+    for attempt in range(_DB_MAX_RETRIES):
+        conn = None
+        try:
+            conn = db_connect()
+            result = fn(conn)
+            conn.commit()
+            return result
+        except sqlite3.OperationalError as exc:
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            if "locked" not in str(exc).lower() or attempt == _DB_MAX_RETRIES - 1:
+                raise
+            delay = _DB_BASE_DELAY * (2 ** attempt) + random.uniform(0, 0.02)
+            logger.warning(
+                "SQLite locked (tentative %d/%d) — retry dans %.0f ms",
+                attempt + 1, _DB_MAX_RETRIES, delay * 1000,
+            )
+            time.sleep(delay)
+        except Exception:
+            if conn:
+                try:
+                    conn.rollback()
+                except Exception:
+                    pass
+            raise
+        finally:
+            if conn:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
+    raise sqlite3.OperationalError("database is locked — max retries atteint")
+
+
+# ---------------------------------------------------------------------------
+# SITG — Skin-in-the-Game : budget dynamique selon la performance
+# ---------------------------------------------------------------------------
+
+def _compute_sitg_budget(portfolio_value: float) -> float:
+    """
+    Budget multiplicateur [0.25, 1.75] basé sur le PnL courant.
+
+    - PnL = 0%   → 1.00x (neutre)
+    - PnL = +100% → 1.75x (maximum, atteint dès qu'on double sa mise)
+    - PnL = -100% → 0.25x (plancher, quasi-faillite)
+
+    Les bonnes performances débloquent plus de capital à déployer ;
+    les pertes le contractent proportionnellement.
+    """
+    pnl_pct = (portfolio_value / STARTING_CAPITAL) - 1.0   # ex. 0.50 = +50 %
+    if pnl_pct >= 0:
+        budget = 1.0 + min(1.0, pnl_pct) * 0.75
+    else:
+        budget = 1.0 + max(-1.0, pnl_pct) * 0.75
+    return round(max(0.25, min(1.75, budget)), 3)
+
+
+# ---------------------------------------------------------------------------
+# Engine
+# ---------------------------------------------------------------------------
 
 class TradingEngine:
     def __init__(self):
@@ -68,8 +152,10 @@ class TradingEngine:
         self._tick_callback = fn
 
     def _init_db(self):
+        """Crée les tables et active WAL mode de façon permanente sur la DB."""
         DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with sqlite3.connect(DB_PATH) as conn:
+        conn = db_connect()
+        try:
             conn.executescript("""
                 CREATE TABLE IF NOT EXISTS trades (
                     id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -90,6 +176,9 @@ class TradingEngine:
                     positions       TEXT    NOT NULL
                 );
             """)
+            conn.commit()
+        finally:
+            conn.close()
 
     def _load_traders(self):
         loaded = []
@@ -111,7 +200,8 @@ class TradingEngine:
     def tick(self, prices: dict):
         self._tick_count += 1
         now = datetime.utcnow().isoformat()
-        with sqlite3.connect(DB_PATH) as conn:
+
+        def _do_tick(conn):
             for trader in self._traders:
                 try:
                     action = trader.decide(prices)
@@ -121,6 +211,10 @@ class TradingEngine:
                     self._save_snapshot(trader, now, conn)
                 except Exception as e:
                     logger.error(f"Trader {trader.id} error: {e}")
+
+        _write_with_retry(_do_tick)
+        self._update_sitg_budgets()
+
         if self._tick_count % 15 == 0:
             self._schedule_liquidity_refresh()
 
@@ -142,6 +236,8 @@ class TradingEngine:
         price = prices[symbol]
 
         if act == "buy":
+            # SITG : ajuste la taille de position selon la performance du trader
+            amount *= trader.sitg_budget
             cost = amount * price
             if cost > trader.portfolio.cash:
                 return
@@ -182,6 +278,15 @@ class TradingEngine:
         )
 
     # ------------------------------------------------------------------
+    # SITG update
+    # ------------------------------------------------------------------
+
+    def _update_sitg_budgets(self):
+        """Recalcule le budget SITG de chaque trader après chaque tick."""
+        for trader in self._traders:
+            trader.sitg_budget = _compute_sitg_budget(trader.portfolio.portfolio_value)
+
+    # ------------------------------------------------------------------
     # Read state (called by Flask)
     # ------------------------------------------------------------------
 
@@ -191,14 +296,15 @@ class TradingEngine:
         for t in self._traders:
             pv = t.portfolio.portfolio_value
             leaderboard.append({
-                "id":       t.id,
-                "name":     t.name,
-                "strategy": t.strategy,
-                "division": self._get_division(t),
-                "value":    round(pv, 2),
-                "pnl":      round(pv - STARTING_CAPITAL, 2),
-                "pnl_pct":  round((pv - STARTING_CAPITAL) / STARTING_CAPITAL * 100, 2),
-                "won":      pv >= TARGET_CAPITAL,
+                "id":          t.id,
+                "name":        t.name,
+                "strategy":    t.strategy,
+                "division":    self._get_division(t),
+                "value":       round(pv, 2),
+                "pnl":         round(pv - STARTING_CAPITAL, 2),
+                "pnl_pct":     round((pv - STARTING_CAPITAL) / STARTING_CAPITAL * 100, 2),
+                "won":         pv >= TARGET_CAPITAL,
+                "sitg_budget": t.sitg_budget,
             })
         leaderboard.sort(key=lambda x: x["value"], reverse=True)
         for rank, entry in enumerate(leaderboard, 1):
@@ -226,8 +332,8 @@ class TradingEngine:
         trader = next((t for t in self._traders if t.id == trader_id), None)
         if trader is None:
             return None
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.row_factory = sqlite3.Row
+        conn = db_connect()
+        try:
             trades = conn.execute(
                 "SELECT * FROM trades WHERE trader_id = ? ORDER BY timestamp DESC LIMIT 100",
                 (trader_id,),
@@ -237,15 +343,18 @@ class TradingEngine:
                 "WHERE trader_id = ? ORDER BY timestamp ASC",
                 (trader_id,),
             ).fetchall()
+        finally:
+            conn.close()
         return {
-            "id":        trader.id,
-            "name":      trader.name,
-            "strategy":  trader.strategy,
-            "cash":      round(trader.portfolio.cash, 2),
-            "positions": trader.portfolio.positions,
-            "value":     round(trader.portfolio.portfolio_value, 2),
-            "trades":    [dict(r) for r in trades],
-            "history":   [dict(r) for r in history],
+            "id":          trader.id,
+            "name":        trader.name,
+            "strategy":    trader.strategy,
+            "cash":        round(trader.portfolio.cash, 2),
+            "positions":   trader.portfolio.positions,
+            "value":       round(trader.portfolio.portfolio_value, 2),
+            "sitg_budget": trader.sitg_budget,
+            "trades":      [dict(r) for r in trades],
+            "history":     [dict(r) for r in history],
         }
 
     def get_battle_info(self) -> dict:
@@ -299,27 +408,26 @@ class TradingEngine:
             count = len(data["traders"])
             avg   = data["total_value"] / count if count else STARTING_CAPITAL
             result.append({
-                "name":        div_name,
-                "icon":        data["icon"],
-                "color":       data["color"],
+                "name":         div_name,
+                "icon":         data["icon"],
+                "color":        data["color"],
                 "trader_count": count,
-                "avg_value":   round(avg, 2),
-                "avg_pnl":     round(avg - STARTING_CAPITAL, 2),
-                "avg_pnl_pct": round((avg - STARTING_CAPITAL) / STARTING_CAPITAL * 100, 2),
-                "wins":        data["wins"],
-                "best_trader": data["best_trader"],
+                "avg_value":    round(avg, 2),
+                "avg_pnl":      round(avg - STARTING_CAPITAL, 2),
+                "avg_pnl_pct":  round((avg - STARTING_CAPITAL) / STARTING_CAPITAL * 100, 2),
+                "wins":         data["wins"],
+                "best_trader":  data["best_trader"],
             })
         return result
 
     def get_weekly_agent(self) -> dict:
-        # Best trader by current value; weekly gain from DB if available
         best = max(self._traders, key=lambda t: t.portfolio.portfolio_value)
-        weekly_gain  = best.portfolio.portfolio_value - STARTING_CAPITAL
-        trade_count  = 0
-        week_num     = date.today().isocalendar()[1]
+        weekly_gain = best.portfolio.portfolio_value - STARTING_CAPITAL
+        trade_count = 0
+        week_num    = date.today().isocalendar()[1]
 
-        with sqlite3.connect(DB_PATH) as conn:
-            conn.row_factory = sqlite3.Row
+        conn = db_connect()
+        try:
             row = conn.execute(
                 "SELECT COUNT(*) as cnt FROM trades WHERE trader_id = ? "
                 "AND timestamp >= date('now', '-7 days')",
@@ -336,6 +444,8 @@ class TradingEngine:
             ).fetchone()
             if oldest:
                 weekly_gain = best.portfolio.portfolio_value - oldest["portfolio_value"]
+        finally:
+            conn.close()
 
         pv = best.portfolio.portfolio_value
         return {
@@ -349,6 +459,7 @@ class TradingEngine:
             "weekly_gain": round(weekly_gain, 2),
             "trade_count": trade_count,
             "week":        week_num,
+            "sitg_budget": best.sitg_budget,
         }
 
     def get_post_market(self) -> dict:
@@ -356,25 +467,25 @@ class TradingEngine:
         leaderboard = state["leaderboard"]
         divisions   = self.get_divisions()
 
-        values      = [t["value"] for t in leaderboard]
-        total_pnl   = sum(t["pnl"] for t in leaderboard)
-        winners     = [t for t in leaderboard if t["won"]]
+        values    = [t["value"] for t in leaderboard]
+        total_pnl = sum(t["pnl"] for t in leaderboard)
+        winners   = [t for t in leaderboard if t["won"]]
 
         divs_ranked = sorted(divisions, key=lambda d: d["avg_pnl_pct"], reverse=True)
 
         return {
-            "battle_day":     state["battle_day"],
-            "top5":           leaderboard[:5],
-            "bottom5":        list(reversed(leaderboard[-5:])),
-            "best_division":  divs_ranked[0]  if divs_ranked else None,
-            "worst_division": divs_ranked[-1] if divs_ranked else None,
+            "battle_day":       state["battle_day"],
+            "top5":             leaderboard[:5],
+            "bottom5":          list(reversed(leaderboard[-5:])),
+            "best_division":    divs_ranked[0]  if divs_ranked else None,
+            "worst_division":   divs_ranked[-1] if divs_ranked else None,
             "divisions_ranked": divs_ranked,
-            "total_pnl":      round(total_pnl, 2),
-            "avg_value":      round(sum(values) / len(values), 2) if values else 0,
-            "max_value":      round(max(values), 2) if values else 0,
-            "min_value":      round(min(values), 2) if values else 0,
-            "winners_count":  len(winners),
-            "timestamp":      datetime.utcnow().isoformat(),
+            "total_pnl":        round(total_pnl, 2),
+            "avg_value":        round(sum(values) / len(values), 2) if values else 0,
+            "max_value":        round(max(values), 2) if values else 0,
+            "min_value":        round(min(values), 2) if values else 0,
+            "winners_count":    len(winners),
+            "timestamp":        datetime.utcnow().isoformat(),
         }
 
     # ------------------------------------------------------------------

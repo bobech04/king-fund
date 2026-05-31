@@ -33,6 +33,7 @@ class BaseTrader:
         self.strategy: str = "Hold"
         self.portfolio: Portfolio = Portfolio(starting_capital)
         self._liq = get_liquidity_client()  # disponible pour tous les traders via self._liq
+        self.sitg_budget: float = 1.0       # Skin-in-the-Game : multiplicateur dynamique [0.25, 1.75]
 
     # ------------------------------------------------------------------
     # Strategy interface — override in subclasses
