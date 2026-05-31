@@ -4,16 +4,23 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from traders.base_trader import BaseTrader
 from strategies import MeanReversionStrategy
+from data.news_client import get_news_client
+from data.alphavantage_client import get_alphavantage_client
 
 
 class Trader(BaseTrader):
+    """Expert Sectoriel Retail — sentiment News + signal Alpha Vantage."""
+
     def __init__(self, trader_id: int, starting_capital: float):
         super().__init__(trader_id, starting_capital)
-        self.name     = "ECHO"
-        self.strategy = "Mean reversion · AMZN"
-        self._symbol  = "AMZN"
-        self._strat   = MeanReversionStrategy(window=15, k=1.5)
-        self._history: list = []
+        self.name          = "ECHO"
+        self.strategy      = "Mean reversion · AMZN + News/AV"
+        self._symbol       = "AMZN"
+        self._strat        = MeanReversionStrategy(window=15, k=1.5)
+        self._history:list = []
+        self._news         = get_news_client()
+        self._av           = get_alphavantage_client()
+        self._query        = "amazon AMZN ecommerce retail AWS"
 
     def decide(self, prices: dict) -> dict:
         price = prices.get(self._symbol, 0.0)
@@ -21,8 +28,9 @@ class Trader(BaseTrader):
             return self._hold()
         self._history.append(price)
         sig = self._strat.signal(self._history)
+        ext = (self._news.get_sentiment(self._query) + self._av.get_price_signal(self._symbol)) / 2.0
         if sig == "buy":
-            return self._buy(self._symbol, 0.5, prices)
+            return self._buy(self._symbol, 0.5, prices) if ext > -0.4 else self._hold()
         if sig == "sell":
-            return self._sell(self._symbol, 1.0)
+            return self._sell(self._symbol, 1.0) if ext < 0.4 else self._hold()
         return self._hold()

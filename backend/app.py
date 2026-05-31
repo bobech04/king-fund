@@ -11,6 +11,7 @@ from flask_sock import Sock
 sys.path.insert(0, str(Path(__file__).parent))
 
 from engine import TradingEngine
+from data.morning_brief import get_morning_brief
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -53,6 +54,29 @@ def get_state():
 @app.route("/api/battle")
 def get_battle():
     return jsonify(engine.get_battle_info())
+
+
+@app.route("/api/divisions")
+def get_divisions():
+    return jsonify(engine.get_divisions())
+
+
+@app.route("/api/brief")
+def get_brief():
+    brief_obj = get_morning_brief()
+    prices    = engine._last_prices or {}
+    brief     = brief_obj.get_brief(prices)
+    return jsonify(brief)
+
+
+@app.route("/api/weekly-agent")
+def get_weekly_agent():
+    return jsonify(engine.get_weekly_agent())
+
+
+@app.route("/api/post-market")
+def get_post_market():
+    return jsonify(engine.get_post_market())
 
 
 @app.route("/api/trader/<int:trader_id>")

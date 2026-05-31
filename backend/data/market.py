@@ -1,12 +1,14 @@
+import sys
 import time
 import logging
+from pathlib import Path
 
 import yfinance as yf
 
-logger = logging.getLogger(__name__)
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import MARKET_CACHE_TTL
 
-# Slightly under TICK_INTERVAL so we never serve stale data two ticks in a row
-_CACHE_TTL = 55.0
+logger = logging.getLogger(__name__)
 
 
 class MarketData:
@@ -27,7 +29,7 @@ class MarketData:
 
     def get_prices(self) -> dict:
         now = time.monotonic()
-        if self._cache and now - self._cache_ts < _CACHE_TTL:
+        if self._cache and now - self._cache_ts < MARKET_CACHE_TTL:
             return self._cache.copy()
         try:
             fresh = self._fetch_prices()

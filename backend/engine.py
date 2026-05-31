@@ -30,6 +30,39 @@ class TradingEngine:
     # Setup
     # ------------------------------------------------------------------
 
+    _DIVISION_COLORS = {
+        "Investissement":   "#ffd700",
+        "Banque Centrale":  "#4488ff",
+        "Expert Tech":      "#00e5a0",
+        "Expert Crypto":    "#b44cff",
+        "Expert Commerce":  "#ff6b35",
+        "Morning Brief":    "#ff4488",
+    }
+    _DIVISION_ICONS = {
+        "Investissement":   "📈",
+        "Banque Centrale":  "🏛️",
+        "Expert Tech":      "💻",
+        "Expert Crypto":    "₿",
+        "Expert Commerce":  "🛒",
+        "Morning Brief":    "🌅",
+    }
+
+    def _get_division(self, trader) -> str:
+        doc = (trader.__class__.__doc__ or "").strip()
+        if "Division Investissement" in doc:
+            return "Investissement"
+        if "Banque Centrale" in doc:
+            return "Banque Centrale"
+        if "Morning Brief" in doc:
+            return "Morning Brief"
+        if "Expert Sectoriel Tech" in doc:
+            return "Expert Tech"
+        if "Expert Sectoriel Crypto" in doc:
+            return "Expert Crypto"
+        if "Expert Sectoriel" in doc:
+            return "Expert Commerce"
+        return "Standard"
+
     def set_tick_callback(self, fn):
         self._tick_callback = fn
 
@@ -150,6 +183,7 @@ class TradingEngine:
                 "id":       t.id,
                 "name":     t.name,
                 "strategy": t.strategy,
+                "division": self._get_division(t),
                 "value":    round(pv, 2),
                 "pnl":      round(pv - STARTING_CAPITAL, 2),
                 "pnl_pct":  round((pv - STARTING_CAPITAL) / STARTING_CAPITAL * 100, 2),
@@ -202,6 +236,122 @@ class TradingEngine:
             "target_capital":   TARGET_CAPITAL,
             "total_traders":    len(self._traders),
             "winners":          len(winners),
+        }
+
+    def get_divisions(self) -> list:
+        DIVISION_ORDER = [
+            "Investissement", "Banque Centrale",
+            "Expert Tech", "Expert Crypto", "Expert Commerce", "Morning Brief",
+        ]
+        division_data: dict = {}
+        for t in self._traders:
+            div = self._get_division(t)
+            pv  = t.portfolio.portfolio_value
+            if div not in division_data:
+                division_data[div] = {
+                    "name":         div,
+                    "icon":         self._DIVISION_ICONS.get(div, "⚡"),
+                    "color":        self._DIVISION_COLORS.get(div, "#888"),
+                    "traders":      [],
+                    "total_value":  0.0,
+                    "wins":         0,
+                    "best_trader":  None,
+                    "best_value":   0.0,
+                }
+            division_data[div]["traders"].append(t.id)
+            division_data[div]["total_value"] += pv
+            if pv >= TARGET_CAPITAL:
+                division_data[div]["wins"] += 1
+            if pv > division_data[div]["best_value"]:
+                division_data[div]["best_value"] = pv
+                division_data[div]["best_trader"] = {
+                    "id": t.id, "name": t.name, "value": round(pv, 2),
+                }
+
+        result = []
+        for div_name in DIVISION_ORDER:
+            if div_name not in division_data:
+                continue
+            data  = division_data[div_name]
+            count = len(data["traders"])
+            avg   = data["total_value"] / count if count else STARTING_CAPITAL
+            result.append({
+                "name":        div_name,
+                "icon":        data["icon"],
+                "color":       data["color"],
+                "trader_count": count,
+                "avg_value":   round(avg, 2),
+                "avg_pnl":     round(avg - STARTING_CAPITAL, 2),
+                "avg_pnl_pct": round((avg - STARTING_CAPITAL) / STARTING_CAPITAL * 100, 2),
+                "wins":        data["wins"],
+                "best_trader": data["best_trader"],
+            })
+        return result
+
+    def get_weekly_agent(self) -> dict:
+        # Best trader by current value; weekly gain from DB if available
+        best = max(self._traders, key=lambda t: t.portfolio.portfolio_value)
+        weekly_gain  = best.portfolio.portfolio_value - STARTING_CAPITAL
+        trade_count  = 0
+        week_num     = date.today().isocalendar()[1]
+
+        with sqlite3.connect(DB_PATH) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT COUNT(*) as cnt FROM trades WHERE trader_id = ? "
+                "AND timestamp >= date('now', '-7 days')",
+                (best.id,),
+            ).fetchone()
+            if row:
+                trade_count = row["cnt"]
+
+            oldest = conn.execute(
+                "SELECT portfolio_value FROM snapshots "
+                "WHERE trader_id = ? AND timestamp >= date('now', '-7 days') "
+                "ORDER BY timestamp ASC LIMIT 1",
+                (best.id,),
+            ).fetchone()
+            if oldest:
+                weekly_gain = best.portfolio.portfolio_value - oldest["portfolio_value"]
+
+        pv = best.portfolio.portfolio_value
+        return {
+            "id":          best.id,
+            "name":        best.name,
+            "strategy":    best.strategy,
+            "division":    self._get_division(best),
+            "value":       round(pv, 2),
+            "pnl":         round(pv - STARTING_CAPITAL, 2),
+            "pnl_pct":     round((pv - STARTING_CAPITAL) / STARTING_CAPITAL * 100, 2),
+            "weekly_gain": round(weekly_gain, 2),
+            "trade_count": trade_count,
+            "week":        week_num,
+        }
+
+    def get_post_market(self) -> dict:
+        state       = self.get_state()
+        leaderboard = state["leaderboard"]
+        divisions   = self.get_divisions()
+
+        values      = [t["value"] for t in leaderboard]
+        total_pnl   = sum(t["pnl"] for t in leaderboard)
+        winners     = [t for t in leaderboard if t["won"]]
+
+        divs_ranked = sorted(divisions, key=lambda d: d["avg_pnl_pct"], reverse=True)
+
+        return {
+            "battle_day":     state["battle_day"],
+            "top5":           leaderboard[:5],
+            "bottom5":        list(reversed(leaderboard[-5:])),
+            "best_division":  divs_ranked[0]  if divs_ranked else None,
+            "worst_division": divs_ranked[-1] if divs_ranked else None,
+            "divisions_ranked": divs_ranked,
+            "total_pnl":      round(total_pnl, 2),
+            "avg_value":      round(sum(values) / len(values), 2) if values else 0,
+            "max_value":      round(max(values), 2) if values else 0,
+            "min_value":      round(min(values), 2) if values else 0,
+            "winners_count":  len(winners),
+            "timestamp":      datetime.utcnow().isoformat(),
         }
 
     # ------------------------------------------------------------------
