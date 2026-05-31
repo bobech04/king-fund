@@ -11,7 +11,7 @@ venv/
 env/
 
 # Database
-database/*.db
+database/
 
 # Logs
 logs/
@@ -19,3 +19,6 @@ logs/
 # IDE
 .vscode/
 .idea/
+
+# Claude Code
+.claude/
