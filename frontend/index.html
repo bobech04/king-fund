@@ -5,16 +5,34 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#0a0a0f" />
   <title>👑 KING FUND</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="assets/style.css" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
+<!-- ── HEADER ────────────────────────────────────────────────── -->
 <header class="header">
-  <div class="logo">👑 KING FUND</div>
-  <div class="battle-day" id="battle-day">J— / 30</div>
+  <div class="header-left">
+    <div class="logo">👑 KING FUND</div>
+    <div class="battle-day" id="battle-day">J— / 30</div>
+    <div class="live-pill" id="live-pill">
+      <span class="live-dot"></span>LIVE
+    </div>
+  </div>
+  <div class="header-right">
+    <div class="header-clock" id="header-clock"></div>
+    <button class="bell-btn" id="bell-btn" title="Alertes">
+      🔔<span class="bell-badge hidden" id="bell-badge">0</span>
+    </button>
+    <div class="ws-dot" id="ws-dot"></div>
+    <div class="update-time" id="update-time">—</div>
+  </div>
 </header>
 
+<!-- ── STATS BAR ─────────────────────────────────────────────── -->
 <div class="stats-bar">
   <div class="stat">
     <div class="stat-label">MISE</div>
@@ -26,19 +44,85 @@
   </div>
   <div class="stat">
     <div class="stat-label">WINNERS</div>
-    <div class="stat-value" id="winners-count">0</div>
+    <div class="stat-value gold" id="winners-count">0</div>
   </div>
   <div class="stat">
-    <div class="stat-label">MAJ</div>
-    <div class="stat-value muted" id="update-time">—</div>
+    <div class="stat-label">TOP</div>
+    <div class="stat-value green" id="top-value">—</div>
   </div>
 </div>
 
+<!-- ── TICKER TAPE ─────────────────────────────────────────────── -->
+<div class="ticker-bar">
+  <span class="ticker-label">MOVERS</span>
+  <div class="ticker-wrap">
+    <div class="ticker-inner" id="ticker-inner">
+      <span class="ticker-loading">· · ·</span>
+    </div>
+  </div>
+</div>
+
+<!-- ── OFFLINE BANNER ────────────────────────────────────────── -->
 <div class="banner hidden" id="banner">⚠ WebSocket déconnecté — mode polling</div>
 
-<main id="leaderboard"></main>
+<!-- ── TAB BAR ───────────────────────────────────────────────── -->
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="classement">🏆 Classement</button>
+  <button class="tab-btn" data-tab="divisions">🏛 Divisions</button>
+  <button class="tab-btn" data-tab="brief">🌅 Morning Brief</button>
+  <button class="tab-btn" data-tab="postmarket">📊 Post-Market</button>
+  <button class="tab-btn" data-tab="diplome">🎓 Diplôme</button>
+</nav>
 
-<!-- Trader detail modal -->
+<!-- ── MAIN ──────────────────────────────────────────────────── -->
+<main>
+
+  <!-- TAB : CLASSEMENT ──────────────────────────────────────── -->
+  <div class="tab-pane" id="tab-classement">
+    <div class="filter-bar hidden" id="filter-bar">
+      <div class="filter-badge" id="filter-badge"></div>
+      <button class="filter-clear" id="filter-clear">✕ Effacer</button>
+    </div>
+    <div id="leaderboard"></div>
+  </div>
+
+  <!-- TAB : DIVISIONS ───────────────────────────────────────── -->
+  <div class="tab-pane hidden" id="tab-divisions">
+    <div class="div-perf-wrap">
+      <div class="div-perf-label">PERFORMANCE DES DIVISIONS</div>
+      <div class="div-perf-chart">
+        <canvas id="div-chart"></canvas>
+      </div>
+    </div>
+    <div class="divisions-grid" id="divisions-grid">
+      <div class="loading-state" style="grid-column:1/-1">Chargement des divisions</div>
+    </div>
+  </div>
+
+  <!-- TAB : MORNING BRIEF ───────────────────────────────────── -->
+  <div class="tab-pane hidden" id="tab-brief">
+    <div id="brief-wrap">
+      <div class="loading-state">Chargement du Morning Brief</div>
+    </div>
+  </div>
+
+  <!-- TAB : POST-MARKET ─────────────────────────────────────── -->
+  <div class="tab-pane hidden" id="tab-postmarket">
+    <div id="postmarket-wrap">
+      <div class="loading-state">Chargement de la revue post-marché</div>
+    </div>
+  </div>
+
+  <!-- TAB : DIPLÔME ─────────────────────────────────────────── -->
+  <div class="tab-pane hidden" id="tab-diplome">
+    <div id="diplome-wrap">
+      <div class="loading-state">Chargement du diplôme</div>
+    </div>
+  </div>
+
+</main>
+
+<!-- ── TRADER DETAIL MODAL ───────────────────────────────────── -->
 <div class="overlay hidden" id="overlay">
   <div class="modal" id="modal">
 
@@ -50,6 +134,8 @@
       </div>
       <div class="modal-rank-badge" id="modal-rank-badge"></div>
     </div>
+
+    <div class="modal-div-row" id="modal-div-row"></div>
 
     <div class="modal-kpi">
       <div class="kpi-block">
@@ -92,6 +178,18 @@
 
   </div>
 </div>
+
+<!-- ── NOTIFICATION HISTORY PANEL ─────────────────────────────── -->
+<div class="notif-panel" id="notif-panel">
+  <div class="notif-panel-header">
+    <span>ALERTES</span>
+    <button class="notif-clear-btn" id="notif-clear-btn">Tout effacer</button>
+  </div>
+  <div id="notif-list"><div class="notif-empty">Aucune alerte</div></div>
+</div>
+
+<!-- ── TOAST NOTIFICATIONS ────────────────────────────────────── -->
+<div id="toast-container" aria-live="polite" aria-atomic="false"></div>
 
 <script src="app.js"></script>
 </body>
