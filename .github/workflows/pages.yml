@@ -1,0 +1,33 @@
+name: Deploy GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+      - "docs/config.js"
+
+permissions:
+  contents: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sync frontend → docs
+        run: python scripts/build_pages.py
+
+      - name: Inject API URL (optionnel — configure KING_API_URL dans les Secrets)
+        if: ${{ vars.KING_API_URL != '' }}
+        run: |
+          sed -i "s|window.KING_API = null|window.KING_API = '${{ vars.KING_API_URL }}'|" docs/config.js
+
+      - name: Commit docs
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/
+          git diff --staged --quiet || git commit -m "chore: sync frontend → docs [skip ci]"
+          git push

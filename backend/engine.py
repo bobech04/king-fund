@@ -23,6 +23,7 @@ class TradingEngine:
         self._tick_callback = None
         self._last_prices: dict = {}
         self._traders = []
+        self._tick_count = 0
         self._init_db()
         self._load_traders()
 
@@ -108,6 +109,7 @@ class TradingEngine:
     # ------------------------------------------------------------------
 
     def tick(self, prices: dict):
+        self._tick_count += 1
         now = datetime.utcnow().isoformat()
         with sqlite3.connect(DB_PATH) as conn:
             for trader in self._traders:
@@ -119,6 +121,15 @@ class TradingEngine:
                     self._save_snapshot(trader, now, conn)
                 except Exception as e:
                     logger.error(f"Trader {trader.id} error: {e}")
+        if self._tick_count % 15 == 0:
+            self._schedule_liquidity_refresh()
+
+    def _schedule_liquidity_refresh(self):
+        try:
+            from divisions.middle_office import get_liquidity_desk
+            get_liquidity_desk().trigger_background_refresh()
+        except Exception as e:
+            logger.debug(f"Liquidity refresh skipped: {e}")
 
     def _execute_trade(self, trader, action: dict, prices: dict, timestamp: str, conn):
         symbol = action.get("symbol")
@@ -192,11 +203,23 @@ class TradingEngine:
         leaderboard.sort(key=lambda x: x["value"], reverse=True)
         for rank, entry in enumerate(leaderboard, 1):
             entry["rank"] = rank
+        liq_score  = None
+        liq_regime = None
+        try:
+            from divisions.middle_office import get_liquidity_desk
+            desk       = get_liquidity_desk()
+            liq_score  = desk.get_score()
+            liq_regime = desk.get_regime()
+        except Exception:
+            pass
+
         return {
-            "battle_day": min(battle_day, BATTLE_DAYS),
-            "target":     TARGET_CAPITAL,
-            "leaderboard": leaderboard,
-            "timestamp":  datetime.utcnow().isoformat(),
+            "battle_day":       min(battle_day, BATTLE_DAYS),
+            "target":           TARGET_CAPITAL,
+            "leaderboard":      leaderboard,
+            "timestamp":        datetime.utcnow().isoformat(),
+            "liquidity_score":  liq_score,
+            "liquidity_regime": liq_regime,
         }
 
     def get_trader(self, trader_id: int):

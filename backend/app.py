@@ -69,6 +69,29 @@ def get_brief():
     return jsonify(brief)
 
 
+@app.route("/api/liquidite")
+def get_liquidite():
+    from divisions.middle_office import get_liquidity_desk
+    desk = get_liquidity_desk()
+    data = desk.get_data()
+    return jsonify({
+        "global_liquidity_score": data.get("global_liquidity_score"),
+        "regime":                 data.get("regime"),
+        "agent_scores":           data.get("agent_scores", {}),
+        "agent_summaries":        data.get("agent_summaries", {}),
+        "alerts":                 data.get("alerts", []),
+        "errors":                 data.get("errors", []),
+        "timestamp":              data.get("timestamp"),
+    })
+
+
+@app.route("/api/liquidite/refresh", methods=["POST"])
+def trigger_liquidite_refresh():
+    from divisions.middle_office import get_liquidity_desk
+    get_liquidity_desk().trigger_background_refresh()
+    return jsonify({"status": "refresh triggered"})
+
+
 @app.route("/api/weekly-agent")
 def get_weekly_agent():
     return jsonify(engine.get_weekly_agent())
@@ -77,6 +100,13 @@ def get_weekly_agent():
 @app.route("/api/post-market")
 def get_post_market():
     return jsonify(engine.get_post_market())
+
+
+@app.route("/api/maintenance/health")
+def get_maintenance_health():
+    from maintenance import get_health as _health
+    from config import DB_PATH
+    return jsonify(_health(engine, DB_PATH, len(_ws_queues)))
 
 
 @app.route("/api/trader/<int:trader_id>")

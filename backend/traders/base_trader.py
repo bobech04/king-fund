@@ -4,6 +4,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from models.portfolio import Portfolio
+from data.liquidity_client import get_liquidity_client
 
 
 class BaseTrader:
@@ -31,6 +32,7 @@ class BaseTrader:
         self.name: str = f"Trader {trader_id:02d}"
         self.strategy: str = "Hold"
         self.portfolio: Portfolio = Portfolio(starting_capital)
+        self._liq = get_liquidity_client()  # disponible pour tous les traders via self._liq
 
     # ------------------------------------------------------------------
     # Strategy interface — override in subclasses

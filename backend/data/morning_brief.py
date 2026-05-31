@@ -48,13 +48,32 @@ You are a concise sell-side analyst. Today is {date}.
 
 Current market prices (USD):
 {prices_block}
-
+{liquidity_block}
 Generate an intraday market outlook as valid JSON only (no markdown fences):
 {{
   "direction": "bullish" | "bearish" | "neutral",
-  "confidence": 0.0–1.0,
+  "confidence": 0.0-1.0,
   "summary": "<one sentence>"
 }}"""
+
+
+def _get_liquidity_block() -> str:
+    """Retourne le contexte de liquidite si disponible, chaine vide sinon."""
+    try:
+        from divisions.middle_office import get_liquidity_desk
+        desk = get_liquidity_desk()
+        data = desk.get_data_cached_only()
+        if data is None:
+            return ""
+        score = data.get("global_liquidity_score")
+        regime = data.get("regime", "?")
+        summaries = data.get("agent_scores", {})
+        lines = [f"Liquidity conditions (score: {score}/10 — regime: {regime}):"]
+        for agent, s in summaries.items():
+            lines.append(f"  {agent}: {s}/10")
+        return "\n".join(lines) + "\n"
+    except Exception:
+        return ""
 
 
 class MorningBrief:
@@ -81,7 +100,11 @@ class MorningBrief:
         prices_block = "\n".join(
             f"  {sym}: {price:.4f}" for sym, price in sorted(prices.items())
         )
-        prompt = _PROMPT.format(date=date.today().isoformat(), prices_block=prices_block)
+        prompt = _PROMPT.format(
+            date=date.today().isoformat(),
+            prices_block=prices_block,
+            liquidity_block=_get_liquidity_block(),
+        )
         try:
             msg = self._client.messages.create(
                 model="claude-haiku-4-5-20251001",
