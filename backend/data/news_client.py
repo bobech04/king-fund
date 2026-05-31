@@ -11,8 +11,9 @@ from config import NEWS_API_KEY
 
 logger = logging.getLogger(__name__)
 
-_BASE = "https://newsapi.org/v2/everything"
-_TTL  = 3_600   # 1 h
+_BASE         = "https://newsapi.org/v2/everything"
+_TTL          = 4 * 3600   # 4 heures
+_MAX_REQ_HOUR = 10          # plan gratuit NewsAPI
 
 _POSITIVE = frozenset([
     "surge", "rally", "gain", "rise", "jump", "beat", "record", "high",
@@ -36,6 +37,32 @@ def _score(texts: list[str]) -> float:
     return 0.0 if total == 0 else (pos - neg) / total
 
 
+class _RateLimiter:
+    """Fenêtre glissante : max N requêtes par heure."""
+
+    def __init__(self, max_per_hour: int):
+        self._max  = max_per_hour
+        self._lock = threading.Lock()
+        self._timestamps: list[float] = []
+
+    def allow(self) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            cutoff = now - 3600
+            self._timestamps = [t for t in self._timestamps if t > cutoff]
+            if len(self._timestamps) < self._max:
+                self._timestamps.append(now)
+                return True
+            remaining = 3600 - (now - self._timestamps[0])
+            logger.warning(
+                "NewsAPI rate limit (10 req/h) atteint — quota disponible dans %.0fs", remaining
+            )
+            return False
+
+
+_rate_limiter = _RateLimiter(_MAX_REQ_HOUR)
+
+
 class NewsClient:
     def __init__(self):
         self._lock     = threading.Lock()
@@ -44,6 +71,8 @@ class NewsClient:
 
     def _fetch(self, query: str) -> list[str]:
         if not NEWS_API_KEY:
+            return []
+        if not _rate_limiter.allow():
             return []
         try:
             r = requests.get(
@@ -68,10 +97,7 @@ class NewsClient:
             return []
 
     def get_sentiment(self, query: str) -> float:
-        """
-        Score in [-1.0, +1.0] for a news query.
-        0.0 on error or missing key.
-        """
+        """Score in [-1.0, +1.0] for a news query. 0.0 on error or missing key."""
         now = time.monotonic()
         with self._lock:
             if query in self._cache and now - self._cache_ts[query] < _TTL:
