@@ -405,7 +405,7 @@ function updateDivisionChart() {
 
   const maxLen   = Math.max(...Array.from(divisionHistory.values()).map(a => a.length));
   const labels   = Array.from({ length: maxLen }, (_, i) => i + 1);
-  const datasets = Array.from(divisionHistory.entries()).map(([div, values]) => {
+  const datasets = Array.from(divisionHistory.entries()).filter(([div]) => div !== 'Morning Brief').map(([div, values]) => {
     const color = divColor(div);
     return {
       label: div,
@@ -471,7 +471,7 @@ async function loadDivisions(silent = false) {
 }
 
 function renderDivisions(divs) {
-  qs('#divisions-grid').innerHTML = divs.map(d => {
+  qs('#divisions-grid').innerHTML = divs.filter(d => d.name !== 'Morning Brief').map(d => {
     const dc       = d.color || divColor(d.name);
     const ic       = d.icon  || divIcon(d.name);
     const pnlSign  = d.avg_pnl >= 0 ? '+' : '';
