@@ -5,6 +5,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from models.portfolio import Portfolio
 from data.liquidity_client import get_liquidity_client
+from data.expert_signal_client import get_expert_signal_client
 
 
 class BaseTrader:
@@ -25,6 +26,10 @@ class BaseTrader:
     - "buy"  → rejected if cost > portfolio.cash
     - "sell" → capped at quantity actually held
     - Any unknown action is treated as "hold"
+
+    Available signal helpers:
+    - self._liq.liquidity_bias()          → global liquidity [-1, +1]
+    - self._experts.get_signal(symbol)    → expert consensus [-1, +1]
     """
 
     def __init__(self, trader_id: int, starting_capital: float):
@@ -32,8 +37,9 @@ class BaseTrader:
         self.name: str = f"Trader {trader_id:02d}"
         self.strategy: str = "Hold"
         self.portfolio: Portfolio = Portfolio(starting_capital)
-        self._liq = get_liquidity_client()  # disponible pour tous les traders via self._liq
-        self.sitg_budget: float = 1.0       # Skin-in-the-Game : multiplicateur dynamique [0.25, 1.75]
+        self._liq     = get_liquidity_client()       # global liquidity regime
+        self._experts = get_expert_signal_client()   # sectoral + CB expert signals
+        self.sitg_budget: float = 1.0                # Skin-in-the-Game : multiplicateur dynamique [0.25, 1.75]
 
     # ------------------------------------------------------------------
     # Strategy interface — override in subclasses

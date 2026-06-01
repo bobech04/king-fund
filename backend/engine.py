@@ -106,8 +106,11 @@ class TradingEngine:
         self._running = False
         self._tick_callback = None
         self._last_prices: dict = {}
+        self._prev_tick_prices: dict = {}   # used to skip decide() on stale prices
         self._traders = []
         self._tick_count = 0
+        from data.expert_signal_client import get_expert_signal_client
+        self._expert_signals = get_expert_signal_client()
         self._init_db()
         self._load_traders()
 
@@ -192,6 +195,36 @@ class TradingEngine:
             loaded.append(trader)
         self._traders = loaded
         logger.info(f"Loaded {len(self._traders)} traders")
+        self._preload_histories()
+
+    def _preload_histories(self):
+        """Preload each trader's price history with real market data at startup.
+
+        This ensures strategies can generate signals from the very first tick
+        instead of waiting for N warmup ticks to fill their history windows.
+        Also prevents the 'flat history' problem that occurs when the engine
+        starts during off-market hours and stale prices fill the history.
+        """
+        from data.market import MarketData
+        market = MarketData(SYMBOLS)
+
+        # One fetch per unique symbol — at most 10 calls
+        histories: dict = {}
+        for sym in SYMBOLS:
+            hist = market.get_history(sym, period="5d", interval="1m")
+            if hist:
+                histories[sym] = hist
+                logger.info("Preloaded %d price points for %s", len(hist), sym)
+            else:
+                logger.warning("Could not preload history for %s", sym)
+
+        assigned = 0
+        for trader in self._traders:
+            sym = getattr(trader, "_symbol", None)
+            if sym and sym in histories and hasattr(trader, "_history"):
+                trader._history = list(histories[sym])
+                assigned += 1
+        logger.info("Preloaded histories for %d/%d traders", assigned, len(self._traders))
 
     # ------------------------------------------------------------------
     # Tick
@@ -200,19 +233,34 @@ class TradingEngine:
     def tick(self, prices: dict):
         self._tick_count += 1
         now = datetime.utcnow().isoformat()
+        prev = self._prev_tick_prices   # snapshot of previous tick's prices
 
         def _do_tick(conn):
             for trader in self._traders:
                 try:
-                    action = trader.decide(prices)
-                    if action and action.get("action") != "hold":
-                        self._execute_trade(trader, action, prices, now, conn)
+                    sym = getattr(trader, "_symbol", None)
+                    # Skip decide() when price hasn't changed since last tick.
+                    # This prevents stale off-market prices from polluting the
+                    # strategy history and causing perpetual "hold" signals.
+                    price_unchanged = bool(
+                        sym and prev and prices.get(sym) == prev.get(sym)
+                    )
+                    if not price_unchanged:
+                        action = trader.decide(prices)
+                        # Apply expert signal influence (sectoral experts + CBs)
+                        expert_sig = self._expert_signals.get_signal(sym)
+                        action = self._apply_expert_influence(
+                            trader, action, expert_sig, prices
+                        )
+                        if action and action.get("action") != "hold":
+                            self._execute_trade(trader, action, prices, now, conn)
                     trader.portfolio.portfolio_value = trader.portfolio.value(prices)
                     self._save_snapshot(trader, now, conn)
                 except Exception as e:
                     logger.error(f"Trader {trader.id} error: {e}")
 
         _write_with_retry(_do_tick)
+        self._prev_tick_prices = dict(prices)   # becomes "prev" on next tick
         self._update_sitg_budgets()
 
         if self._tick_count % 15 == 0:
@@ -224,6 +272,87 @@ class TradingEngine:
             get_liquidity_desk().trigger_background_refresh()
         except Exception as e:
             logger.debug(f"Liquidity refresh skipped: {e}")
+
+    # ------------------------------------------------------------------
+    # Expert signal influence
+    # ------------------------------------------------------------------
+
+    def _apply_expert_influence(
+        self, trader, action: dict, expert_sig: float, prices: dict
+    ) -> dict:
+        """
+        Modulates a trader's raw decide() output using aggregated expert signals
+        from sectoral desk agents (Yahoo_Equity, CoinGecko_Market, FRED_*) and
+        central bank RSS sentiments (FED, BCE …).
+
+        expert_sig in [-1.0, +1.0]:
+          +1.0  all experts strongly bullish
+          -1.0  all experts strongly bearish
+           0.0  neutral / data not yet available
+
+        Behaviour table:
+          HOLD + sig ≥ +0.70, no position, cash ≥ 20€  → open 10% long
+          HOLD + sig ≤ -0.70, has position               → partial 20% exit
+          BUY  + sig ≤ -0.55                             → blocked
+          SELL + sig ≥ +0.55                             → blocked
+          BUY/SELL + |sig| > 0.20                        → size scaled ±20% max
+        """
+        act = action.get("action", "hold")
+        sym = getattr(trader, "_symbol", None)
+
+        if abs(expert_sig) < 0.20:
+            return action   # signal too weak — no influence
+
+        # ---- Expert override on HOLD -----------------------------------------
+        if act == "hold" and sym:
+            held = trader.portfolio.positions.get(sym, 0.0)
+
+            if expert_sig >= 0.70 and held == 0.0 and trader.portfolio.cash >= 20.0:
+                new_action = trader._buy(sym, 0.10, prices)
+                if new_action.get("amount", 0) > 0:
+                    logger.info(
+                        "Expert +%.2f → open position TRD%02d %s (10%%)",
+                        expert_sig, trader.id, sym,
+                    )
+                    return new_action
+
+            elif expert_sig <= -0.70 and held > 0.0:
+                new_action = trader._sell(sym, 0.20)
+                if new_action.get("amount", 0) > 0:
+                    logger.info(
+                        "Expert %.2f → partial exit TRD%02d %s (20%%)",
+                        expert_sig, trader.id, sym,
+                    )
+                    return new_action
+
+            return action
+
+        # ---- Scale or block existing BUY / SELL ------------------------------
+        action = dict(action)   # shallow copy — never mutate caller's dict
+
+        if act == "buy":
+            if expert_sig <= -0.55:
+                logger.info(
+                    "Expert %.2f blocks BUY TRD%02d %s",
+                    expert_sig, trader.id, sym or "?",
+                )
+                return {"action": "hold", "symbol": "", "amount": 0}
+            # scale: +1.0 → ×1.20,  0.0 → ×1.00,  -0.55 → ×0.89
+            scale = 1.0 + expert_sig * 0.20
+            action["amount"] = action["amount"] * max(0.50, min(1.50, scale))
+
+        elif act == "sell":
+            if expert_sig >= 0.55:
+                logger.info(
+                    "Expert %.2f blocks SELL TRD%02d %s",
+                    expert_sig, trader.id, sym or "?",
+                )
+                return {"action": "hold", "symbol": "", "amount": 0}
+            # scale: -1.0 → ×1.20,  0.0 → ×1.00,  +0.55 → ×0.89
+            scale = 1.0 - expert_sig * 0.20
+            action["amount"] = action["amount"] * max(0.50, min(1.50, scale))
+
+        return action
 
     def _execute_trade(self, trader, action: dict, prices: dict, timestamp: str, conn):
         symbol = action.get("symbol")
@@ -261,6 +390,10 @@ class TradingEngine:
             "(trader_id, timestamp, symbol, action, amount, price, portfolio_value) "
             "VALUES (?, ?, ?, ?, ?, ?, ?)",
             (trader.id, timestamp, symbol, act, amount, price, pv),
+        )
+        logger.info(
+            "TRADE TRD%02d %s %s %.6f @ %.4f → PV=%.2f",
+            trader.id, act.upper(), symbol, amount, price, pv,
         )
 
     def _save_snapshot(self, trader, timestamp: str, conn):
