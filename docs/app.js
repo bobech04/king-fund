@@ -317,6 +317,23 @@ function sitgLabel(budget) {
   return `${arrow} ×${budget.toFixed(2)}`;
 }
 
+const GRADE_META = {
+  'RECRUE':  { cls: 'grade-recrue',  icon: '⚔️' },
+  'JUNIOR':  { cls: 'grade-junior',  icon: '🔰' },
+  'SENIOR':  { cls: 'grade-senior',  icon: '⭐' },
+  'ELITE':   { cls: 'grade-elite',   icon: '💎' },
+  'LÉGENDE': { cls: 'grade-legende', icon: '👑' },
+};
+
+function gradeClass(grade) {
+  return GRADE_META[grade]?.cls || 'grade-recrue';
+}
+
+function gradeLabel(grade) {
+  const m = GRADE_META[grade];
+  return m ? `${m.icon} ${grade}` : grade || 'RECRUE';
+}
+
 function cardHTML(t) {
   const pp       = pct(t.value);
   const sign     = t.pnl >= 0 ? '+' : '';
@@ -327,6 +344,7 @@ function cardHTML(t) {
   const spkColor = t.pnl >= 0 ? '#00e5a0' : '#ff4466';
   const spkSvg   = makeSvgSparkline(spkArr, spkColor);
   const sitg     = t.sitg_budget ?? 1.0;
+  const grade    = t.grade || 'RECRUE';
 
   return `
     <div class="card-top">
@@ -345,6 +363,7 @@ function cardHTML(t) {
         ${spkSvg ? `<div class="card-sparkline">${spkSvg}</div>` : ''}
         <div class="card-value">€${fmt(t.value, 0)}</div>
         <div class="card-pnl ${pnlCls}">${sign}€${fmt(Math.abs(t.pnl), 0)} (${sign}${t.pnl_pct}%)</div>
+        <div class="grade-pill ${gradeClass(grade)}">${gradeLabel(grade)}</div>
         <div class="sitg-pill ${sitgClass(sitg)}">${sitgLabel(sitg)}</div>
       </div>
     </div>
@@ -799,9 +818,12 @@ function renderModal(data) {
   qs('#modal-pnl').innerHTML =
     `<span class="${cls}">${sign}€${fmt(Math.abs(pnl), 2)} (${sign}${((pnl / START) * 100).toFixed(2)}%)</span>`;
 
-  const sitg = data.sitg_budget ?? ts?.sitg_budget ?? 1.0;
+  const sitg  = data.sitg_budget ?? ts?.sitg_budget ?? 1.0;
+  const grade = data.grade ?? ts?.grade ?? 'RECRUE';
   qs('#modal-sitg-value').innerHTML =
     `<span class="${sitgClass(sitg)}">${sitgLabel(sitg)}</span>`;
+  qs('#modal-grade-value').innerHTML =
+    `<span class="${gradeClass(grade)}">${gradeLabel(grade)}</span>`;
 
   const pp   = pct(data.value);
   const fill = qs('#modal-progress');

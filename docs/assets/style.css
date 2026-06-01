@@ -301,6 +301,20 @@ body {
   margin-top: 2px;
 }
 
+/* ── Grade badge ───────────────────────────────────────────────── */
+.grade-pill {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin-top: 2px;
+  font-family: var(--font-mono);
+}
+.grade-recrue  { color: #aaa; }
+.grade-junior  { color: #4fc3f7; }
+.grade-senior  { color: #00e5a0; }
+.grade-elite   { color: #b44cff; }
+.grade-legende { color: #ffd700; }
+
 /* ── SITG Budget badge ─────────────────────────────────────────── */
 .sitg-pill {
   font-size: 0.60rem;

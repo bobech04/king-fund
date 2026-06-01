@@ -6,6 +6,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from models.portfolio import Portfolio
 from data.liquidity_client import get_liquidity_client
 from data.expert_signal_client import get_expert_signal_client
+from config import get_grade, get_grade_fraction
 
 
 class BaseTrader:
@@ -30,6 +31,8 @@ class BaseTrader:
     Available signal helpers:
     - self._liq.liquidity_bias()          → global liquidity [-1, +1]
     - self._experts.get_signal(symbol)    → expert consensus [-1, +1]
+    - self.grade                          → current performance tier (str)
+    - self.base_fraction                  → recommended trade size fraction for this grade
     """
 
     def __init__(self, trader_id: int, starting_capital: float):
@@ -37,9 +40,22 @@ class BaseTrader:
         self.name: str = f"Trader {trader_id:02d}"
         self.strategy: str = "Hold"
         self.portfolio: Portfolio = Portfolio(starting_capital)
+        self._starting_capital: float = starting_capital
         self._liq     = get_liquidity_client()       # global liquidity regime
         self._experts = get_expert_signal_client()   # sectoral + CB expert signals
         self.sitg_budget: float = 1.0                # Skin-in-the-Game : multiplicateur dynamique [0.25, 1.75]
+
+    @property
+    def grade(self) -> str:
+        """Current performance tier: RECRUE → JUNIOR → SENIOR → ELITE → LÉGENDE."""
+        pnl_pct = (self.portfolio.portfolio_value / self._starting_capital - 1.0) * 100
+        return get_grade(pnl_pct)
+
+    @property
+    def base_fraction(self) -> float:
+        """Recommended fraction of available cash to deploy per trade for this grade."""
+        pnl_pct = (self.portfolio.portfolio_value / self._starting_capital - 1.0) * 100
+        return get_grade_fraction(pnl_pct)
 
     # ------------------------------------------------------------------
     # Strategy interface — override in subclasses

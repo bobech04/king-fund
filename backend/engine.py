@@ -308,11 +308,12 @@ class TradingEngine:
             held = trader.portfolio.positions.get(sym, 0.0)
 
             if expert_sig >= 0.70 and held == 0.0 and trader.portfolio.cash >= 20.0:
-                new_action = trader._buy(sym, 0.10, prices)
+                frac = trader.base_fraction
+                new_action = trader._buy(sym, frac, prices)
                 if new_action.get("amount", 0) > 0:
                     logger.info(
-                        "Expert +%.2f → open position TRD%02d %s (10%%)",
-                        expert_sig, trader.id, sym,
+                        "Expert +%.2f → open position TRD%02d %s (%.0f%% — grade %s)",
+                        expert_sig, trader.id, sym, frac * 100, trader.grade,
                     )
                     return new_action
 
@@ -438,6 +439,7 @@ class TradingEngine:
                 "pnl_pct":     round((pv - STARTING_CAPITAL) / STARTING_CAPITAL * 100, 2),
                 "won":         pv >= TARGET_CAPITAL,
                 "sitg_budget": t.sitg_budget,
+                "grade":       t.grade,
             })
         leaderboard.sort(key=lambda x: x["value"], reverse=True)
         for rank, entry in enumerate(leaderboard, 1):
