@@ -34,6 +34,39 @@ king-fund/
 └── logs/                    # Per-trader daily logs
 ```
 
+## Profil académique BAC+6 — Injection dans tous les appels Claude API
+
+Le fichier `backend/agents/formation.py` définit le profil académique du gestionnaire de portefeuille.
+Ce profil est **injecté automatiquement en tête de chaque system prompt** Claude via `enrichir_systeme()`.
+
+### Formation (BAC+6)
+| Diplôme | Compétences clés |
+|---|---|
+| Master Finance de Marché | Valorisation, dérivés, obligataire, structuration, marchés actions/taux |
+| Master Mathématiques Appliquées – Statistiques Quantitatives | Stochastique, Itô, Monte Carlo, VaR, CVaR, backtesting |
+| Master Économie Géopolitique & Macro | Cycles éco, politique monétaire comparée, risques géopolitiques, marchés émergents |
+| Droit Financier MiFID II & AMF | Best execution, transparency, reporting réglementaire, protection investisseurs |
+| CFA Level 3 | Portfolio management, allocation d'actifs, risk management, éthique CFA Institute |
+| Anglais Financier (C1/C2) | Terminologie financière internationale, rédaction rapports institutionnels |
+
+### Usage
+```python
+from agents.formation import enrichir_systeme
+
+prompt_systeme = enrichir_systeme("Tu es le CIO d'un fonds institutionnel...")
+```
+
+### Fichiers qui injectent le profil
+- `backend/divisions/sources/anthropic_reports.py` — Morning Brief + Post-Market (sources)
+- `backend/divisions/back_office/post_market_review.py` — Post-Market Review 18:00
+- `backend/divisions/middle_office/risk_committee.py` — Risk Committee vendredi 19:00
+
+### Règle de développement
+Tout nouveau fichier ajoutant un appel `client.messages.create()` **doit** utiliser
+`enrichir_systeme()` sur le `system=` prompt. Ne jamais passer un system prompt brut.
+
+---
+
 ## Key Design Rules
 
 - **One battle session = 30 days, 30 traders, 500€ start, 10 000€ target.**
