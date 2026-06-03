@@ -3,6 +3,7 @@ import queue
 import threading
 import logging
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from flask import Flask, jsonify
@@ -102,6 +103,32 @@ def get_weekly_agent():
 @app.route("/api/post-market")
 def get_post_market():
     return jsonify(engine.get_post_market())
+
+
+@app.route("/api/investissement/watchlist")
+def get_investissement_watchlist():
+    from divisions.investissement.watchlist import get_watchlist_manager
+    force = False
+    try:
+        mgr     = get_watchlist_manager()
+        results = mgr.analyser_watchlist(force=force)
+        return jsonify({"timestamp": datetime.utcnow().isoformat(), "watchlist": results})
+    except Exception as e:
+        logger.error("investissement watchlist: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/investissement/theses")
+def get_investissement_theses():
+    from divisions.investissement.watchlist import get_watchlist_manager
+    from divisions.investissement.these import get_these_manager
+    try:
+        watchlist = get_watchlist_manager().analyser_watchlist(force=False)
+        theses    = get_these_manager().generer_theses(watchlist)
+        return jsonify({"timestamp": datetime.utcnow().isoformat(), "theses": theses})
+    except Exception as e:
+        logger.error("investissement theses: %s", e)
+        return jsonify({"erreur": str(e)}), 500
 
 
 @app.route("/api/maintenance/health")

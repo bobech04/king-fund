@@ -36,8 +36,9 @@ let divisionsData    = null;
 let divisionsLoaded  = false;
 let briefLoaded      = false;
 let postmarketLoaded = false;
-let diplomeLoaded    = false;
-let liquiditeLoaded  = false;
+let diplomeLoaded           = false;
+let investissementLoaded    = false;
+let liquiditeLoaded         = false;
 let _liqRefreshing   = false;
 
 // ── Change detection state ────────────────────────────────────────
@@ -257,6 +258,7 @@ function switchTab(tab) {
   if (tab === 'brief')               loadBrief();
   if (tab === 'postmarket')          loadPostMarket();
   if (tab === 'diplome')             loadDiplome();
+  if (tab === 'investissement')      loadInvestissement();
   if (tab === 'liquidite')           loadLiquidite();
 }
 
@@ -1010,6 +1012,119 @@ function toggleNotifPanel() {
     updateBellBadge();
     renderNotifList();
   }
+}
+
+// ── Investissement tab ────────────────────────────────────────────
+async function loadInvestissement(silent = false) {
+  if (investissementLoaded && !silent) return;
+  const wrap = qs('#investissement-wrap');
+  wrap.innerHTML = '<div class="loading-state">Analyse pipeline 17 étapes en cours…</div>';
+  try {
+    const [wlRes, thRes] = await Promise.allSettled([
+      fetch(`${API}/investissement/watchlist`).then(r => r.json()),
+      fetch(`${API}/investissement/theses`).then(r => r.json()),
+    ]);
+    const watchlist = wlRes.status === 'fulfilled' ? (wlRes.value.watchlist || []) : [];
+    const theses    = thRes.status === 'fulfilled' ? (thRes.value.theses   || {}) : {};
+    investissementLoaded = true;
+    renderInvestissement(watchlist, theses);
+  } catch {
+    wrap.innerHTML = '<div class="error-state">Impossible de charger les analyses investissement.</div>';
+  }
+}
+
+function renderInvestissement(watchlist, theses) {
+  const nbBuy  = watchlist.filter(a => a.signal === 'BUY').length;
+  const nbHold = watchlist.filter(a => a.signal === 'HOLD').length;
+  const nbSell = watchlist.filter(a => a.signal === 'SELL').length;
+  const scores = watchlist.map(a => a.score).filter(s => s != null);
+  const avgScore = scores.length ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1) : '—';
+
+  const sigBadge = (sig) => {
+    if (sig === 'BUY')  return '<span style="background:#1a3a1a;color:#4ade80;font-weight:700;padding:2px 9px;border-radius:4px;font-size:11px">BUY</span>';
+    if (sig === 'SELL') return '<span style="background:#3a1a1a;color:#f87171;font-weight:700;padding:2px 9px;border-radius:4px;font-size:11px">SELL</span>';
+    return '<span style="background:#2a2a14;color:#facc15;font-weight:700;padding:2px 9px;border-radius:4px;font-size:11px">HOLD</span>';
+  };
+
+  let rows = '';
+  for (const a of watchlist) {
+    if (a.erreur) {
+      rows += `<tr>
+        <td><strong>${a.ticker}</strong></td>
+        <td style="font-size:11px">${a.nom}</td>
+        <td style="font-size:10px;opacity:.6">${a.bourse}</td>
+        <td colspan="8" style="color:#f87171;font-size:11px">${a.erreur}</td>
+      </tr>`;
+      continue;
+    }
+    const score   = a.score != null ? a.score.toFixed(1) : '—';
+    const scoreCl = a.score == null ? '' : a.score >= 7 ? 'style="color:#4ade80;font-weight:700"' : a.score >= 4 ? '' : 'style="color:#f87171"';
+    const marge   = a.marge_securite;
+    const margeFmt = marge != null ? (marge * 100).toFixed(1) + '%' : '—';
+    const margeCl  = marge == null ? '' : marge >= 0.20 ? 'style="color:#4ade80"' : marge >= 0 ? '' : 'style="color:#f87171"';
+    const these    = theses[a.ticker] || '';
+    const theseHtml = these
+      ? `<span title="${these.replace(/"/g,'&quot;')}" style="font-size:11px;opacity:.75;cursor:help">${these.length > 85 ? these.slice(0,83)+'…' : these}</span>`
+      : '<span style="opacity:.35;font-size:10px">—</span>';
+
+    rows += `<tr>
+      <td><strong>${a.ticker}</strong></td>
+      <td style="font-size:11px">${a.nom}</td>
+      <td style="font-size:10px;opacity:.6">${a.bourse}</td>
+      <td ${scoreCl}>${score}/10</td>
+      <td ${margeCl}>${margeFmt}</td>
+      <td>${sigBadge(a.signal)}</td>
+      <td style="font-size:11px">${a.prix_actuel != null ? a.prix_actuel.toLocaleString('fr-FR',{maximumFractionDigits:2}) : '—'}</td>
+      <td style="font-size:11px">${a.per != null ? a.per.toFixed(1) : '—'}</td>
+      <td style="font-size:11px">${a.pbr != null ? a.pbr.toFixed(2) : '—'}</td>
+      <td>${theseHtml}</td>
+    </tr>`;
+  }
+
+  qs('#investissement-wrap').innerHTML = `
+    <div class="kpi-row" style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px">
+      <div class="kpi-card" style="flex:1;min-width:110px;background:var(--surface,#1e1e2e);border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;opacity:.6;margin-bottom:4px">Analysés</div>
+        <div style="font-size:24px;font-weight:700">${watchlist.length}</div>
+        <div style="font-size:10px;opacity:.5">13 titres</div>
+      </div>
+      <div class="kpi-card" style="flex:1;min-width:110px;background:#0d2010;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;opacity:.6;margin-bottom:4px">BUY</div>
+        <div style="font-size:24px;font-weight:700;color:#4ade80">${nbBuy}</div>
+        <div style="font-size:10px;opacity:.5">Achat recommandé</div>
+      </div>
+      <div class="kpi-card" style="flex:1;min-width:110px;background:#1e1e10;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;opacity:.6;margin-bottom:4px">HOLD</div>
+        <div style="font-size:24px;font-weight:700;color:#facc15">${nbHold}</div>
+        <div style="font-size:10px;opacity:.5">À surveiller</div>
+      </div>
+      <div class="kpi-card" style="flex:1;min-width:110px;background:#200d0d;border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;opacity:.6;margin-bottom:4px">SELL</div>
+        <div style="font-size:24px;font-weight:700;color:#f87171">${nbSell}</div>
+        <div style="font-size:10px;opacity:.5">Éviter / Vendre</div>
+      </div>
+      <div class="kpi-card" style="flex:1;min-width:110px;background:var(--surface,#1e1e2e);border-radius:8px;padding:12px;text-align:center">
+        <div style="font-size:11px;opacity:.6;margin-bottom:4px">Score Moyen</div>
+        <div style="font-size:24px;font-weight:700">${avgScore}</div>
+        <div style="font-size:10px;opacity:.5">sur 10</div>
+      </div>
+    </div>
+
+    <div style="overflow-x:auto">
+      <table class="data-table" style="width:100%;border-collapse:collapse">
+        <thead><tr>
+          <th>Ticker</th><th>Nom</th><th>Bourse</th>
+          <th>Score /10</th><th>Marge Sécu.</th><th>Signal</th>
+          <th>Prix</th><th>PER</th><th>PBR</th>
+          <th style="min-width:200px">Thèse d'investissement</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>
+
+    <div style="font-size:10px;opacity:.4;margin-top:12px;text-align:right">
+      Analyse pipeline 17 étapes · Graham · Buffett · Damodaran · Thèse Claude API
+    </div>`;
 }
 
 // ── Liquidité tab ─────────────────────────────────────────────────
