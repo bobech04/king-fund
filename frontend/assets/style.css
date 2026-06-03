@@ -1535,3 +1535,85 @@ body::after {
 .liq-refresh-btn:hover  { background: var(--surface3); border-color: #363650; }
 .liq-refresh-btn:active { background: var(--surface3); }
 .liq-refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Bertez Signal card ────────────────────────────────────────── */
+.bertez-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.bertez-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.bertez-signal-num {
+  margin-left: auto;
+  font-size: 1.1rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  letter-spacing: -0.01em;
+}
+.bertez-gauge-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.50rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  margin-bottom: 3px;
+}
+.bertez-gauge-track {
+  height: 8px;
+  background: var(--surface3);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  margin-bottom: 3px;
+}
+.bertez-gauge-center {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 1px;
+  height: 100%;
+  background: var(--border);
+  z-index: 1;
+}
+.bertez-gauge-pos {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 0 4px 4px 0;
+  transition: width 0.8s ease;
+}
+.bertez-gauge-neg {
+  position: absolute;
+  right: 50%;
+  top: 0;
+  height: 100%;
+  background: var(--red);
+  border-radius: 4px 0 0 4px;
+  transition: width 0.8s ease;
+}
+.bertez-axis-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.48rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  margin-bottom: 10px;
+}
+.bertez-summary {
+  font-size: 0.60rem;
+  color: var(--muted);
+  font-family: var(--font-mono);
+  line-height: 1.55;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  word-break: break-word;
+}

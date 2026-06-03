@@ -20,19 +20,27 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 # liq_weights must sum to 1.0 per domain.
-# cb_weight: fraction of the final combined signal given to CB sentiment.
+# cb_weight:     fraction of the final combined signal given to CB sentiment.
+# bertez_weight: fraction given to the Bertez energy/GDP macro-structural signal.
+#   equity_us — Bertez modère via le ratio énergie/PIB et la dette productive
+#   crypto    — Bertez est moins direct (risque-on/off > structure énergétique)
 _DOMAINS: dict[str, dict] = {
     "equity_us": {
-        "liq_agents":  ["Yahoo_Equity", "FRED_Macro", "FRED_Credit"],
-        "liq_weights": [0.45,            0.35,         0.20],
-        "cb_codes":    ["FED", "BCE"],   # FED drives US, BCE sets global rate comparison
-        "cb_weight":   0.25,
+        "liq_agents":    ["Yahoo_Equity", "FRED_Macro", "FRED_Credit"],
+        "liq_weights":   [0.45,            0.35,         0.20],
+        "cb_codes":      ["FED", "BCE"],
+        "cb_weight":     0.25,
+        "bertez_weight": 0.15,
+        # combined = liq*(1-cb_w-bertez_w) + cb*cb_w + bertez*bertez_w
+        # → liq poids effectif = 0.60
     },
     "crypto": {
-        "liq_agents":  ["CoinGecko_Market", "CoinGecko_DeFi", "FRED_Macro"],
-        "liq_weights": [0.50,               0.25,              0.25],
-        "cb_codes":    ["FED"],            # macro liquidity / USD strength matters for crypto
-        "cb_weight":   0.15,
+        "liq_agents":    ["CoinGecko_Market", "CoinGecko_DeFi", "FRED_Macro"],
+        "liq_weights":   [0.50,               0.25,              0.25],
+        "cb_codes":      ["FED"],
+        "cb_weight":     0.15,
+        "bertez_weight": 0.05,
+        # → liq poids effectif = 0.80
     },
 }
 
@@ -66,9 +74,14 @@ class ExpertSignalClient:
         """
         Composite expert signal for *symbol* in [-1.0, +1.0].
 
-          +1.0  all sectoral experts and CBs strongly bullish
+          +1.0  all sectoral experts, CBs and Bertez strongly bullish
           -1.0  all experts strongly bearish
            0.0  neutral / data not yet available
+
+        Three-source blend:
+          liq_sig    × (1 - cb_weight - bertez_weight)
+          cb_sig     × cb_weight
+          bertez_sig × bertez_weight
         """
         if not symbol:
             return 0.0
@@ -77,11 +90,17 @@ class ExpertSignalClient:
             return 0.0
         domain = _DOMAINS[domain_name]
 
-        liq_sig = self._liq_signal(domain)
-        cb_sig  = self._cb_signal(domain["cb_codes"])
+        liq_sig    = self._liq_signal(domain)
+        cb_sig     = self._cb_signal(domain["cb_codes"])
+        bertez_sig = self._bertez_signal()
 
-        cb_w     = domain["cb_weight"]
-        combined = liq_sig * (1.0 - cb_w) + cb_sig * cb_w
+        cb_w      = domain["cb_weight"]
+        bertez_w  = domain["bertez_weight"]
+        combined  = (
+            liq_sig    * (1.0 - cb_w - bertez_w)
+            + cb_sig   * cb_w
+            + bertez_sig * bertez_w
+        )
         return round(max(-1.0, min(1.0, combined)), 3)
 
     def get_breakdown(self, symbol: str) -> dict:
@@ -91,18 +110,21 @@ class ExpertSignalClient:
             return {"symbol": symbol, "signal": 0.0, "domain": "unknown"}
         domain = _DOMAINS[domain_name]
 
-        agent_sigs = self._liq_agent_signals(domain)
-        cb_sigs    = self._cb_agent_signals(domain["cb_codes"])
-        final      = self.get_signal(symbol)
+        agent_sigs  = self._liq_agent_signals(domain)
+        cb_sigs     = self._cb_agent_signals(domain["cb_codes"])
+        bertez_sig  = self._bertez_signal()
+        final       = self.get_signal(symbol)
 
         return {
-            "symbol":        symbol,
-            "domain":        domain_name,
-            "signal":        final,
-            "liq_signal":    round(self._liq_signal(domain), 3),
-            "cb_signal":     round(self._cb_signal(domain["cb_codes"]), 3),
-            "agent_signals": agent_sigs,
-            "cb_signals":    cb_sigs,
+            "symbol":         symbol,
+            "domain":         domain_name,
+            "signal":         final,
+            "liq_signal":     round(self._liq_signal(domain), 3),
+            "cb_signal":      round(self._cb_signal(domain["cb_codes"]), 3),
+            "bertez_signal":  round(bertez_sig, 3),
+            "bertez_mode":    self._bertez_mode(),
+            "agent_signals":  agent_sigs,
+            "cb_signals":     cb_sigs,
         }
 
     # ------------------------------------------------------------------
@@ -138,6 +160,26 @@ class ExpertSignalClient:
     def _cb_signal(self, cb_codes: list[str]) -> float:
         signals = self._cb_agent_signals(cb_codes)
         return round(sum(signals.values()) / len(signals), 3) if signals else 0.0
+
+    def _bertez_signal(self) -> float:
+        """Signal macro-structurel Bertez en [-1, +1] (lecture cache — aucun I/O)."""
+        try:
+            from divisions.middle_office.desk_liquidite.agents.agent_bertez import (
+                get_bertez_signal,
+            )
+            return get_bertez_signal()
+        except Exception:
+            return 0.0
+
+    def _bertez_mode(self) -> str:
+        """Mode courant Bertez : 'DEFENSIF', 'NEUTRE' ou 'OFFENSIF'."""
+        try:
+            from divisions.middle_office.desk_liquidite.agents.agent_bertez import (
+                get_bertez_mode,
+            )
+            return get_bertez_mode()
+        except Exception:
+            return "NEUTRE"
 
     def _cb_agent_signals(self, cb_codes: list[str]) -> dict[str, float]:
         """Returns {cb_code: sentiment} in [-1, +1] from central bank RSS feeds."""

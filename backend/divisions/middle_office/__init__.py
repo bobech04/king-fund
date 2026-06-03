@@ -61,6 +61,14 @@ class LiquidityDesk:
         data = self.get_data_cached_only()
         return data.get("regime") if data else None
 
+    def get_bertez_signal(self) -> float | None:
+        data = self.get_data_cached_only()
+        return data.get("bertez_signal") if data else None
+
+    def get_bertez_mode(self) -> str | None:
+        data = self.get_data_cached_only()
+        return data.get("bertez_mode") if data else None
+
     def trigger_background_refresh(self):
         """Lance un refresh dans un thread daemon — non bloquant, idempotent."""
         with self._lock:

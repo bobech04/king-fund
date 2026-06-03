@@ -13,6 +13,7 @@ from agents import (
     YahooForexAgent,
     CoinGeckoMarketAgent,
     CoinGeckoDeFiAgent,
+    BertezEnergyAgent,
     LiquidityAggregatorAgent,
 )
 
@@ -26,6 +27,7 @@ async def run_desk() -> dict:
         YahooForexAgent(),
         CoinGeckoMarketAgent(),
         CoinGeckoDeFiAgent(),
+        BertezEnergyAgent(),
     ]
 
     print(f"Lancement de {len(agents)} agents en parallèle...")

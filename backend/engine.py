@@ -493,13 +493,17 @@ class TradingEngine:
         leaderboard.sort(key=lambda x: x["value"], reverse=True)
         for rank, entry in enumerate(leaderboard, 1):
             entry["rank"] = rank
-        liq_score  = None
-        liq_regime = None
+        liq_score     = None
+        liq_regime    = None
+        bertez_signal = None
+        bertez_mode   = None
         try:
             from divisions.middle_office import get_liquidity_desk
-            desk       = get_liquidity_desk()
-            liq_score  = desk.get_score()
-            liq_regime = desk.get_regime()
+            desk          = get_liquidity_desk()
+            liq_score     = desk.get_score()
+            liq_regime    = desk.get_regime()
+            bertez_signal = desk.get_bertez_signal()
+            bertez_mode   = desk.get_bertez_mode()
         except Exception:
             pass
 
@@ -510,6 +514,8 @@ class TradingEngine:
             "timestamp":        datetime.utcnow().isoformat(),
             "liquidity_score":  liq_score,
             "liquidity_regime": liq_regime,
+            "bertez_signal":    bertez_signal,
+            "bertez_mode":      bertez_mode,
         }
 
     def get_trader(self, trader_id: int):

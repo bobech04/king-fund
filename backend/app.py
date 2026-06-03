@@ -82,6 +82,8 @@ def get_liquidite():
         "alerts":                 data.get("alerts", []),
         "errors":                 data.get("errors", []),
         "timestamp":              data.get("timestamp"),
+        "bertez_signal":          data.get("bertez_signal"),
+        "bertez_mode":            data.get("bertez_mode"),
     })
 
 

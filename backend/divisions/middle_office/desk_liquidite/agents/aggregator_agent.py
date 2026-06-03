@@ -11,6 +11,8 @@ AGENT_WEIGHTS = {
     "Yahoo_Forex":       0.10,
     "CoinGecko_Market":  0.10,
     "CoinGecko_DeFi":    0.10,
+    # Thèse Bertez : énergie/PIB, dette productive, Bastiat hors bilan
+    "Bertez_Energy":     0.15,
 }
 
 SCORE_THRESHOLDS = {
@@ -34,6 +36,7 @@ class LiquidityAggregatorAgent:
         scores = {}
         errors = []
         summaries = {}
+        bertez_data: dict[str, Any] = {}
 
         for result in agent_results:
             agent_name = result.get("agent", "unknown")
@@ -44,22 +47,32 @@ class LiquidityAggregatorAgent:
             if score is not None:
                 scores[agent_name] = score
             summaries[agent_name] = result.get("summary", "")
+            if agent_name == "Bertez_Energy":
+                bertez_data = {
+                    "signal": result.get("bertez_signal"),
+                    "mode":   result.get("mode"),
+                    "data":   result.get("data", {}),
+                }
 
         global_score = self._weighted_score(scores)
         regime = self._classify_regime(global_score)
         alerts = self._generate_alerts(global_score, scores)
-        report = self._build_report(global_score, regime, scores, summaries, alerts, errors)
+        report = self._build_report(
+            global_score, regime, scores, summaries, alerts, errors, bertez_data
+        )
 
         return {
-            "agent": self.name,
-            "timestamp": datetime.utcnow().isoformat(),
+            "agent":                self.name,
+            "timestamp":            datetime.utcnow().isoformat(),
             "global_liquidity_score": global_score,
-            "regime": regime,
-            "agent_scores": scores,
-            "agent_summaries": summaries,
-            "alerts": alerts,
-            "errors": errors,
-            "report": report,
+            "regime":               regime,
+            "agent_scores":         scores,
+            "agent_summaries":      summaries,
+            "alerts":               alerts,
+            "errors":               errors,
+            "report":               report,
+            "bertez_signal":        bertez_data.get("signal"),
+            "bertez_mode":          bertez_data.get("mode"),
         }
 
     def _weighted_score(self, scores: dict[str, float]) -> float:
@@ -102,6 +115,7 @@ class LiquidityAggregatorAgent:
         summaries: dict,
         alerts: list,
         errors: list,
+        bertez_data: dict | None = None,
     ) -> str:
         now = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
         lines = [
@@ -124,6 +138,49 @@ class LiquidityAggregatorAgent:
             lines += ["-" * 60, "  RESUME PAR SOURCE"]
             for agent, summary in summaries.items():
                 lines.append(f"  {agent:<22} {summary}")
+
+        if bertez_data:
+            lines += ["-" * 60, "  SIGNAL BERTEZ — ENERGIE / PIB"]
+            mode = bertez_data.get("mode", "NEUTRE")
+            sig  = bertez_data.get("signal")
+            d    = bertez_data.get("data", {})
+            eg   = d.get("energy_gdp", {})
+            pd_  = d.get("productive_debt", {})
+            bast = d.get("bastiat", {})
+            rot  = d.get("rotation", {})
+
+            sig_str = f"{sig:+.3f}" if sig is not None else "N/A"
+            lines.append(f"  MODE           : {mode}")
+            lines.append(f"  Signal [-1,+1] : {sig_str}")
+
+            chg = eg.get("change_pct")
+            wti = eg.get("wti_latest")
+            if chg is not None:
+                lines.append(f"  Energie/PIB Δ12m: {chg:+.1f}%")
+            if wti:
+                lines.append(f"  WTI            : {wti} $/b")
+
+            pa = pd_.get("assessment")
+            if pa:
+                ratio = pd_.get("ratio")
+                lines.append(f"  Dette prod.    : {pa}  (ratio={ratio})")
+
+            b_level = bast.get("risk_level")
+            b_score = bast.get("risk_score")
+            if b_level:
+                lines.append(f"  Bastiat risque : {b_level}  (score={b_score}/10)")
+            for flag in bast.get("flags", []):
+                lines.append(f"    • {flag}")
+
+            if mode == "DEFENSIF" and rot.get("active"):
+                prices = rot.get("prices", {})
+                chg5d  = rot.get("chg_5d_pct", {})
+                if prices:
+                    lines.append("  ROTATION DEFENSIVE :")
+                    for t, p in list(prices.items())[:6]:
+                        c = chg5d.get(t)
+                        c_str = f"  {c:+.1f}%5j" if c is not None else ""
+                        lines.append(f"    {t:<10} {p:>8.2f}{c_str}")
 
         if alerts:
             lines += ["-" * 60, "  ALERTES & SIGNAUX"]

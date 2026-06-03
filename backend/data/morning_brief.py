@@ -48,7 +48,7 @@ You are a concise sell-side analyst. Today is {date}.
 
 Current market prices (USD):
 {prices_block}
-{liquidity_block}
+{liquidity_block}{bertez_block}
 Generate an intraday market outlook as valid JSON only (no markdown fences):
 {{
   "direction": "bullish" | "bearish" | "neutral",
@@ -71,6 +71,58 @@ def _get_liquidity_block() -> str:
         lines = [f"Liquidity conditions (score: {score}/10 — regime: {regime}):"]
         for agent, s in summaries.items():
             lines.append(f"  {agent}: {s}/10")
+        return "\n".join(lines) + "\n"
+    except Exception:
+        return ""
+
+
+def _get_bertez_block() -> str:
+    """
+    Contexte Bertez pour le Morning Brief et le Risk Committee.
+    Lit le cache de BertezEnergyAgent (mis à jour à chaque run du desk liquidité).
+    Injecte : mode, ratio énergie/PIB, dette productive, Bastiat flags, rotation si défensif.
+    """
+    try:
+        from divisions.middle_office.desk_liquidite.agents.agent_bertez import (
+            get_last_bertez_result,
+        )
+        r = get_last_bertez_result()
+        if not r:
+            return ""
+
+        mode       = r.get("mode", "NEUTRE")
+        score      = r.get("liquidity_score")
+        data       = r.get("data", {})
+        eg         = data.get("energy_gdp", {})
+        pd_        = data.get("productive_debt", {})
+        bastiat    = data.get("bastiat", {})
+        rotation   = data.get("rotation", {})
+
+        lines = [f"Bertez Energy Signal (score: {score}/10 — mode: {mode}):"]
+
+        chg = eg.get("change_pct")
+        if chg is not None:
+            lines.append(f"  Energy/GDP ratio Δ12m: {chg:+.1f}%")
+
+        wti = eg.get("wti_latest")
+        if wti:
+            lines.append(f"  WTI: {wti}$/b")
+
+        pa = pd_.get("assessment")
+        if pa:
+            lines.append(f"  Productive debt: {pa} (ratio={pd_.get('ratio')})")
+
+        b_level = bastiat.get("risk_level")
+        if b_level:
+            lines.append(f"  Bastiat off-balance-sheet risk: {b_level}")
+        for flag in bastiat.get("flags", [])[:2]:
+            lines.append(f"    • {flag}")
+
+        if mode == "DEFENSIF" and rotation.get("active"):
+            tickers = list(rotation.get("prices", {}).keys())[:6]
+            if tickers:
+                lines.append(f"  DEFENSIVE ROTATION: {', '.join(tickers)}")
+
         return "\n".join(lines) + "\n"
     except Exception:
         return ""
@@ -104,6 +156,7 @@ class MorningBrief:
             date=date.today().isoformat(),
             prices_block=prices_block,
             liquidity_block=_get_liquidity_block(),
+            bertez_block=_get_bertez_block(),
         )
         try:
             msg = self._client.messages.create(

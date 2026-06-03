@@ -8,8 +8,9 @@ if _backend_env.exists():
     load_dotenv(_backend_env)
 load_dotenv(Path(__file__).parent / ".env", override=True)
 
-FRED_API_KEY = os.getenv("FRED_API_KEY", "")  # https://fred.stlouisfed.org/docs/api/api_key.html
+FRED_API_KEY = os.getenv("FRED_API_KEY", "")        # https://fred.stlouisfed.org/docs/api/api_key.html
 COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")  # optionnel, tier gratuit disponible
+EIA_API_KEY = os.getenv("EIA_API_KEY", "")          # https://www.eia.gov/opendata/ — optionnel (backup WTI)
 
 FRED_SERIES = {
     "m2_money_supply":    "M2SL",
