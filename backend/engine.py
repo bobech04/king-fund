@@ -195,7 +195,56 @@ class TradingEngine:
             loaded.append(trader)
         self._traders = loaded
         logger.info(f"Loaded {len(self._traders)} traders")
+        self._restore_trader_states()
+        self._update_sitg_budgets()
         self._preload_histories()
+
+    def _restore_trader_states(self):
+        """Reload cash + positions from the latest snapshot for each trader."""
+        conn = db_connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT trader_id, cash, positions, portfolio_value
+                FROM snapshots
+                WHERE id IN (
+                    SELECT MAX(id) FROM snapshots GROUP BY trader_id
+                )
+                """
+            ).fetchall()
+        finally:
+            conn.close()
+
+        if not rows:
+            logger.info(
+                "[RESTORE] No snapshots found - traders start fresh at %.2f", STARTING_CAPITAL
+            )
+            return
+
+        logger.info("[RESTORE] Restoring %d traders from last snapshot...", len(rows))
+        restored = 0
+        for row in rows:
+            trader = next((t for t in self._traders if t.id == row["trader_id"]), None)
+            if trader is None:
+                continue
+            try:
+                positions = json.loads(row["positions"])
+                trader.portfolio.cash = row["cash"]
+                trader.portfolio.positions = positions
+                trader.portfolio.portfolio_value = row["portfolio_value"]
+                restored += 1
+                pos_count = sum(1 for qty in positions.values() if qty > 0)
+                logger.info(
+                    "[RESTORE] TRD%02d  pv=%.2f  cash=%.2f  positions=%d",
+                    row["trader_id"], row["portfolio_value"], row["cash"], pos_count,
+                )
+            except Exception as e:
+                logger.warning("[RESTORE] Trader %d failed: %s", row["trader_id"], e)
+
+        logger.info(
+            "[RESTORE] Done: %d/%d traders restored from last snapshot",
+            restored, len(self._traders),
+        )
 
     def _preload_histories(self):
         """Preload each trader's price history with real market data at startup.
