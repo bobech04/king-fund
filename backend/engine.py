@@ -109,6 +109,9 @@ class TradingEngine:
         self._prev_tick_prices: dict = {}   # used to skip decide() on stale prices
         self._traders = []
         self._tick_count = 0
+        self._last_eod_date = None            # détection changement de journée
+        self._selection_multipliers: dict = {}  # trader.id → multiplicateur sélection naturelle
+        self._eliminated_ids: set = set()       # IDs des traders éliminés au J15
         from data.expert_signal_client import get_expert_signal_client
         self._expert_signals = get_expert_signal_client()
         self._init_db()
@@ -177,6 +180,13 @@ class TradingEngine:
                     portfolio_value REAL    NOT NULL,
                     cash            REAL    NOT NULL,
                     positions       TEXT    NOT NULL
+                );
+                CREATE TABLE IF NOT EXISTS eliminations (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    trader_id       INTEGER NOT NULL,
+                    timestamp       TEXT    NOT NULL,
+                    jour_bataille   INTEGER NOT NULL,
+                    pv_au_moment    REAL    NOT NULL
                 );
             """)
             conn.commit()
@@ -314,6 +324,14 @@ class TradingEngine:
         self._prev_tick_prices = dict(prices)   # becomes "prev" on next tick
         self._update_sitg_budgets()
 
+        # Sélection naturelle — une fois par journée calendaire
+        today = date.today()
+        if self._last_eod_date is None:
+            self._last_eod_date = today
+        elif today > self._last_eod_date:
+            self._run_eod_natural_selection()
+            self._last_eod_date = today
+
         if self._tick_count % 15 == 0:
             self._schedule_liquidity_refresh()
 
@@ -419,6 +437,8 @@ class TradingEngine:
         if act == "buy":
             # SITG : ajuste la taille de position selon la performance du trader
             amount *= trader.sitg_budget
+            # Sélection naturelle : bonus top5 (+20%/j) / malus bottom5 (-50%/j)
+            amount *= self._selection_multipliers.get(trader.id, 1.0)
             cost = amount * price
             if cost > trader.portfolio.cash:
                 return
@@ -472,6 +492,75 @@ class TradingEngine:
             trader.sitg_budget = _compute_sitg_budget(trader.portfolio.portfolio_value)
 
     # ------------------------------------------------------------------
+    # Sélection naturelle (fin de journée)
+    # ------------------------------------------------------------------
+
+    def _run_eod_natural_selection(self):
+        """Top 5 +20% budget, Bottom 5 -50% budget. Élimination si J≥15 et PV<300€."""
+        ranked = sorted(self._traders, key=lambda t: t.portfolio.portfolio_value, reverse=True)
+
+        for t in ranked[:5]:
+            cur = self._selection_multipliers.get(t.id, 1.0)
+            new = round(min(2.5, cur * 1.20), 3)
+            self._selection_multipliers[t.id] = new
+            logger.info(
+                "SELECTION TOP5   TRD%02d  PV=%.2f€  ×%.3f → ×%.3f",
+                t.id, t.portfolio.portfolio_value, cur, new,
+            )
+
+        for t in ranked[-5:]:
+            cur = self._selection_multipliers.get(t.id, 1.0)
+            new = round(max(0.10, cur * 0.50), 3)
+            self._selection_multipliers[t.id] = new
+            logger.info(
+                "SELECTION BOT5   TRD%02d  PV=%.2f€  ×%.3f → ×%.3f",
+                t.id, t.portfolio.portfolio_value, cur, new,
+            )
+
+        battle_day = (date.today() - BATTLE_START_DATE).days + 1
+        if battle_day >= 15:
+            self._check_eliminations(battle_day)
+
+    def _check_eliminations(self, battle_day: int):
+        """Élimine tout trader < 300€ après J15 et le remplace par une stratégie fraîche."""
+        for trader in list(self._traders):
+            if trader.id in self._eliminated_ids:
+                continue
+            if trader.portfolio.portfolio_value < 300:
+                pv = trader.portfolio.portfolio_value
+                logger.warning(
+                    "ÉLIMINATION TRD%02d  PV=%.2f€ < 300€  (J%d)",
+                    trader.id, pv, battle_day,
+                )
+                _write_with_retry(lambda conn, _id=trader.id, _pv=pv, _day=battle_day: conn.execute(
+                    "INSERT INTO eliminations (trader_id, timestamp, jour_bataille, pv_au_moment) "
+                    "VALUES (?, ?, ?, ?)",
+                    (_id, datetime.utcnow().isoformat(), _day, _pv),
+                ))
+                self._eliminated_ids.add(trader.id)
+                self._replace_trader(trader)
+
+    def _replace_trader(self, trader):
+        """Réinitialise le portfolio à 500€ et recharge le module (instance fraîche)."""
+        i = trader.id
+        try:
+            mod_name = f"traders.trader_{i:02d}"
+            mod      = importlib.import_module(mod_name)
+            importlib.reload(mod)
+            new_trader = mod.Trader(trader_id=i, starting_capital=STARTING_CAPITAL)
+        except Exception:
+            from traders.base_trader import BaseTrader
+            new_trader = BaseTrader(trader_id=i, starting_capital=STARTING_CAPITAL)
+
+        self._selection_multipliers[i] = 1.0
+        self._eliminated_ids.discard(i)   # ardoise vierge après remplacement
+
+        idx = next((j for j, t in enumerate(self._traders) if t.id == i), None)
+        if idx is not None:
+            self._traders[idx] = new_trader
+        logger.info("REMPLACEMENT TRD%02d → capital %.2f€ remis à zéro", i, STARTING_CAPITAL)
+
+    # ------------------------------------------------------------------
     # Read state (called by Flask)
     # ------------------------------------------------------------------
 
@@ -488,9 +577,11 @@ class TradingEngine:
                 "value":       round(pv, 2),
                 "pnl":         round(pv - STARTING_CAPITAL, 2),
                 "pnl_pct":     round((pv - STARTING_CAPITAL) / STARTING_CAPITAL * 100, 2),
-                "won":         pv >= TARGET_CAPITAL,
-                "sitg_budget": t.sitg_budget,
-                "grade":       t.grade,
+                "won":                 pv >= TARGET_CAPITAL,
+                "sitg_budget":         t.sitg_budget,
+                "grade":               t.grade,
+                "selection_multiplier": self._selection_multipliers.get(t.id, 1.0),
+                "eliminated":          t.id in self._eliminated_ids,
             })
         leaderboard.sort(key=lambda x: x["value"], reverse=True)
         for rank, entry in enumerate(leaderboard, 1):
