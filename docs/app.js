@@ -134,6 +134,19 @@ function applyState(s) {
     hour: '2-digit', minute: '2-digit', second: '2-digit',
   });
 
+  // Bertez mode badge (stats bar — visible sur tous les onglets)
+  const bEl = qs('#bertez-mode-val');
+  if (bEl) {
+    const bm = s.bertez_mode;
+    const abbr = { DEFENSIF: 'DEF', NEUTRE: 'NEU', OFFENSIF: 'OFF' };
+    bEl.textContent = abbr[bm] || '—';
+    bEl.className = 'stat-value ' + (
+      bm === 'DEFENSIF' ? 'red' :
+      bm === 'OFFENSIF' ? 'green' :
+      'muted'
+    );
+  }
+
   // Accumulate sparkline data per trader
   s.leaderboard.forEach(t => {
     if (!sparklineData.has(t.id)) sparklineData.set(t.id, []);
@@ -1034,6 +1047,37 @@ function renderLiquidite(d) {
     :                               'Neutre — taille normale';
   const gaugeW   = hasScore ? Math.min(100, score / 10 * 100).toFixed(1) : 0;
 
+  // Bertez card
+  const bSig  = d.bertez_signal;
+  const bMode = d.bertez_mode;
+  const bSum  = (d.agent_summaries || {})['Bertez_Energy'] || '';
+  const hasBertez = bSig !== null && bSig !== undefined;
+  const modeRegime = { DEFENSIF: 'critique', NEUTRE: 'neutre', OFFENSIF: 'ample' }[bMode] || 'neutre';
+  const sigColor = !hasBertez ? 'var(--muted)' : bSig > 0 ? 'var(--accent)' : bSig < 0 ? 'var(--red)' : 'var(--muted)';
+  const sigStr   = hasBertez ? (bSig >= 0 ? '+' : '') + Number(bSig).toFixed(3) : '—';
+  const gaugePos = hasBertez && bSig > 0 ? Math.min(bSig * 50, 50).toFixed(1) : '0';
+  const gaugeNeg = hasBertez && bSig < 0 ? Math.min(-bSig * 50, 50).toFixed(1) : '0';
+
+  const bertezHtml = `
+    <div class="bertez-card">
+      <div class="liq-section-title">⚡ Signal Bertez — Économie / Énergie</div>
+      <div class="bertez-header">
+        <div class="liq-regime regime-${modeRegime}">${bMode || 'INCONNU'}</div>
+        <div class="bertez-signal-num" style="color:${sigColor}">${sigStr}</div>
+        <div style="font-size:0.52rem;color:var(--muted);font-family:var(--font-mono)">[-1 / +1]</div>
+      </div>
+      <div class="bertez-gauge-labels">
+        <span>DÉFENSIF ◄</span><span>NEUTRE</span><span>► OFFENSIF</span>
+      </div>
+      <div class="bertez-gauge-track">
+        <div class="bertez-gauge-center"></div>
+        <div class="bertez-gauge-pos" style="width:${gaugePos}%"></div>
+        <div class="bertez-gauge-neg" style="width:${gaugeNeg}%"></div>
+      </div>
+      <div class="bertez-axis-labels"><span>-1</span><span>0</span><span>+1</span></div>
+      ${bSum ? `<div class="bertez-summary">${escHtml(bSum)}</div>` : ''}
+    </div>`;
+
   const agentsHtml = Object.entries(d.agent_scores || {}).map(([agent, sc]) => {
     const agColor = sc < 3 ? '#ff4466' : sc < 5 ? '#ff9944' : sc < 6.5 ? '#aaaacc' : sc < 8 ? '#00e5a0' : '#ffd700';
     const agW     = (sc / 10 * 100).toFixed(1);
@@ -1082,9 +1126,11 @@ function renderLiquidite(d) {
         </div>
       </div>
 
+      ${bertezHtml}
+
       ${agentsHtml ? `
       <div class="liq-card">
-        <div class="liq-section-title">Scores par agent (7 sources)</div>
+        <div class="liq-section-title">Scores par agent (8 sources)</div>
         <div class="liq-agents">${agentsHtml}</div>
       </div>` : ''}
 
