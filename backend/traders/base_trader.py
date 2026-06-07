@@ -1,3 +1,4 @@
+import sqlite3
 import sys
 from pathlib import Path
 
@@ -44,6 +45,8 @@ class BaseTrader:
         self._liq     = get_liquidity_client()       # global liquidity regime
         self._experts = get_expert_signal_client()   # sectoral + CB expert signals
         self.sitg_budget: float = 1.0                # Skin-in-the-Game : multiplicateur dynamique [0.25, 1.75]
+        self._feedback_cautious: bool = False        # True si taux de réussite < 40%
+        self._win_rate: float = 1.0                  # taux de réussite sur les 20 derniers cycles
 
     @property
     def grade(self) -> str:
@@ -61,6 +64,46 @@ class BaseTrader:
     # Strategy interface — override in subclasses
     # ------------------------------------------------------------------
 
+    def refresh_feedback(self, db_path: Path) -> None:
+        """Lit les 20 derniers cycles buy→sell dans SQLite et active le mode prudent si taux < 40%."""
+        try:
+            conn = sqlite3.connect(str(db_path), timeout=5, check_same_thread=False)
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT action, symbol, price FROM trades "
+                "WHERE trader_id = ? ORDER BY id DESC LIMIT 40",
+                (self.id,),
+            ).fetchall()
+            conn.close()
+        except Exception:
+            return
+
+        if not rows:
+            return
+
+        wins = 0
+        losses = 0
+        last_buy: dict[str, float] = {}
+
+        for row in reversed(rows):   # ordre chronologique
+            act, sym, price = row["action"], row["symbol"], float(row["price"])
+            if act == "buy":
+                last_buy[sym] = price
+            elif act == "sell" and wins + losses < 20:
+                bp = last_buy.pop(sym, None)
+                if bp is not None:
+                    if price > bp:
+                        wins += 1
+                    else:
+                        losses += 1
+
+        total = wins + losses
+        if total >= 5:
+            self._win_rate = wins / total
+            self._feedback_cautious = self._win_rate < 0.40
+        else:
+            self._feedback_cautious = False
+
     def decide(self, prices: dict) -> dict:
         return {"action": "hold", "symbol": "", "amount": 0}
 
@@ -73,6 +116,8 @@ class BaseTrader:
         Place a buy order for `fraction` of available cash on `symbol`.
         fraction=1.0 means "go all-in", fraction=0.1 means "10% of cash".
         """
+        if self._feedback_cautious:
+            fraction *= 0.5   # taux réussite < 40% → taille position réduite de 50%
         fraction = max(0.0, min(fraction, 1.0))
         price = prices.get(symbol, 0.0)
         if price <= 0:

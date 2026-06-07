@@ -295,6 +295,8 @@ class TradingEngine:
                         sym and prev and prices.get(sym) == prev.get(sym)
                     )
                     if not price_unchanged:
+                        if self._tick_count % 20 == 0:
+                            trader.refresh_feedback(DB_PATH)
                         action = trader.decide(prices)
                         # Apply expert signal influence (sectoral experts + CBs)
                         expert_sig = self._expert_signals.get_signal(sym)

@@ -71,3 +71,4 @@ COINGECKO_API_KEY     = os.getenv("COINGECKO_API_KEY", "")
 EXCHANGE_RATE_API_KEY = os.getenv("EXCHANGE_RATE_API_KEY", "")
 POLYGON_API_KEY       = os.getenv("POLYGON_API_KEY", "")
 ANTHROPIC_API_KEY     = os.getenv("ANTHROPIC_API_KEY", "")
+EIA_API_KEY           = os.getenv("EIA_API_KEY", "")   # gratuit — eia.gov/opendata
