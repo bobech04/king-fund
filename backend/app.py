@@ -131,6 +131,14 @@ def get_investissement_theses():
         return jsonify({"erreur": str(e)}), 500
 
 
+@app.route("/api/bus/state")
+def get_bus_state():
+    hub = getattr(engine, "_hub", None)
+    if hub is None:
+        return jsonify({"erreur": "InterAgentHub non initialisé"}), 503
+    return jsonify(hub.get_etat())
+
+
 @app.route("/api/maintenance/health")
 def get_maintenance_health():
     from maintenance import get_health as _health

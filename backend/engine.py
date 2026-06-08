@@ -116,6 +116,13 @@ class TradingEngine:
         self._expert_signals = get_expert_signal_client()
         self._init_db()
         self._load_traders()
+        # Inter-agent communication hub (4 flux PubSub)
+        try:
+            from divisions.interagents import get_interagent_hub
+            self._hub = get_interagent_hub()
+        except Exception as _hub_err:
+            logger.warning("[Engine] InterAgentHub indisponible : %s", _hub_err)
+            self._hub = None
 
     # ------------------------------------------------------------------
     # Setup
@@ -294,6 +301,15 @@ class TradingEngine:
         now = datetime.utcnow().isoformat()
         prev = self._prev_tick_prices   # snapshot of previous tick's prices
 
+        # ── Flux 4 : Black Swan — si VIX > 35 on skip tous les trades ──────
+        if self._hub and self._hub.black_swan_halt:
+            logger.warning(
+                "[Engine] BLACK SWAN HALT actif — tick %d ignoré (VIX=%.1f)",
+                self._tick_count, self._hub.last_vix or 0,
+            )
+            self._prev_tick_prices = dict(prices)
+            return
+
         def _do_tick(conn):
             for trader in self._traders:
                 try:
@@ -334,6 +350,17 @@ class TradingEngine:
 
         if self._tick_count % 15 == 0:
             self._schedule_liquidity_refresh()
+
+        # ── Cycles inter-agents (non bloquants — threads daemon) ────────────
+        if self._hub:
+            if self._tick_count % 60 == 0:
+                self._hub.run_cycle_cb()        # Flux 1 : CB → Division Banque Centrale
+            if self._tick_count % 30 == 0:
+                self._hub.run_cycle_experts()   # Flux 2 : Experts → Division Investissement
+            if self._tick_count % 15 == 0:
+                self._hub.run_cycle_liq()       # Flux 3 : Desk Liq → budget_factor
+            if self._tick_count % 20 == 0:
+                self._hub.run_cycle_vix()       # Flux 4 : VIX Black Swan check
 
     def _schedule_liquidity_refresh(self):
         try:
@@ -439,6 +466,9 @@ class TradingEngine:
             amount *= trader.sitg_budget
             # Sélection naturelle : bonus top5 (+20%/j) / malus bottom5 (-50%/j)
             amount *= self._selection_multipliers.get(trader.id, 1.0)
+            # Flux 3 : Desk Liquidité — ajuste le budget selon la liquidité globale
+            if self._hub:
+                amount *= self._hub.liq_budget_factor
             cost = amount * price
             if cost > trader.portfolio.cash:
                 return
