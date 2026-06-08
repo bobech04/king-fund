@@ -2,6 +2,7 @@ import sys
 import time
 import threading
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import requests
@@ -65,15 +66,19 @@ _rate_limiter = _RateLimiter(_MAX_REQ_HOUR)
 
 class NewsClient:
     def __init__(self):
-        self._lock     = threading.Lock()
-        self._cache:    dict = {}
-        self._cache_ts: dict = {}
+        self._lock      = threading.Lock()
+        self._cache:     dict[str, float] = {}
+        self._cache_ts:  dict[str, float] = {}
+        self._in_flight: set[str]         = set()
+        # 2 workers max : les fetches sont parallélisés mais contrôlés
+        self._executor  = ThreadPoolExecutor(max_workers=2, thread_name_prefix="news-fetch")
 
-    def _fetch(self, query: str) -> list[str]:
+    def _fetch(self, query: str) -> list[str] | None:
+        """None = échec (rate limit ou erreur réseau). [] = 0 articles (résultat valide)."""
         if not NEWS_API_KEY:
-            return []
+            return None
         if not _rate_limiter.allow():
-            return []
+            return None
         try:
             r = requests.get(
                 _BASE,
@@ -93,22 +98,40 @@ class NewsClient:
                 for a in arts
             ]
         except Exception as e:
-            logger.warning(f"NewsAPI [{query!r}]: {e}")
-            return []
+            logger.warning("NewsAPI [%r]: %s", query, e)
+            return None
+
+    def _fetch_and_cache(self, query: str) -> None:
+        """Worker arrière-plan : 1 appel API, mise à jour cache partagé.
+        N'écrit dans le cache QUE si le fetch a réussi (évite de cacher un échec)."""
+        try:
+            texts = self._fetch(query)
+            if texts is None:
+                # rate limit ou erreur réseau — conserver la valeur existante en cache
+                return
+            score = _score(texts)
+            with self._lock:
+                self._cache[query]    = score
+                self._cache_ts[query] = time.monotonic()
+            logger.debug("News [%r] → %+.3f (%d articles)", query, score, len(texts))
+        finally:
+            with self._lock:
+                self._in_flight.discard(query)
 
     def get_sentiment(self, query: str) -> float:
-        """Score in [-1.0, +1.0] for a news query. 0.0 on error or missing key."""
+        """Score [-1, +1] lu depuis le cache partagé. Ne bloque jamais.
+        Déclenche un refresh en arrière-plan si le cache est expiré ou absent."""
         now = time.monotonic()
         with self._lock:
-            if query in self._cache and now - self._cache_ts[query] < _TTL:
-                return self._cache[query]
-        texts = self._fetch(query)
-        score = _score(texts)
-        with self._lock:
-            self._cache[query]    = score
-            self._cache_ts[query] = now
-        logger.debug(f"News [{query!r}] → {score:+.3f} ({len(texts)} articles)")
-        return score
+            cached = self._cache.get(query, 0.0)
+            ts     = self._cache_ts.get(query, 0.0)
+            if ts and now - ts < _TTL:
+                return cached            # cache valide — aucun appel API
+            if query not in self._in_flight:
+                self._in_flight.add(query)
+                self._executor.submit(self._fetch_and_cache, query)
+        # Retourne la valeur stale (ou 0.0) pendant que le fetch tourne en fond
+        return cached
 
 
 _instance: NewsClient | None = None
