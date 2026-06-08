@@ -18,7 +18,8 @@ BATTLE_START_DATE = date.fromisoformat(os.getenv("BATTLE_START_DATE", "2026-05-3
 
 SYMBOLS = os.getenv(
     "SYMBOLS",
-    "AAPL,MSFT,TSLA,AMZN,GOOGL,NVDA,META,NFLX,BTC-USD,ETH-USD,SPY,QQQ,GLD",
+    "AAPL,MSFT,TSLA,AMZN,GOOGL,NVDA,META,NFLX,BTC-USD,ETH-USD,SPY,QQQ,GLD,"
+    "VPK.AS,GTT.PA,TTE.PA,SU.PA,TEL.OL,DNB.OL",
 ).split(",")
 
 # ---------------------------------------------------------------------------
@@ -72,3 +73,6 @@ EXCHANGE_RATE_API_KEY = os.getenv("EXCHANGE_RATE_API_KEY", "")
 POLYGON_API_KEY       = os.getenv("POLYGON_API_KEY", "")
 ANTHROPIC_API_KEY     = os.getenv("ANTHROPIC_API_KEY", "")
 EIA_API_KEY           = os.getenv("EIA_API_KEY", "")   # gratuit — eia.gov/opendata
+GLASSNODE_API_KEY     = os.getenv("GLASSNODE_API_KEY", "")  # gratuit — glassnode.com
+
+RAPPORTS_DIR = Path(os.getenv("RAPPORTS_DIR", Path(__file__).parent.parent / "rapports"))

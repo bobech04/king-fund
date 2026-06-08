@@ -9,6 +9,8 @@ async def run_async() -> dict[str, Any]:
         YahooEquityAgent, YahooETFAgent, YahooForexAgent,
         CoinGeckoMarketAgent, CoinGeckoDeFiAgent,
         BertezEnergyAgent,
+        YahooAsianIndicesAgent,
+        SentimentAgent,
     )
     from desk_liquidite.agents.aggregator_agent import LiquidityAggregatorAgent
 
@@ -17,6 +19,8 @@ async def run_async() -> dict[str, Any]:
         YahooEquityAgent(), YahooETFAgent(), YahooForexAgent(),
         CoinGeckoMarketAgent(), CoinGeckoDeFiAgent(),
         BertezEnergyAgent(),
+        YahooAsianIndicesAgent(),
+        SentimentAgent(),
     ]
     raw = await asyncio.gather(*[a.run() for a in agents], return_exceptions=True)
     results = []

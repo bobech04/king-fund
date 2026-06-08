@@ -134,6 +134,28 @@ class BaseTrader:
         held = self.portfolio.positions.get(symbol, 0.0)
         return {"action": "sell", "symbol": symbol, "amount": held * fraction}
 
+    def _short(self, symbol: str, fraction: float, prices: dict) -> dict:
+        """
+        Vente à découvert : fraction du cash disponible sur symbol.
+        Produit de la vente crédité en cash ; position enregistrée négative.
+        """
+        if self._feedback_cautious:
+            fraction *= 0.5
+        fraction = max(0.0, min(fraction, 1.0))
+        price = prices.get(symbol, 0.0)
+        if price <= 0:
+            return self._hold()
+        amount = (self.portfolio.cash * fraction) / price
+        return {"action": "short", "symbol": symbol, "amount": amount}
+
+    def _cover(self, symbol: str, fraction: float = 1.0) -> dict:
+        """Rachat de position courte. fraction=1.0 = clôture totale."""
+        fraction = max(0.0, min(fraction, 1.0))
+        short_held = self.portfolio.positions.get(symbol, 0.0)
+        if short_held >= 0:
+            return self._hold()
+        return {"action": "cover", "symbol": symbol, "amount": abs(short_held) * fraction}
+
     def _hold(self) -> dict:
         return {"action": "hold", "symbol": "", "amount": 0}
 

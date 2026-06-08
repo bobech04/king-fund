@@ -1,4 +1,5 @@
 import json
+import os
 import queue
 import threading
 import logging
@@ -6,16 +7,40 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
+import requests as _requests
 from flask import Flask, jsonify
 from flask_sock import Sock
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
+import pytz
 
 sys.path.insert(0, str(Path(__file__).parent))
 
 from engine import TradingEngine
 from data.morning_brief import get_morning_brief
+from config import TICK_INTERVAL
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Telegram
+# ---------------------------------------------------------------------------
+
+def _send_telegram(message: str) -> None:
+    token   = os.getenv("TELEGRAM_BOT_TOKEN", "")
+    chat_id = os.getenv("TELEGRAM_CHAT_ID", "")
+    if not token or not chat_id:
+        return
+    try:
+        _requests.post(
+            f"https://api.telegram.org/bot{token}/sendMessage",
+            json={"chat_id": chat_id, "text": message, "parse_mode": "HTML"},
+            timeout=5,
+        )
+    except Exception as exc:
+        logger.warning("Telegram alert failed: %s", exc)
 
 app = Flask(__name__, static_folder="../frontend", static_url_path="")
 sock = Sock(app)
@@ -131,6 +156,52 @@ def get_investissement_theses():
         return jsonify({"erreur": str(e)}), 500
 
 
+# ── Patrimoine ────────────────────────────────────────────────────────────────
+
+@app.route("/api/patrimoine")
+def get_patrimoine():
+    from data.patrimoine import get_patrimoine as _get
+    try:
+        return jsonify(_get())
+    except Exception as e:
+        logger.error("patrimoine: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/patrimoine/apport", methods=["POST"])
+def add_patrimoine_apport():
+    from data.patrimoine import add_apport
+    from flask import request
+    body = request.get_json(silent=True) or {}
+    try:
+        montant = float(body.get("montant", 0))
+        note    = str(body.get("note", ""))
+        apport  = add_apport(montant, note)
+        return jsonify({"status": "ok", "apport": apport})
+    except ValueError as e:
+        return jsonify({"erreur": str(e)}), 400
+    except Exception as e:
+        logger.error("apport: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/patrimoine/config", methods=["POST"])
+def update_patrimoine_config():
+    from data.patrimoine import update_config
+    from flask import request
+    body = request.get_json(silent=True) or {}
+    try:
+        cfg = update_config(
+            taux=body.get("taux_annuel"),
+            age=body.get("age_actuel"),
+            retraite=body.get("age_retraite"),
+            apport_mensuel=body.get("apport_mensuel"),
+        )
+        return jsonify({"status": "ok", "config": cfg})
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
 @app.route("/api/bus/state")
 def get_bus_state():
     hub = getattr(engine, "_hub", None)
@@ -182,13 +253,51 @@ def websocket(ws):
                 _ws_queues.remove(q)
 
 
+# ---------------------------------------------------------------------------
+# Scheduler APScheduler — jobs périodiques
+# ---------------------------------------------------------------------------
+
+_scheduler = BackgroundScheduler(timezone=pytz.timezone("Europe/Paris"))
+
+
+def _job_rapport_pdf():
+    logger.info("[SCHEDULER] Démarrage job rapport_investisseur (lundi 09:00 Paris)")
+    try:
+        from divisions.rapports.rapport_investisseur import generer_rapport
+        chemin = generer_rapport(engine)
+        logger.info("[SCHEDULER] ✓ Rapport PDF confirmé → %s", chemin)
+        _send_telegram(f"📄 <b>Rapport investisseur généré</b>\n{chemin}")
+    except Exception as exc:
+        logger.error("[SCHEDULER] ✗ Rapport PDF ÉCHEC: %s", exc)
+        _send_telegram(f"⚠️ Rapport investisseur ÉCHEC: {exc}")
+
+
+_scheduler.add_job(
+    _job_rapport_pdf,
+    CronTrigger(day_of_week="mon", hour=9, minute=0),
+    id="rapport_investisseur",
+    replace_existing=True,
+)
+
+
 # ------------------------------------------------------------------
 # Entry point
 # ------------------------------------------------------------------
 
 if __name__ == "__main__":
+    _scheduler.start()
+    logger.info("[SCHEDULER] APScheduler démarré — job rapport_investisseur lundi 09:00")
+
     engine.set_tick_callback(_broadcast)
     engine_thread = threading.Thread(target=engine.run, daemon=True)
     engine_thread.start()
+
+    _send_telegram(
+        f"🟢 <b>King Fund opérationnel</b>\n"
+        f"Serveur démarré le {datetime.now().strftime('%d/%m/%Y à %H:%M:%S')}\n"
+        f"30 traders actifs — Tick {TICK_INTERVAL}s\n"
+        f"Scheduler PDF : lundi 09:00 (Europe/Paris)"
+    )
+    logger.info("[STARTUP] Alerte Telegram envoyée")
     logger.info("Server starting on http://0.0.0.0:5000")
     app.run(host="0.0.0.0", port=5000, debug=False)

@@ -396,6 +396,46 @@ class TradingEngine:
         act = action.get("action", "hold")
         sym = getattr(trader, "_symbol", None)
 
+        # ── AUTO-SHORT SPY/QQQ lors d'un BLACK SWAN (VIX ≥ 35) ──────────────
+        if self._hub and self._hub.black_swan_halt and act == "hold":
+            for inv_sym in ["SPY", "QQQ"]:
+                if inv_sym not in prices:
+                    continue
+                already_short = trader.portfolio.positions.get(inv_sym, 0) < 0
+                if not already_short and trader.portfolio.cash >= 50.0:
+                    new_action = trader._short(inv_sym, 0.08, prices)
+                    if new_action.get("amount", 0) > 0:
+                        logger.warning(
+                            "BLACK SWAN SHORT TRD%02d %s (VIX=%.1f)",
+                            trader.id, inv_sym, self._hub.last_vix or 0,
+                        )
+                        return new_action
+
+        # ── AUTO-COVER quand Black Swan levé ────────────────────────────────
+        if self._hub and not self._hub.black_swan_halt and act == "hold":
+            for inv_sym in ["SPY", "QQQ"]:
+                short_held = trader.portfolio.positions.get(inv_sym, 0)
+                if short_held < 0 and inv_sym in prices:
+                    new_action = trader._cover(inv_sym, 1.0)
+                    if new_action.get("amount", 0) > 0:
+                        logger.info(
+                            "BLACK SWAN LIFTED — COVER TRD%02d %s", trader.id, inv_sym
+                        )
+                        return new_action
+
+        # ── CIO BEARISH SHORT SPY/QQQ (expert_sig ≤ -0.70) ──────────────────
+        if sym in ("SPY", "QQQ") and act == "hold" and expert_sig <= -0.70:
+            already_short = trader.portfolio.positions.get(sym, 0) < 0
+            if not already_short and trader.portfolio.cash >= 50.0:
+                frac = trader.base_fraction * 0.5
+                new_action = trader._short(sym, frac, prices)
+                if new_action.get("amount", 0) > 0:
+                    logger.info(
+                        "CIO BEARISH SHORT TRD%02d %s sig=%.2f",
+                        trader.id, sym, expert_sig,
+                    )
+                    return new_action
+
         if abs(expert_sig) < 0.20:
             return action   # signal too weak — no influence
 
@@ -483,6 +523,27 @@ class TradingEngine:
                 return
             trader.portfolio.cash += sell_qty * price
             trader.portfolio.positions[symbol] = held - sell_qty
+        elif act == "short":
+            # Vente à découvert : le produit crédite le cash, position devient négative
+            trader.portfolio.cash += amount * price
+            trader.portfolio.positions[symbol] = (
+                trader.portfolio.positions.get(symbol, 0) - amount
+            )
+        elif act == "cover":
+            # Rachat de la position courte
+            short_held = trader.portfolio.positions.get(symbol, 0)
+            if short_held >= 0:
+                return
+            cover_qty = min(amount, abs(short_held))
+            buyback_cost = cover_qty * price
+            if buyback_cost > trader.portfolio.cash:
+                return
+            trader.portfolio.cash -= buyback_cost
+            new_qty = short_held + cover_qty
+            if abs(new_qty) < 1e-9:
+                trader.portfolio.positions.pop(symbol, None)
+            else:
+                trader.portfolio.positions[symbol] = new_qty
         else:
             return
 
@@ -527,9 +588,22 @@ class TradingEngine:
 
     def _run_eod_natural_selection(self):
         """Top 5 +20% budget, Bottom 5 -50% budget. Élimination si J≥15 et PV<300€."""
-        ranked = sorted(self._traders, key=lambda t: t.portfolio.portfolio_value, reverse=True)
+        ranked    = sorted(self._traders, key=lambda t: t.portfolio.portfolio_value, reverse=True)
+        battle_day = (date.today() - BATTLE_START_DATE).days + 1
 
-        for t in ranked[:5]:
+        top5 = ranked[:5]
+        bot5 = ranked[-5:]
+
+        top_str = " | ".join(f"TRD{t.id:02d}={t.portfolio.portfolio_value:.0f}€" for t in top5)
+        bot_str = " | ".join(f"TRD{t.id:02d}={t.portfolio.portfolio_value:.0f}€" for t in bot5)
+
+        logger.info("╔══════════════════════════════════════════════════════════╗")
+        logger.info("║  SÉLECTION NATURELLE — EOD J%-2d                          ║", battle_day)
+        logger.info("║  TOP 5 (+20%%) : %-44s ║", top_str)
+        logger.info("║  BOT 5 (-50%%) : %-44s ║", bot_str)
+        logger.info("╚══════════════════════════════════════════════════════════╝")
+
+        for t in top5:
             cur = self._selection_multipliers.get(t.id, 1.0)
             new = round(min(2.5, cur * 1.20), 3)
             self._selection_multipliers[t.id] = new
@@ -538,7 +612,7 @@ class TradingEngine:
                 t.id, t.portfolio.portfolio_value, cur, new,
             )
 
-        for t in ranked[-5:]:
+        for t in bot5:
             cur = self._selection_multipliers.get(t.id, 1.0)
             new = round(max(0.10, cur * 0.50), 3)
             self._selection_multipliers[t.id] = new
@@ -547,7 +621,6 @@ class TradingEngine:
                 t.id, t.portfolio.portfolio_value, cur, new,
             )
 
-        battle_day = (date.today() - BATTLE_START_DATE).days + 1
         if battle_day >= 15:
             self._check_eliminations(battle_day)
 

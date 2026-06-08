@@ -34,6 +34,15 @@ _DOMAINS: dict[str, dict] = {
         # combined = liq*(1-cb_w-bertez_w) + cb*cb_w + bertez*bertez_w
         # → liq poids effectif = 0.60
     },
+    "equity_eu": {
+        "liq_agents":    ["Yahoo_Equity", "FRED_Macro", "Bertez_Energy"],
+        "liq_weights":   [0.40,            0.35,         0.25],
+        "cb_codes":      ["BCE", "NORGES"],
+        "cb_weight":     0.20,
+        "bertez_weight": 0.20,
+        # BCE + Norges pilotent les taux EU ; Bertez reflète l'exposition énergie/infrastructure
+        # → liq poids effectif = 0.60
+    },
     "crypto": {
         "liq_agents":    ["CoinGecko_Market", "CoinGecko_DeFi", "FRED_Macro"],
         "liq_weights":   [0.50,               0.25,              0.25],
@@ -53,8 +62,18 @@ _SYMBOL_DOMAIN: dict[str, str] = {
     "NVDA":    "equity_us",
     "META":    "equity_us",
     "NFLX":    "equity_us",
+    "SPY":     "equity_us",
+    "QQQ":     "equity_us",
+    "GLD":     "equity_us",
     "BTC-USD": "crypto",
     "ETH-USD": "crypto",
+    # Actifs européens — BCE + Norges + Bertez énergie
+    "VPK.AS":  "equity_eu",
+    "GTT.PA":  "equity_eu",
+    "TTE.PA":  "equity_eu",
+    "SU.PA":   "equity_eu",
+    "TEL.OL":  "equity_eu",
+    "DNB.OL":  "equity_eu",
 }
 
 

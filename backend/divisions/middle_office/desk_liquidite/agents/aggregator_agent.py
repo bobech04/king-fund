@@ -4,15 +4,18 @@ from typing import Any
 
 
 AGENT_WEIGHTS = {
-    "FRED_Macro":        0.20,
-    "FRED_Credit":       0.20,
-    "Yahoo_Equity":      0.15,
-    "Yahoo_ETF":         0.15,
-    "Yahoo_Forex":       0.10,
-    "CoinGecko_Market":  0.10,
-    "CoinGecko_DeFi":    0.10,
+    "FRED_Macro":        0.17,
+    "FRED_Credit":       0.17,
+    "Yahoo_Equity":      0.13,
+    "Yahoo_ETF":         0.13,
+    "Yahoo_Forex":       0.09,
+    "CoinGecko_Market":  0.09,
+    "CoinGecko_DeFi":    0.09,
     # Thèse Bertez : énergie/PIB, dette productive, Bastiat hors bilan
-    "Bertez_Energy":     0.15,
+    "Bertez_Energy":     0.13,
+    # Ajouts 2026-06-08
+    "Yahoo_Asian":       0.08,   # sessions Asie : N225 HSI SSEC KS11 BSESN AXJO
+    "Sentiment":         0.05,   # retail StockTwits + BTC on-chain Glassnode
 }
 
 SCORE_THRESHOLDS = {

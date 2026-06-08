@@ -8,9 +8,10 @@ if _backend_env.exists():
     load_dotenv(_backend_env)
 load_dotenv(Path(__file__).parent / ".env", override=True)
 
-FRED_API_KEY = os.getenv("FRED_API_KEY", "")        # https://fred.stlouisfed.org/docs/api/api_key.html
+FRED_API_KEY      = os.getenv("FRED_API_KEY", "")        # https://fred.stlouisfed.org/docs/api/api_key.html
 COINGECKO_API_KEY = os.getenv("COINGECKO_API_KEY", "")  # optionnel, tier gratuit disponible
-EIA_API_KEY = os.getenv("EIA_API_KEY", "")          # https://www.eia.gov/opendata/ — optionnel (backup WTI)
+EIA_API_KEY       = os.getenv("EIA_API_KEY", "")        # https://www.eia.gov/opendata/ — optionnel (backup WTI)
+GLASSNODE_API_KEY = os.getenv("GLASSNODE_API_KEY", "")  # https://studio.glassnode.com/api — free tier disponible
 
 FRED_SERIES = {
     "m2_money_supply":    "M2SL",
@@ -28,7 +29,8 @@ FRED_CREDIT_SERIES = {
     "sofr_ois":           "IORB",           # Interest on Reserve Balances (remplace TED)
 }
 
-YAHOO_EQUITIES = ["SPY", "QQQ", "IWM", "^VIX", "^GSPC"]
+YAHOO_EQUITIES      = ["SPY", "QQQ", "IWM", "^VIX", "^GSPC"]
+YAHOO_ASIAN_INDICES = ["^N225", "^HSI", "000001.SS", "^KS11", "^BSESN", "^AXJO"]
 YAHOO_ETFS     = ["TLT", "HYG", "LQD", "JNK", "AGG"]
 YAHOO_FOREX    = ["EURUSD=X", "USDJPY=X", "GBPUSD=X", "DX-Y.NYB", "USDCHF=X"]
 

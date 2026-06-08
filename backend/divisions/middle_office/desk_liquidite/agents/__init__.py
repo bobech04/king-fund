@@ -6,6 +6,8 @@ from .yahoo_forex_agent import YahooForexAgent
 from .coingecko_market_agent import CoinGeckoMarketAgent
 from .coingecko_defi_agent import CoinGeckoDeFiAgent
 from .agent_bertez import BertezEnergyAgent
+from .yahoo_asian_indices_agent import YahooAsianIndicesAgent
+from .sentiment_agent import SentimentAgent
 from .aggregator_agent import LiquidityAggregatorAgent
 
 __all__ = [
@@ -17,5 +19,7 @@ __all__ = [
     "CoinGeckoMarketAgent",
     "CoinGeckoDeFiAgent",
     "BertezEnergyAgent",
+    "YahooAsianIndicesAgent",
+    "SentimentAgent",
     "LiquidityAggregatorAgent",
 ]
