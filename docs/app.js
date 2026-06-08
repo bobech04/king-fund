@@ -38,8 +38,10 @@ let briefLoaded      = false;
 let postmarketLoaded = false;
 let diplomeLoaded           = false;
 let investissementLoaded    = false;
+let patrimoineLoaded        = false;
 let liquiditeLoaded         = false;
 let _liqRefreshing   = false;
+let _patrimoineCharts       = {};   // {evolution: Chart, camembert: Chart, projection: Chart}
 
 // ── Change detection state ────────────────────────────────────────
 const prevTraderValues = new Map();  // id → value
@@ -259,6 +261,7 @@ function switchTab(tab) {
   if (tab === 'postmarket')          loadPostMarket();
   if (tab === 'diplome')             loadDiplome();
   if (tab === 'investissement')      loadInvestissement();
+  if (tab === 'patrimoine')          loadPatrimoine();
   if (tab === 'liquidite')           loadLiquidite();
 }
 
@@ -1127,6 +1130,472 @@ function renderInvestissement(watchlist, theses) {
     </div>`;
 }
 
+// ── Patrimoine tab ────────────────────────────────────────────────
+async function loadPatrimoine(silent = false) {
+  if (patrimoineLoaded && !silent) return;
+  try {
+    const d = await (await fetch(`${API}/patrimoine`)).json();
+    patrimoineLoaded = true;
+    renderPatrimoine(d);
+  } catch {
+    if (!silent)
+      qs('#patrimoine-wrap').innerHTML = '<div class="error-state">Impossible de charger le patrimoine.</div>';
+  }
+}
+
+function renderPatrimoine(d) {
+  const actifs   = d.actifs || [];
+  const total    = d.total_eur || 0;
+  const proj     = d.projection || [];
+  const apports  = d.apports || [];
+  const cfg      = d.config || {};
+  const fisc     = d.fiscalite || {};
+  const fscFra   = fisc.fsc_fra_01 || {};
+
+  // ── KPI row ────────────────────────────────────────────────────
+  const valRetraite = d.valeur_retraite || 0;
+  const anneeRet    = cfg.annee_base + (cfg.age_retraite - cfg.age_actuel);
+  const apportMens  = d.apport_mensuel_effectif || cfg.apport_mensuel || 500;
+  const apport12m   = d.apports_cumules_12m || 0;
+
+  // ── Camembert data (actifs > 0 seulement) ─────────────────────
+  const actifsPie = actifs.filter(a => a.valeur_eur > 0);
+  const pieLabels = actifsPie.map(a => a.nom);
+  const pieValues = actifsPie.map(a => a.valeur_eur);
+  const pieColors = actifsPie.map(a => a.couleur);
+
+  // ── Projection data ────────────────────────────────────────────
+  const projLabels   = proj.map(p => p.annee);
+  const projTotal    = proj.map(p => p.valeur);
+  const projGrowth   = proj.map(p => p.croissance);
+  const projApports  = proj.map(p => p.apports_cumules);
+
+  // ── Apports history table ──────────────────────────────────────
+  const apportsHtml = apports.length === 0
+    ? '<div style="color:var(--muted);font-size:.78rem;text-align:center;padding:20px">Aucun apport enregistré</div>'
+    : apports.slice(0, 10).map(a => `
+        <div class="pat-apport-row">
+          <span class="pat-apport-date">${a.date || '—'}</span>
+          <span class="pat-apport-note">${escHtml(a.note || 'Apport')}</span>
+          <span class="pat-apport-montant">+${fmt(a.montant, 0)} €</span>
+        </div>`).join('');
+
+  // ── Or tax details ─────────────────────────────────────────────
+  const orFisc  = fscFra.or || {};
+  const orA     = orFisc.option_A || {};
+  const orB     = orFisc.option_B || {};
+  const stFisc  = fscFra.stellantis || {};
+  const peaFisc = fisc.pea  || {};
+  const immoFisc = fisc.immo || {};
+  const immoRP   = immoFisc.residence_principale || {};
+  const immoLoc  = immoFisc.locatif || {};
+  const immoIfi  = immoFisc.ifi || {};
+  const immoType = immoFisc.type || 'residence_principale';
+  const immoVal  = immoFisc.valeur || 0;
+  const immoNet  = immoFisc.valeur_nette || 0;
+  const peaVal   = peaFisc.valeur || 0;
+  const peaActif = actifs.find(a => a.id === 'pea') || {};
+  const immoActif = actifs.find(a => a.id === 'immo') || {};
+
+  qs('#patrimoine-wrap').innerHTML = `
+  <div class="pat-panel">
+
+    <!-- KPI row -->
+    <div class="pat-kpi-row">
+      <div class="pat-kpi">
+        <div class="pat-kpi-label">PATRIMOINE TOTAL</div>
+        <div class="pat-kpi-val" style="color:var(--accent)">${fmt(total, 0)} €</div>
+      </div>
+      <div class="pat-kpi">
+        <div class="pat-kpi-label">OBJECTIF RETRAITE ${cfg.age_retraite || 56} ANS</div>
+        <div class="pat-kpi-val" style="color:var(--gold)">${fmt(valRetraite, 0)} €</div>
+        <div class="pat-kpi-sub">${anneeRet}</div>
+      </div>
+      <div class="pat-kpi">
+        <div class="pat-kpi-label">APPORT MOYEN</div>
+        <div class="pat-kpi-val">${fmt(apportMens, 0)} €<span style="font-size:.65rem;color:var(--muted)">/mois</span></div>
+      </div>
+      <div class="pat-kpi">
+        <div class="pat-kpi-label">APPORTS 12M</div>
+        <div class="pat-kpi-val">${fmt(apport12m, 0)} €</div>
+      </div>
+    </div>
+
+    <!-- Graphique + Camembert -->
+    <div class="pat-charts-row">
+      <div class="pat-card" style="flex:1;min-width:0">
+        <div class="pat-card-title">📈 Projection vers la retraite (${cfg.taux_annuel * 100 || 10}%/an)</div>
+        <div style="position:relative;height:220px">
+          <canvas id="pat-proj-chart"></canvas>
+        </div>
+      </div>
+      <div class="pat-card" style="width:220px;flex-shrink:0">
+        <div class="pat-card-title">🥧 Répartition patrimoine</div>
+        <div style="position:relative;height:220px;display:flex;align-items:center;justify-content:center">
+          <canvas id="pat-pie-chart"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Apports -->
+    <div class="pat-card">
+      <div class="pat-card-header">
+        <div class="pat-card-title">💰 Suivi des apports mensuels</div>
+        <button class="pat-btn-add" id="pat-add-apport-btn">＋ Ajouter un apport</button>
+      </div>
+      <div class="pat-apports-list">${apportsHtml}</div>
+    </div>
+
+    <!-- Fiscalité FSC-FRA-01 -->
+    <div class="pat-card">
+      <div class="pat-fisc-header" onclick="this.nextElementSibling.classList.toggle('hidden')">
+        <div class="pat-card-title">🇫🇷 FSC-FRA-01 — Flat Tax (PFU 30%)</div>
+        <span class="pat-fisc-toggle">▼</span>
+      </div>
+      <div class="pat-fisc-body">
+        <div class="pat-fisc-ref">${escHtml(fscFra.reference || '')}</div>
+        <div class="pat-fisc-taux">${escHtml(fscFra.taux || '30% = 12.8% IR + 17.2% PS')}</div>
+
+        <div class="pat-fisc-section">
+          <div class="pat-fisc-actif">🥇 ${escHtml((orFisc.actif || 'Or physique'))}</div>
+          <div class="pat-fisc-option">
+            <span class="pat-fisc-badge">Option A</span>
+            <span>${escHtml(orA.nom || '')} — <strong>${fmt(orA.impot || 0, 2)} €</strong></span>
+            <div class="pat-fisc-detail">${escHtml(orA.detail || '')}</div>
+          </div>
+          <div class="pat-fisc-option">
+            <span class="pat-fisc-badge ${orB.exonere ? 'exonere' : ''}">Option B</span>
+            <span>${escHtml(orB.nom || '')}
+              ${orB.exonere ? '→ <strong style="color:var(--accent)">EXONÉRÉ</strong>' : `— abattement ${escHtml(orB.abattement_acquis || '')} acquis`}
+            </span>
+            <div class="pat-fisc-detail">${escHtml(orB.detail || '')}</div>
+          </div>
+          <div class="pat-fisc-conseil">${escHtml(orFisc.conseil || '')}</div>
+        </div>
+
+        <div class="pat-fisc-section">
+          <div class="pat-fisc-actif">🚗 ${escHtml(stFisc.actif || 'Stellantis')}</div>
+          <div class="pat-fisc-option">
+            Dividendes estimés : <strong>${fmt(stFisc.dividendes_estimes || 0, 2)} €/an</strong>
+            → PFU : <strong>${fmt(stFisc.pfu_annuel || 0, 2)} €/an</strong>
+          </div>
+          <div class="pat-fisc-detail">${escHtml(stFisc.detail || '')}</div>
+          <div class="pat-fisc-conseil">${escHtml(stFisc.conseil || '')}</div>
+        </div>
+
+        <div class="pat-fisc-section">
+          <div class="pat-fisc-actif">💵 ${escHtml((fscFra.cash || {}).actif || 'Cash')}</div>
+          <div class="pat-fisc-detail">${escHtml((fscFra.cash || {}).detail || '')}</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PEA -->
+    <div class="pat-card">
+      <div class="pat-fisc-header" onclick="this.nextElementSibling.classList.toggle('hidden')">
+        <div class="pat-card-title">📊 PEA — Plan d'Épargne en Actions</div>
+        <span class="pat-fisc-toggle">▼</span>
+      </div>
+      <div class="pat-fisc-body">
+        <div class="pat-fisc-ref">${escHtml(peaFisc.reference || '')}</div>
+
+        <div class="pat-kpi-row" style="margin-bottom:10px">
+          <div class="pat-kpi">
+            <div class="pat-kpi-label">VALEUR PEA</div>
+            <div class="pat-kpi-val" style="color:var(--accent)">${fmt(peaVal, 0)} €</div>
+          </div>
+          <div class="pat-kpi">
+            <div class="pat-kpi-label">PLAFOND RESTANT</div>
+            <div class="pat-kpi-val" style="color:var(--gold)">${fmt(peaFisc.dispo || 0, 0)} €</div>
+          </div>
+          <div class="pat-kpi">
+            <div class="pat-kpi-label">PLAFOND LÉGAL</div>
+            <div class="pat-kpi-val">150 000 €</div>
+          </div>
+          <div class="pat-kpi">
+            <div class="pat-kpi-label">PEA-PME</div>
+            <div class="pat-kpi-val">+ 75 000 €</div>
+          </div>
+        </div>
+
+        <div class="pat-fisc-section">
+          <div class="pat-fisc-actif">⏳ Fiscalité selon ancienneté</div>
+          <div class="pat-fisc-option">
+            <span class="pat-fisc-badge critique">Avant 5 ans</span>${escHtml(peaFisc.avant_5ans || '')}
+          </div>
+          <div class="pat-fisc-option">
+            <span class="pat-fisc-badge exonere">Après 5 ans</span>${escHtml(peaFisc.apres_5ans || '')}
+          </div>
+        </div>
+
+        <div class="pat-fisc-section">
+          <div class="pat-fisc-actif">🚗 Stellantis dans PEA — gain fiscal</div>
+          <div class="pat-fisc-detail">${escHtml(peaFisc.detail_economie || '')}</div>
+          <div class="pat-fisc-conseil">Économie annuelle estimée : +${fmt(peaFisc.economie_stellantis_an || 0, 2)} €/an</div>
+        </div>
+
+        <div class="pat-fisc-section">
+          <div class="pat-fisc-actif">💡 Conseils</div>
+          ${(peaFisc.conseil || []).map(c => `<div class="pat-fisc-option">· ${escHtml(c)}</div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    <!-- Immobilier -->
+    <div class="pat-card">
+      <div class="pat-fisc-header" onclick="this.nextElementSibling.classList.toggle('hidden')">
+        <div class="pat-card-title">🏠 Immobilier — Fiscalité et Plus-Values</div>
+        <span class="pat-fisc-toggle">▼</span>
+      </div>
+      <div class="pat-fisc-body">
+        <div class="pat-fisc-ref">${escHtml(immoFisc.reference || '')}</div>
+
+        <div class="pat-kpi-row" style="margin-bottom:10px">
+          <div class="pat-kpi">
+            <div class="pat-kpi-label">VALEUR BIEN</div>
+            <div class="pat-kpi-val" style="color:var(--accent)">${fmt(immoVal, 0)} €</div>
+          </div>
+          <div class="pat-kpi">
+            <div class="pat-kpi-label">CRÉDIT RESTANT</div>
+            <div class="pat-kpi-val" style="color:var(--red)">${fmt(immoFisc.credit_restant || 0, 0)} €</div>
+          </div>
+          <div class="pat-kpi">
+            <div class="pat-kpi-label">VALEUR NETTE</div>
+            <div class="pat-kpi-val" style="color:var(--gold)">${fmt(immoNet, 0)} €</div>
+          </div>
+          <div class="pat-kpi">
+            <div class="pat-kpi-label">DÉTENTION</div>
+            <div class="pat-kpi-val">${immoFisc.annees_detention || 0} ans</div>
+          </div>
+        </div>
+
+        <div class="pat-fisc-section">
+          <div class="pat-fisc-actif">🏡 Résidence principale</div>
+          <div class="pat-fisc-option">
+            <span class="pat-fisc-badge exonere">EXONÉRÉ</span>${escHtml(immoRP.regime || '')}
+          </div>
+          <div class="pat-fisc-detail">${escHtml(immoRP.detail || '')}</div>
+          <div class="pat-fisc-conseil">${escHtml(immoRP.conseil || '')}</div>
+        </div>
+
+        <div class="pat-fisc-section">
+          <div class="pat-fisc-actif">🏢 Investissement locatif — PV</div>
+          <div class="pat-fisc-option">
+            Taux PV applicable actuellement :
+            <strong style="color:${immoLoc.taux_pv_applicable === 0 ? 'var(--accent)' : 'var(--red)'}">
+              ${immoLoc.taux_pv_applicable ?? 36.2}%
+            </strong>
+            ${immoLoc.exonere_ir && immoLoc.exonere_ps
+              ? '<span class="pat-fisc-badge exonere">EXONÉRÉ TOTAL</span>'
+              : immoLoc.exonere_ir ? '<span class="pat-fisc-badge exonere">IR EXONÉRÉ</span>' : ''}
+          </div>
+          <div class="pat-fisc-option" style="gap:8px;display:flex;flex-wrap:wrap">
+            <span>Abattement IR : <strong>${escHtml(immoLoc.abattement_ir_acquis || '0%')}</strong></span>
+            <span>Abattement PS : <strong>${escHtml(immoLoc.abattement_ps_acquis || '0%')}</strong></span>
+            <span>IR net : <strong>${immoLoc.ir_net_pct ?? 19}%</strong></span>
+            <span>PS net : <strong>${immoLoc.ps_net_pct ?? 17.2}%</strong></span>
+          </div>
+          <div class="pat-fisc-detail">${escHtml(immoLoc.detail_abattements || '')}</div>
+          <div class="pat-fisc-section" style="margin-top:6px">
+            <div class="pat-fisc-actif" style="font-size:.65rem">Revenus locatifs — Micro-foncier</div>
+            <div class="pat-fisc-detail">
+              Seuil : ${escHtml((immoLoc.micro_foncier || {}).seuil || '')} →
+              abattement ${escHtml((immoLoc.micro_foncier || {}).abattement || '')}
+            </div>
+            <div class="pat-fisc-detail">${escHtml((immoLoc.micro_foncier || {}).detail || '')}</div>
+          </div>
+          <div class="pat-fisc-conseil">${escHtml(immoLoc.conseil || '')}</div>
+        </div>
+
+        <div class="pat-fisc-section">
+          <div class="pat-fisc-actif">⚡ IFI — Impôt sur la Fortune Immobilière</div>
+          <div class="pat-fisc-detail">${escHtml(immoIfi.seuil || '')}</div>
+          <div class="pat-fisc-detail">${escHtml(immoIfi.detail || '')}</div>
+        </div>
+      </div>
+    </div>
+
+  </div>`;
+
+  // ── Draw charts ────────────────────────────────────────────────
+  _drawPatrimoinePie(pieLabels, pieValues, pieColors);
+  _drawPatrimoineProjection(projLabels, projGrowth, projApports, projTotal, cfg);
+
+  // ── Events ────────────────────────────────────────────────────
+  qs('#pat-add-apport-btn').addEventListener('click', () => {
+    qs('#apport-overlay').classList.remove('hidden');
+    qs('#apport-montant').focus();
+  });
+}
+
+function _destroyChart(key) {
+  if (_patrimoineCharts[key]) {
+    _patrimoineCharts[key].destroy();
+    _patrimoineCharts[key] = null;
+  }
+}
+
+function _drawPatrimoinePie(labels, values, colors) {
+  _destroyChart('pie');
+  const ctx = qs('#pat-pie-chart');
+  if (!ctx) return;
+  _patrimoineCharts.pie = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{ data: values, backgroundColor: colors, borderWidth: 2, borderColor: '#0a0a0f' }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '62%',
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: { color: '#dddded', font: { size: 10 }, padding: 8, boxWidth: 12 },
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.label}: ${fmt(ctx.parsed, 0)} €`,
+          },
+        },
+      },
+    },
+  });
+}
+
+function _drawPatrimoineProjection(labels, growth, apports, total, cfg) {
+  _destroyChart('proj');
+  const ctx = qs('#pat-proj-chart');
+  if (!ctx) return;
+
+  // Ligne verticale "retraite" via un dataset sparse
+  const retIdx   = cfg.age_retraite - cfg.age_actuel;
+  const retMax   = total[retIdx] || Math.max(...total);
+  const retLine  = labels.map((_, i) => (i === retIdx ? retMax : null));
+
+  _patrimoineCharts.proj = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Patrimoine total',
+          data: total,
+          borderColor: '#ffd700',
+          backgroundColor: 'rgba(255,215,0,.08)',
+          borderWidth: 2,
+          fill: true,
+          tension: 0.3,
+          pointRadius: (ctx) => ctx.dataIndex === retIdx ? 6 : 2,
+          pointBackgroundColor: (ctx) => ctx.dataIndex === retIdx ? '#ff4466' : '#ffd700',
+        },
+        {
+          label: 'Croissance naturelle',
+          data: growth,
+          borderColor: '#00e5a0',
+          borderWidth: 1.5,
+          borderDash: [4, 3],
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+        },
+        {
+          label: 'Apports cumulés',
+          data: apports,
+          borderColor: '#b44cff',
+          borderWidth: 1.5,
+          borderDash: [2, 4],
+          fill: false,
+          tension: 0.3,
+          pointRadius: 0,
+        },
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: {
+          labels: { color: '#dddded', font: { size: 10 }, boxWidth: 12 },
+        },
+        tooltip: {
+          callbacks: {
+            title: (items) => {
+              const yr = items[0]?.label;
+              return yr == String(cfg.annee_base + retIdx) ? `${yr} 🎯 Retraite ${cfg.age_retraite} ans` : yr;
+            },
+            label: (c) => ` ${c.dataset.label}: ${fmt(c.parsed.y, 0)} €`,
+          },
+        },
+      },
+      scales: {
+        x: {
+          ticks: {
+            color: (ctx) => ctx.tick?.label == String(cfg.annee_base + retIdx) ? '#ff4466' : '#52526a',
+            font: { size: 10 },
+          },
+          grid: { color: '#1e1e2a' },
+        },
+        y: {
+          ticks: {
+            color: '#52526a', font: { size: 10 },
+            callback: v => v >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v}€`,
+          },
+          grid: { color: '#1e1e2a' },
+        },
+      },
+    },
+  });
+}
+
+// ── Apport modal events ───────────────────────────────────────────
+function fmtNum(n) { return Number(n).toLocaleString('fr-FR'); }
+
+function _initApportModal() {
+  qs('#apport-close').addEventListener('click', () => {
+    qs('#apport-overlay').classList.add('hidden');
+  });
+  qs('#apport-overlay').addEventListener('click', e => {
+    if (e.target === qs('#apport-overlay')) qs('#apport-overlay').classList.add('hidden');
+  });
+  qs('#apport-submit').addEventListener('click', async () => {
+    const montant = parseFloat(qs('#apport-montant').value);
+    const note    = qs('#apport-note').value.trim();
+    const fb      = qs('#apport-feedback');
+    if (!montant || montant <= 0) {
+      fb.style.color = 'var(--red)';
+      fb.textContent = 'Montant invalide';
+      return;
+    }
+    fb.style.color = 'var(--muted)';
+    fb.textContent = 'Envoi en cours…';
+    try {
+      const r = await fetch(`${API}/patrimoine/apport`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ montant, note }),
+      });
+      const res = await r.json();
+      if (res.status === 'ok') {
+        fb.style.color = 'var(--accent)';
+        fb.textContent = `✓ Apport de ${fmt(montant, 0)} € enregistré`;
+        qs('#apport-montant').value = '';
+        qs('#apport-note').value    = '';
+        setTimeout(() => {
+          qs('#apport-overlay').classList.add('hidden');
+          patrimoineLoaded = false;
+          loadPatrimoine(true);
+        }, 1200);
+      } else {
+        throw new Error(res.erreur || 'Erreur');
+      }
+    } catch (err) {
+      fb.style.color = 'var(--red)';
+      fb.textContent = `Erreur : ${err.message}`;
+    }
+  });
+}
+
 // ── Liquidité tab ─────────────────────────────────────────────────
 async function loadLiquidite(silent = false) {
   if (liquiditeLoaded && !silent) return;
@@ -1347,3 +1816,4 @@ qs('#notif-clear-btn').addEventListener('click', () => {
 startClock();
 initWS();
 startPolling();
+_initApportModal();

@@ -82,6 +82,7 @@
   <button class="tab-btn" data-tab="postmarket">📊 Post-Market</button>
   <button class="tab-btn" data-tab="diplome">🎓 Diplôme</button>
   <button class="tab-btn" data-tab="investissement">📈 Investissement</button>
+  <button class="tab-btn" data-tab="patrimoine">💎 Patrimoine</button>
   <button class="tab-btn" data-tab="liquidite">💧 Liquidité</button>
 </nav>
 
@@ -135,6 +136,42 @@
   <div class="tab-pane hidden" id="tab-investissement">
     <div id="investissement-wrap">
       <div class="loading-state">Analyse pipeline 17 étapes en cours…</div>
+    </div>
+  </div>
+
+  <!-- TAB : PATRIMOINE ──────────────────────────────────────── -->
+  <div class="tab-pane hidden" id="tab-patrimoine">
+    <div id="patrimoine-wrap">
+      <div class="loading-state">Chargement du patrimoine…</div>
+    </div>
+  </div>
+
+  <!-- MODAL APPORT ────────────────────────────────────────────── -->
+  <div class="overlay hidden" id="apport-overlay">
+    <div class="modal" id="apport-modal" style="max-width:380px">
+      <div class="modal-header">
+        <button class="btn-close" id="apport-close">✕</button>
+        <div class="modal-title"><h2 class="modal-name">Ajouter un apport</h2></div>
+      </div>
+      <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
+        <label style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">
+          Montant (€)
+          <input id="apport-montant" type="number" min="1" step="0.01" placeholder="500"
+            style="margin-top:6px;width:100%;background:var(--surface2);border:1px solid var(--border);
+                   color:var(--text);border-radius:8px;padding:10px 12px;font-size:1rem;outline:none" />
+        </label>
+        <label style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">
+          Note (optionnel)
+          <input id="apport-note" type="text" placeholder="Salaire, économies…"
+            style="margin-top:6px;width:100%;background:var(--surface2);border:1px solid var(--border);
+                   color:var(--text);border-radius:8px;padding:10px 12px;font-size:0.9rem;outline:none" />
+        </label>
+        <button id="apport-submit" style="background:var(--accent);color:#000;border:none;border-radius:8px;
+          padding:12px;font-weight:700;font-size:0.9rem;cursor:pointer;letter-spacing:.05em">
+          AJOUTER L'APPORT
+        </button>
+        <div id="apport-feedback" style="font-size:0.75rem;text-align:center;min-height:18px"></div>
+      </div>
     </div>
   </div>
 
