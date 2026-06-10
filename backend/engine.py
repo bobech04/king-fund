@@ -129,6 +129,10 @@ class TradingEngine:
     # ------------------------------------------------------------------
 
     _DIVISION_COLORS = {
+        "Groupe A — EU Valeurs":        "#00cc88",
+        "Groupe B — Macro Dalio":       "#4488ff",
+        "Groupe C — Protecteurs Taleb": "#ff4444",
+        # Anciens noms (compatibilité si des traders non migrés subsistent)
         "Investissement":   "#ffd700",
         "Banque Centrale":  "#4488ff",
         "Expert Tech":      "#00e5a0",
@@ -137,6 +141,10 @@ class TradingEngine:
         "Morning Brief":    "#ff4488",
     }
     _DIVISION_ICONS = {
+        "Groupe A — EU Valeurs":        "🇪🇺",
+        "Groupe B — Macro Dalio":       "🌍",
+        "Groupe C — Protecteurs Taleb": "🛡️",
+        # Anciens noms
         "Investissement":   "📈",
         "Banque Centrale":  "🏛️",
         "Expert Tech":      "💻",
@@ -147,6 +155,13 @@ class TradingEngine:
 
     def _get_division(self, trader) -> str:
         doc = (trader.__class__.__doc__ or "").strip()
+        if "Groupe A" in doc:
+            return "Groupe A — EU Valeurs"
+        if "Groupe B" in doc:
+            return "Groupe B — Macro Dalio"
+        if "Groupe C" in doc:
+            return "Groupe C — Protecteurs Taleb"
+        # Fallback anciens noms
         if "Division Investissement" in doc:
             return "Investissement"
         if "Banque Centrale" in doc:
@@ -362,13 +377,14 @@ class TradingEngine:
         # ── Cycles inter-agents (non bloquants — threads daemon) ────────────
         if self._hub:
             if self._tick_count % 60 == 0:
-                self._hub.run_cycle_cb()        # Flux 1 : CB → Division Banque Centrale
+                self._hub.run_cycle_cb()        # Flux 1 : CB → Groupe B Macro Dalio
             if self._tick_count % 30 == 0:
-                self._hub.run_cycle_experts()   # Flux 2 : Experts → Division Investissement
+                self._hub.run_cycle_experts()   # Flux 2 : Experts → Groupe A EU Valeurs
+                self._hub.run_cycle_bertez()    # Flux 3 : Bertez → Groupe C Protecteurs
             if self._tick_count % 15 == 0:
-                self._hub.run_cycle_liq()       # Flux 3 : Desk Liq → budget_factor
+                self._hub.run_cycle_liq()       # Flux 4 : Desk Liq → budget_factor
             if self._tick_count % 20 == 0:
-                self._hub.run_cycle_vix()       # Flux 4 : VIX Black Swan check
+                self._hub.run_cycle_vix()       # Flux 5 : VIX Black Swan check
 
     def _schedule_liquidity_refresh(self):
         try:
@@ -772,6 +788,10 @@ class TradingEngine:
 
     def get_divisions(self) -> list:
         DIVISION_ORDER = [
+            "Groupe A — EU Valeurs",
+            "Groupe B — Macro Dalio",
+            "Groupe C — Protecteurs Taleb",
+            # Anciens noms (si traders non migrés présents)
             "Investissement", "Banque Centrale",
             "Expert Tech", "Expert Crypto", "Expert Commerce", "Morning Brief",
         ]

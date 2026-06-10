@@ -3,33 +3,45 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from traders.base_trader import BaseTrader
-from strategies import MACDStrategy
-from data.fred_client import get_fred_client
+from strategies import MeanReversionStrategy
+from data.liquidity_client import get_liquidity_client
+
+
+def _bertez_mode() -> str:
+    try:
+        from divisions.investissement.agent_bertez import get_agent_bertez
+        return get_agent_bertez().analyse().get("mode", "NEUTRE")
+    except Exception:
+        return "NEUTRE"
 
 
 class Trader(BaseTrader):
-    """Banque Centrale — FRED macro bias modulates position size."""
+    """Groupe C — Protecteurs Taleb · SPY mean reversion bear défensif."""
 
     def __init__(self, trader_id: int, starting_capital: float):
         super().__init__(trader_id, starting_capital)
         self.name     = "CROSS"
-        self.strategy = "MACD prudent · AAPL + FRED"
-        self._symbol  = "AAPL"
-        self._strat   = MACDStrategy(fast=12, slow=26, signal_period=9)
+        self.strategy = "Mean Reversion bear · SPY · cash si crise Bertez"
+        self._symbol  = "SPY"
+        self._strat   = MeanReversionStrategy(window=15, k=1.8)
         self._history: list = []
-        self._fred    = get_fred_client()
+        self._liq     = get_liquidity_client()
 
     def decide(self, prices: dict) -> dict:
         price = prices.get(self._symbol, 0.0)
         if price <= 0:
             return self._hold()
         self._history.append(price)
-        sig  = self._strat.signal(self._history)
-        bias = self._fred.macro_bias()
-        if sig == "buy":
-            fraction = 0.35 * max(0.3, 1.0 + bias * 0.5)
-            return self._buy(self._symbol, min(0.6, fraction), prices)
+        liq = self._liq.liquidity_bias()
+        is_defensive = liq < -0.40 or _bertez_mode() in ("STAGFLATION", "DEFENSIF")
+        if is_defensive:
+            held = self.portfolio.positions.get(self._symbol, 0)
+            if held > 0:
+                return self._sell(self._symbol, 1.0)
+            return self._hold()
+        sig = self._strat.signal(self._history)
+        if sig == "buy" and liq > -0.20:
+            return self._buy(self._symbol, 0.20, prices)
         if sig == "sell":
-            fraction = 0.7 * max(0.5, 1.0 - bias * 0.3)
-            return self._sell(self._symbol, min(1.0, fraction))
+            return self._sell(self._symbol, 1.0)
         return self._hold()

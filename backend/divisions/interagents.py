@@ -42,15 +42,21 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# ── Traders par division (IDs formatés pour le bus) ───────────────────────────
+# ── Traders par groupe (IDs formatés pour le bus) ─────────────────────────────
 
-_TRADERS_BANQUE_CENTRALE: list[str] = [
-    "TRD004", "TRD007", "TRD017", "TRD023", "TRD029",
+_TRADERS_GROUPE_A: list[str] = [
+    "TRD001", "TRD002", "TRD003", "TRD004", "TRD005",
+    "TRD006", "TRD007", "TRD008", "TRD009", "TRD010",
 ]
 
-_TRADERS_INVESTISSEMENT: list[str] = [
-    "TRD001", "TRD005", "TRD008", "TRD013", "TRD016",
-    "TRD020", "TRD024", "TRD025", "TRD027", "TRD028", "TRD030",
+_TRADERS_GROUPE_B: list[str] = [
+    "TRD011", "TRD012", "TRD013", "TRD014", "TRD015",
+    "TRD016", "TRD017", "TRD018", "TRD019", "TRD020",
+]
+
+_TRADERS_GROUPE_C: list[str] = [
+    "TRD021", "TRD022", "TRD023", "TRD024", "TRD025",
+    "TRD026", "TRD027", "TRD028", "TRD029", "TRD030",
 ]
 
 _ALL_TRADERS: list[str] = [f"TRD{i:03d}" for i in range(1, 31)]
@@ -119,7 +125,7 @@ class CBPublisher:
                         "orientation": orientation,
                     },
                     entite=code,
-                    traders_cibles=_TRADERS_BANQUE_CENTRALE,
+                    traders_cibles=_TRADERS_GROUPE_B,
                 ))
                 published += 1
             except Exception as e:
@@ -140,8 +146,13 @@ class ExpertPublisher:
     Publie les signaux forts (|sig| ≥ 0.55) vers la Division Investissement.
     """
 
-    SYMBOLS = ["AAPL", "MSFT", "TSLA", "AMZN", "GOOGL",
-               "NVDA", "META", "NFLX", "BTC-USD", "ETH-USD"]
+    # Groupe A — EU Valeurs Sous-suivies
+    SYMBOLS = [
+        "VPK.AS", "GTT.PA", "TEL.OL", "DNB.OL", "TTE.PA",
+        "SU.PA", "AIR.PA", "DSY.PA", "BIPC", "ADC",
+        # Groupe B — ETF Macro (pour signaux cross-group)
+        "SPY", "QQQ", "GLD", "TLT", "XLE", "XLU",
+    ]
 
     def publish(self, bus) -> None:
         try:
@@ -176,8 +187,8 @@ class ExpertPublisher:
                         "direction":    direction,
                     },
                     entite=symbol,
-                    traders_cibles=_TRADERS_INVESTISSEMENT,
-                    divisions_cibles=["investissement"],
+                    traders_cibles=_TRADERS_GROUPE_A,
+                    divisions_cibles=["groupe_a"],
                 ))
             except Exception as e:
                 logger.debug("ExpertPublisher %s: %s", symbol, e)
@@ -188,7 +199,48 @@ class ExpertPublisher:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 3. Desk Liquidité Budget Adjuster
+# 3. Bertez Publisher — Groupe C Protecteurs Taleb
+# ─────────────────────────────────────────────────────────────────────────────
+
+class BertezPublisher:
+    """
+    Lit le signal AgentBertez (WTI + USD → régime STAGFLATION/REFLATION/NEUTRE)
+    et publie vers le Groupe C (TRD021-030) quand le mode est défensif.
+    """
+
+    def publish(self, bus) -> None:
+        try:
+            from divisions.investissement.agent_bertez import get_agent_bertez
+            analyse = get_agent_bertez().analyse()
+        except Exception as e:
+            logger.debug("BertezPublisher: AgentBertez indisponible — %s", e)
+            return
+
+        mode = analyse.get("mode", "NEUTRE")
+        if mode not in ("STAGFLATION", "REFLATION", "DEFENSIF"):
+            return
+
+        niveau = "critique" if mode in ("STAGFLATION", "DEFENSIF") else "warning"
+        bus.publier(_make_message(
+            categorie="signal_marche",
+            niveau=niveau,
+            source="agent_bertez",
+            titre=f"Bertez — régime {mode} → Groupe C Protecteurs",
+            contenu={
+                "mode":       mode,
+                "wti":        analyse.get("wti"),
+                "dxy":        analyse.get("dxy"),
+                "conclusion": analyse.get("conclusion", ""),
+            },
+            entite="BERTEZ",
+            traders_cibles=_TRADERS_GROUPE_C,
+            divisions_cibles=["groupe_c"],
+        ))
+        logger.info("[BertezPublisher] mode=%s → Groupe C (%d traders)", mode, len(_TRADERS_GROUPE_C))
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. Desk Liquidité Budget Adjuster
 # ─────────────────────────────────────────────────────────────────────────────
 
 class DeskLiqBudget:
@@ -245,7 +297,7 @@ def _score_to_regime(score: float) -> str:
 
 
 # ─────────────────────────────────────────────────────────────────────────────
-# 4. Black Swan Agent (VIX)
+# 5. Black Swan Agent (VIX)
 # ─────────────────────────────────────────────────────────────────────────────
 
 class BlackSwanAgent:
@@ -348,6 +400,7 @@ class InterAgentHub:
         self._bus          = get_bus()
         self._cb_pub       = CBPublisher(self._bus)
         self._expert_pub   = ExpertPublisher()
+        self._bertez_pub   = BertezPublisher()
         self._liq_budget   = DeskLiqBudget()
         self._black_swan   = BlackSwanAgent()
 
@@ -369,7 +422,7 @@ class InterAgentHub:
             callback=self._on_bus_message,
             niveaux=["info", "warning", "critique"],
         )
-        logger.info("[InterAgentHub] Initialisé — 4 flux actifs")
+        logger.info("[InterAgentHub] Initialisé — 5 flux actifs (+ BertezPublisher)")
 
     # ── Callbacks bus ─────────────────────────────────────────────────────────
 
@@ -462,8 +515,17 @@ class InterAgentHub:
             # Le callback _on_bus_message mettra à jour self._liq_budget_factor
         threading.Thread(target=_run, daemon=True, name="hub-liq").start()
 
+    def run_cycle_bertez(self) -> None:
+        """Flux 5 — Bertez → Groupe C Protecteurs. Appeler toutes les 30 ticks."""
+        threading.Thread(
+            target=self._bertez_pub.publish,
+            args=(self._bus,),
+            daemon=True,
+            name="hub-bertez",
+        ).start()
+
     def run_cycle_vix(self) -> None:
-        """Flux 4 — VIX Black Swan check. Appeler toutes les 20 ticks."""
+        """Flux 5 (ex-4) — VIX Black Swan check. Appeler toutes les 20 ticks."""
         threading.Thread(
             target=self._black_swan.check_and_publish,
             args=(self._bus,),

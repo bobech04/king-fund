@@ -18,8 +18,10 @@ BATTLE_START_DATE = date.fromisoformat(os.getenv("BATTLE_START_DATE", "2026-05-3
 
 SYMBOLS = os.getenv(
     "SYMBOLS",
-    "AAPL,MSFT,TSLA,AMZN,GOOGL,NVDA,META,NFLX,BTC-USD,ETH-USD,SPY,QQQ,GLD,"
-    "VPK.AS,GTT.PA,TTE.PA,SU.PA,TEL.OL,DNB.OL",
+    # Groupe A — EU Valeurs Sous-suivies
+    "VPK.AS,GTT.PA,TEL.OL,DNB.OL,TTE.PA,SU.PA,AIR.PA,DSY.PA,BIPC,ADC,"
+    # Groupe B — Macro Global Dalio
+    "SPY,QQQ,GLD,TLT,XLE,XLU,EEM,FXI,INDA,EWZ",
 ).split(",")
 
 # ---------------------------------------------------------------------------

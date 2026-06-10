@@ -4,33 +4,48 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from traders.base_trader import BaseTrader
 from strategies import BreakoutStrategy
-from data.news_client import get_news_client
-from data.alphavantage_client import get_alphavantage_client
+from data.liquidity_client import get_liquidity_client
+
+
+def _bertez_mode() -> str:
+    try:
+        from divisions.investissement.agent_bertez import get_agent_bertez
+        return get_agent_bertez().analyse().get("mode", "NEUTRE")
+    except Exception:
+        return "NEUTRE"
 
 
 class Trader(BaseTrader):
-    """Expert Sectoriel Crypto — sentiment News + signal Alpha Vantage."""
+    """Groupe C — Protecteurs Taleb · GLD breakout barbell Or défensif."""
 
     def __init__(self, trader_id: int, starting_capital: float):
         super().__init__(trader_id, starting_capital)
-        self.name          = "SNAP"
-        self.strategy      = "Breakout moyen · BTC + News/AV"
-        self._symbol       = "BTC-USD"
-        self._strat        = BreakoutStrategy(window=15)
-        self._history:list = []
-        self._news         = get_news_client()
-        self._av           = get_alphavantage_client()
-        self._query        = "bitcoin BTC crypto price rally"
+        self.name     = "SNAP"
+        self.strategy = "Breakout w=15 · GLD Or barbell défensif Bertez"
+        self._symbol  = "GLD"
+        self._strat   = BreakoutStrategy(window=15)
+        self._history: list = []
+        self._liq     = get_liquidity_client()
 
     def decide(self, prices: dict) -> dict:
         price = prices.get(self._symbol, 0.0)
         if price <= 0:
             return self._hold()
         self._history.append(price)
-        sig = self._strat.signal(self._history)
-        ext = (self._news.get_sentiment(self._query) + self._av.get_price_signal(self._symbol)) / 2.0
+        sig  = self._strat.signal(self._history)
+        liq  = self._liq.liquidity_bias()
+        mode = _bertez_mode()
         if sig == "buy":
-            return self._buy(self._symbol, 0.6, prices) if ext > -0.4 else self._hold()
-        if sig == "sell":
-            return self._sell(self._symbol, 1.0) if ext < 0.4 else self._hold()
+            # Or favorisé en STAGFLATION ou risk-off (liq < 0)
+            if mode == "STAGFLATION":
+                frac = 0.75
+            elif liq < -0.20:
+                frac = 0.60
+            elif mode == "NEUTRE":
+                frac = 0.45
+            else:
+                frac = 0.35
+            return self._buy(self._symbol, frac, prices)
+        if sig == "sell" and mode not in ("STAGFLATION",) and liq > 0.10:
+            return self._sell(self._symbol, 0.80)
         return self._hold()

@@ -4,20 +4,22 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from traders.base_trader import BaseTrader
 from strategies import MeanReversionStrategy
-from data.fred_client import get_fred_client
+from data.fmp_client import get_fmp_client
+from data.liquidity_client import get_liquidity_client
 
 
 class Trader(BaseTrader):
-    """Banque Centrale — FRED macro bias modulates position size."""
+    """Groupe A — EU Valeurs Sous-suivies · AIR.PA mean reversion prudent."""
 
     def __init__(self, trader_id: int, starting_capital: float):
         super().__init__(trader_id, starting_capital)
         self.name     = "ZEN"
-        self.strategy = "Mean reversion prudent · AAPL + FRED"
-        self._symbol  = "AAPL"
+        self.strategy = "Mean Reversion w=20 k=2 · AIR.PA + FMP"
+        self._symbol  = "AIR.PA"
         self._strat   = MeanReversionStrategy(window=20, k=2.0)
         self._history: list = []
-        self._fred    = get_fred_client()
+        self._fmp     = get_fmp_client()
+        self._liq     = get_liquidity_client()
 
     def decide(self, prices: dict) -> dict:
         price = prices.get(self._symbol, 0.0)
@@ -25,11 +27,11 @@ class Trader(BaseTrader):
             return self._hold()
         self._history.append(price)
         sig  = self._strat.signal(self._history)
-        bias = self._fred.macro_bias()
-        if sig == "buy":
-            fraction = 0.3 * max(0.3, 1.0 + bias * 0.5)
-            return self._buy(self._symbol, min(0.5, fraction), prices)
+        fund = self._fmp.fundamental_signal(self._symbol)
+        liq  = self._liq.liquidity_bias()
+        if sig == "buy" and liq > -0.50:
+            fraction = 0.55 * max(0.3, 1.0 + fund * 0.2)
+            return self._buy(self._symbol, min(0.70, fraction), prices)
         if sig == "sell":
-            fraction = 1.0 * max(0.5, 1.0 - bias * 0.3)
-            return self._sell(self._symbol, min(1.0, fraction))
+            return self._sell(self._symbol, 1.0)
         return self._hold()

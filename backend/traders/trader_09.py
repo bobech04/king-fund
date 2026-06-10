@@ -4,38 +4,37 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from traders.base_trader import BaseTrader
 from strategies import MomentumStrategy
+from data.fmp_client import get_fmp_client
+from data.liquidity_client import get_liquidity_client
 
 
 class Trader(BaseTrader):
-    """EU Momentum Trader — VPK.AS / GTT.PA / TTE.PA via croisement MA."""
+    """Groupe A — EU Valeurs Sous-suivies · BIPC momentum infrastructure."""
 
     def __init__(self, trader_id: int, starting_capital: float):
         super().__init__(trader_id, starting_capital)
         self.name     = "EURO-MOM"
-        self.strategy = "Momentum MA3/12 · VPK.AS GTT.PA TTE.PA · BCE+Bertez"
-        self._symbols = ["VPK.AS", "GTT.PA", "TTE.PA"]
-        self._symbol  = "VPK.AS"   # primary pour le price-change check du moteur
+        self.strategy = "Momentum MA3/12 · BIPC Infrastructure + FMP"
+        self._symbol  = "BIPC"
         self._strat   = MomentumStrategy(short_window=3, long_window=12, threshold=0.006)
-        self._history: dict[str, list] = {s: [] for s in self._symbols}
+        self._history: list = []
+        self._fmp     = get_fmp_client()
+        self._liq     = get_liquidity_client()
 
     def decide(self, prices: dict) -> dict:
-        for sym in self._symbols:
-            price = prices.get(sym, 0.0)
-            if price <= 0:
-                continue
-            self._history[sym].append(price)
-            sig = self._strat.signal(self._history[sym])
-
-            expert_sig = self._experts.get_signal(sym)
-            liq        = self._liq.liquidity_bias()
-
-            if sig == "buy" and expert_sig > -0.40 and liq > -0.30:
-                frac = self.base_fraction * (1.0 + liq * 0.2)
-                return self._buy(sym, min(frac, 0.60), prices)
-
-            if sig == "sell":
-                held = self.portfolio.positions.get(sym, 0)
-                if held > 0:
-                    return self._sell(sym, 1.0)
-
+        price = prices.get(self._symbol, 0.0)
+        if price <= 0:
+            return self._hold()
+        self._history.append(price)
+        sig  = self._strat.signal(self._history)
+        fund = self._fmp.fundamental_signal(self._symbol)
+        liq  = self._liq.liquidity_bias()
+        expert_sig = self._experts.get_signal(self._symbol)
+        if sig == "buy" and expert_sig > -0.40 and liq > -0.30:
+            frac = self.base_fraction * (1.0 + liq * 0.2 + fund * 0.15)
+            return self._buy(self._symbol, min(frac, 0.65), prices)
+        if sig == "sell":
+            held = self.portfolio.positions.get(self._symbol, 0)
+            if held > 0:
+                return self._sell(self._symbol, 1.0)
         return self._hold()

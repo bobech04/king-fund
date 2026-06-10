@@ -4,31 +4,33 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from traders.base_trader import BaseTrader
 from strategies import RSIStrategy
-from data.fmp_client import get_fmp_client
+from data.liquidity_client import get_liquidity_client
 
 
 class Trader(BaseTrader):
-    """Division Investissement — FMP fundamentals scale position size."""
+    """Groupe B — Macro Global Dalio · GLD RSI safe haven."""
 
     def __init__(self, trader_id: int, starting_capital: float):
         super().__init__(trader_id, starting_capital)
         self.name     = "HAWK"
-        self.strategy = "RSI agressif · TSLA + FMP"
-        self._symbol  = "TSLA"
-        self._strat   = RSIStrategy(period=9, oversold=25.0, overbought=75.0)
+        self.strategy = "RSI 14 · GLD Or safe haven Dalio"
+        self._symbol  = "GLD"
+        self._strat   = RSIStrategy(period=14, oversold=30, overbought=70)
         self._history: list = []
-        self._fmp     = get_fmp_client()
+        self._liq     = get_liquidity_client()
 
     def decide(self, prices: dict) -> dict:
         price = prices.get(self._symbol, 0.0)
         if price <= 0:
             return self._hold()
         self._history.append(price)
-        sig  = self._strat.signal(self._history)
-        fund = self._fmp.fundamental_signal(self._symbol)
+        sig = self._strat.signal(self._history)
+        liq = self._liq.liquidity_bias()
         if sig == "buy":
-            fraction = 0.9 * max(0.4, 1.0 + fund * 0.4)
-            return self._buy(self._symbol, min(1.0, fraction), prices)
-        if sig == "sell":
-            return self._sell(self._symbol, 1.0)
+            # Or s'apprécie quand liquidité se resserre — amplifier en crise
+            fraction = 0.60 + max(0.0, -liq) * 0.20
+            return self._buy(self._symbol, min(0.85, fraction), prices)
+        if sig == "sell" and liq > 0.20:
+            # Ne vend l'or que si liquidité ample (marché risk-on)
+            return self._sell(self._symbol, 0.80)
         return self._hold()

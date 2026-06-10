@@ -4,23 +4,20 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from traders.base_trader import BaseTrader
 from strategies import MeanReversionStrategy
-from data.news_client import get_news_client
-from data.alphavantage_client import get_alphavantage_client
+from data.liquidity_client import get_liquidity_client
 
 
 class Trader(BaseTrader):
-    """Expert Sectoriel Crypto — sentiment News + signal Alpha Vantage."""
+    """Groupe B — Macro Global Dalio · SPY mean reversion core."""
 
     def __init__(self, trader_id: int, starting_capital: float):
         super().__init__(trader_id, starting_capital)
-        self.name          = "NOVA"
-        self.strategy      = "Mean reversion crypto · BTC + News/AV"
-        self._symbol       = "BTC-USD"
-        self._strat        = MeanReversionStrategy(window=10, k=1.2)
-        self._history:list = []
-        self._news         = get_news_client()
-        self._av           = get_alphavantage_client()
-        self._query        = "bitcoin BTC blockchain cryptocurrency price"
+        self.name     = "NOVA"
+        self.strategy = "Mean Reversion w=20 k=2 · SPY Risk Parity Core"
+        self._symbol  = "SPY"
+        self._strat   = MeanReversionStrategy(window=20, k=2.0)
+        self._history: list = []
+        self._liq     = get_liquidity_client()
 
     def decide(self, prices: dict) -> dict:
         price = prices.get(self._symbol, 0.0)
@@ -28,9 +25,10 @@ class Trader(BaseTrader):
             return self._hold()
         self._history.append(price)
         sig = self._strat.signal(self._history)
-        ext = (self._news.get_sentiment(self._query) + self._av.get_price_signal(self._symbol)) / 2.0
+        liq = self._liq.liquidity_bias()
         if sig == "buy":
-            return self._buy(self._symbol, 0.7, prices) if ext > -0.4 else self._hold()
+            fraction = 0.65 * max(0.3, 1.0 + liq * 0.25)
+            return self._buy(self._symbol, min(0.80, fraction), prices)
         if sig == "sell":
-            return self._sell(self._symbol, 1.0) if ext < 0.4 else self._hold()
+            return self._sell(self._symbol, 1.0)
         return self._hold()
