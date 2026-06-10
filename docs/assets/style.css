@@ -1839,3 +1839,391 @@ body::after {
   color: var(--text);
   line-height: 1.5;
 }
+
+/* ── Gérant Délégué Tab ──────────────────────────────────────── */
+.agd-panel {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Identity card */
+.agd-identity {
+  background: linear-gradient(135deg, #111119, #17171f);
+  border: 1px solid #2a2a3a;
+  border-radius: var(--radius);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.agd-identity-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.agd-avatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #b8860b, #ffd700);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+.agd-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: .02em;
+}
+.agd-title {
+  font-size: 0.62rem;
+  color: var(--gold);
+  margin-top: 2px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.agd-xp {
+  font-size: 0.58rem;
+  color: var(--muted);
+  margin-top: 2px;
+  line-height: 1.5;
+}
+.agd-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.agd-badge {
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: .07em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 4px;
+  border: 1px solid;
+}
+.agd-badge.cfa    { color: #ffd700; border-color: rgba(255,215,0,.4); background: rgba(255,215,0,.08); }
+.agd-badge.frm    { color: #4488ff; border-color: rgba(68,136,255,.4); background: rgba(68,136,255,.08); }
+.agd-badge.phd    { color: #00e5a0; border-color: rgba(0,229,160,.4); background: rgba(0,229,160,.08); }
+.agd-badge.bw     { color: #b44cff; border-color: rgba(180,76,255,.4); background: rgba(180,76,255,.08); }
+
+/* Howell banner */
+.agd-howell {
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.62rem;
+  border: 1px solid;
+}
+.agd-howell.serein    { background: rgba(0,229,160,.08); border-color: rgba(0,229,160,.3); color: #00e5a0; }
+.agd-howell.attention { background: rgba(255,215,0,.08); border-color: rgba(255,215,0,.3); color: #ffd700; }
+.agd-howell.vigilance { background: rgba(255,153,0,.08); border-color: rgba(255,153,0,.3); color: #ff9900; }
+.agd-howell.danger    { background: rgba(255,68,102,.08); border-color: rgba(255,68,102,.3); color: #ff4466; }
+.agd-howell-label { font-weight: 700; letter-spacing: .06em; }
+.agd-howell-resume { color: inherit; opacity: .85; flex: 1; text-align: right; }
+
+/* SITG */
+.agd-sitg-row {
+  display: flex;
+  gap: 8px;
+}
+.agd-sitg-cell {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 8px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.agd-sitg-lbl { font-size: 0.52rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.agd-sitg-val { font-size: 0.95rem; font-weight: 700; }
+.agd-sitg-val.x1   { color: var(--muted); }
+.agd-sitg-val.x125 { color: var(--accent); }
+.agd-sitg-val.x150 { color: var(--gold); }
+.agd-sitg-val.x200 { color: #ffd700; text-shadow: 0 0 8px rgba(255,215,0,.5); }
+
+/* Retraite progress */
+.agd-retraite {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+.agd-retraite-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: 6px;
+}
+.agd-retraite-val { font-size: 0.85rem; font-weight: 700; color: var(--gold); }
+.agd-retraite-bar {
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.agd-retraite-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent), var(--gold));
+  border-radius: 3px;
+  transition: width .6s ease;
+}
+
+/* Generic section card */
+.agd-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px;
+}
+.agd-card-title {
+  font-size: 0.58rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  margin-bottom: 12px;
+}
+
+/* Actualités */
+.agd-actu-item {
+  display: flex;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--surface2);
+  align-items: flex-start;
+}
+.agd-actu-item:last-child { border-bottom: none; }
+.agd-niveau {
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: .07em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.agd-niveau.CRITIQUE { background: var(--red-bg); color: var(--red); }
+.agd-niveau.IMPORTANT { background: rgba(255,153,0,.12); color: #ff9900; }
+.agd-niveau.INFO { background: var(--surface2); color: var(--muted); }
+.agd-actu-titre { font-size: 0.72rem; color: var(--text); line-height: 1.4; }
+.agd-actu-src { font-size: 0.58rem; color: var(--muted); margin-top: 2px; }
+
+/* Dividendes */
+.agd-div-kpi {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.agd-div-kpi-cell {
+  flex: 1;
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  text-align: center;
+}
+.agd-div-kpi-val { font-size: 0.9rem; font-weight: 700; color: var(--gold); }
+.agd-div-kpi-lbl { font-size: 0.52rem; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-top: 2px; }
+.agd-div-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--surface2);
+  font-size: 0.7rem;
+}
+.agd-div-row:last-child { border-bottom: none; }
+.agd-div-ticker { font-weight: 700; color: var(--text); }
+.agd-div-rev { color: var(--accent); font-weight: 600; }
+.agd-div-score { font-size: 0.6rem; color: var(--muted); }
+.agd-coupe-alert {
+  background: var(--red-bg);
+  border: 1px solid rgba(255,68,102,.3);
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 0.68rem;
+  color: var(--red);
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+/* Risk Parity */
+.agd-rp-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--surface2);
+}
+.agd-rp-row:last-child { border-bottom: none; }
+.agd-rp-label { font-size: 0.64rem; color: var(--text); width: 110px; flex-shrink: 0; }
+.agd-rp-bar-bg {
+  flex: 1;
+  height: 6px;
+  background: var(--surface2);
+  border-radius: 3px;
+  overflow: hidden;
+}
+.agd-rp-bar-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width .5s ease;
+}
+.agd-rp-pct { font-size: 0.64rem; font-weight: 600; width: 38px; text-align: right; flex-shrink: 0; }
+.agd-rp-status { font-size: 0.55rem; padding: 1px 5px; border-radius: 3px; }
+.agd-rp-status.OK       { color: var(--accent); }
+.agd-rp-status.WARNING  { color: #ff9900; }
+.agd-rp-status.CRITIQUE { color: var(--red); }
+.agd-rp-rebal {
+  margin-top: 10px;
+  background: var(--surface2);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.62rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+
+/* Benchmark */
+.agd-bench-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.agd-bench-table th {
+  font-size: 0.52rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding: 4px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--surface2);
+}
+.agd-bench-table td {
+  font-size: 0.7rem;
+  padding: 7px 6px;
+  border-bottom: 1px solid var(--surface2);
+  color: var(--text);
+}
+.agd-bench-table tr:last-child td { border-bottom: none; }
+.agd-bench-table td.pos { color: var(--accent); font-weight: 700; }
+.agd-bench-table td.neg { color: var(--red); font-weight: 700; }
+.agd-bench-table td.neu { color: var(--muted); }
+
+/* Comité Sélection */
+.agd-vote-row {
+  display: flex;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--surface2);
+  align-items: center;
+}
+.agd-vote-row:last-child { border-bottom: none; }
+.agd-vote-ticker { font-weight: 700; font-size: 0.78rem; width: 70px; flex-shrink: 0; }
+.agd-vote-dec {
+  font-size: 0.62rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 5px;
+  flex-shrink: 0;
+}
+.agd-vote-dec.confirm { background: rgba(0,229,160,.12); color: var(--accent); }
+.agd-vote-dec.cond    { background: var(--gold-bg); color: var(--gold); }
+.agd-vote-dec.hold    { background: rgba(68,136,255,.12); color: #4488ff; }
+.agd-vote-dec.veto    { background: var(--red-bg); color: var(--red); }
+.agd-vote-votes { font-size: 0.58rem; color: var(--muted); }
+.agd-vote-ts    { font-size: 0.55rem; color: var(--muted); margin-left: auto; }
+
+/* Forms */
+.agd-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.agd-form-row {
+  display: flex;
+  gap: 8px;
+}
+.agd-input {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 0.8rem;
+  outline: none;
+  font-family: inherit;
+}
+.agd-input:focus { border-color: var(--accent); }
+.agd-select {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 9px 10px;
+  font-size: 0.8rem;
+  outline: none;
+  cursor: pointer;
+}
+.agd-btn {
+  background: var(--accent);
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 16px;
+  font-weight: 700;
+  font-size: 0.78rem;
+  cursor: pointer;
+  letter-spacing: .05em;
+  transition: opacity .15s;
+}
+.agd-btn:hover   { opacity: .85; }
+.agd-btn:disabled { opacity: .4; cursor: default; }
+.agd-btn.danger  { background: var(--red); color: #fff; }
+.agd-result {
+  font-size: 0.72rem;
+  border-radius: 8px;
+  padding: 10px 12px;
+  line-height: 1.6;
+  display: none;
+}
+.agd-result.show { display: block; }
+.agd-result.veto    { background: var(--red-bg); color: var(--red); border: 1px solid rgba(255,68,102,.3); }
+.agd-result.valide  { background: var(--accent-bg); color: var(--accent); border: 1px solid rgba(0,229,160,.3); }
+.agd-timestamp {
+  font-size: 0.58rem;
+  color: var(--muted);
+  text-align: center;
+  padding-top: 4px;
+}
+.agd-refresh-btn {
+  width: 100%;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 9px;
+  font-size: 0.72rem;
+  cursor: pointer;
+  letter-spacing: .04em;
+  transition: color .15s, border-color .15s;
+  margin-top: 4px;
+}
+.agd-refresh-btn:hover { color: var(--text); border-color: var(--accent); }
