@@ -263,6 +263,7 @@ function switchTab(tab) {
   if (tab === 'investissement')      loadInvestissement();
   if (tab === 'patrimoine')          loadPatrimoine();
   if (tab === 'liquidite')           loadLiquidite();
+  if (tab === 'gerant-delegue')      loadGerantDelegue();
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────
@@ -1754,6 +1755,408 @@ function renderLiquidite(d) {
       if (b) { b.textContent = '↻ Actualiser le score liquidité'; b.disabled = false; }
     }
   });
+}
+
+// ── Gérant Délégué tab ────────────────────────────────────────────
+let gerantDelegueLoaded = false;
+
+async function loadGerantDelegue(silent = false) {
+  if (gerantDelegueLoaded && !silent) return;
+  try {
+    const [etatR, actuR, divR, rpR, benchR, comiteR] = await Promise.allSettled([
+      fetch(`${API}/gerant-delegue/etat`).then(r => r.json()),
+      fetch(`${API}/actualites`).then(r => r.json()),
+      fetch(`${API}/dividendes`).then(r => r.json()),
+      fetch(`${API}/risk-parity`).then(r => r.json()),
+      fetch(`${API}/benchmark`).then(r => r.json()),
+      fetch(`${API}/comite-selection/historique`).then(r => r.json()),
+    ]);
+    gerantDelegueLoaded = true;
+    renderGerantDelegue(
+      etatR.status    === 'fulfilled' ? etatR.value    : null,
+      actuR.status    === 'fulfilled' ? actuR.value    : null,
+      divR.status     === 'fulfilled' ? divR.value     : null,
+      rpR.status      === 'fulfilled' ? rpR.value      : null,
+      benchR.status   === 'fulfilled' ? benchR.value   : null,
+      comiteR.status  === 'fulfilled' ? comiteR.value  : null,
+    );
+  } catch(e) {
+    if (!silent)
+      qs('#agd-wrap').innerHTML = '<div class="error-state">Impossible de charger le Gérant Délégué.</div>';
+  }
+}
+
+function renderGerantDelegue(etat, actuData, divData, rpData, benchData, comiteList) {
+  const agd01 = etat?.agd_01 || {};
+  const howell = agd01.howell_regime || 'HOWELL_SEREIN';
+  const howellResume = agd01.howell_resume || 'Environnement favorable';
+  const howellCls = {
+    HOWELL_SEREIN:    'serein',
+    HOWELL_ATTENTION: 'attention',
+    HOWELL_VIGILANCE: 'vigilance',
+    HOWELL_DANGER:    'danger',
+  }[howell] || 'serein';
+  const howellIcon = {
+    HOWELL_SEREIN: '✅', HOWELL_ATTENTION: '⚠️', HOWELL_VIGILANCE: '🟠', HOWELL_DANGER: '🚨',
+  }[howell] || '✅';
+
+  // SITG
+  const sitgGrille = agd01.sitg_grille || [{perf_min:25,mult:2},{perf_min:15,mult:1.5},{perf_min:10,mult:1.25}];
+  const sitgHtml = sitgGrille.map(g => {
+    const cls = g.mult >= 2 ? 'x200' : g.mult >= 1.5 ? 'x150' : g.mult >= 1.25 ? 'x125' : 'x1';
+    return `<div class="agd-sitg-cell">
+      <div class="agd-sitg-val ${cls}">×${g.mult.toFixed(2)}</div>
+      <div class="agd-sitg-lbl">≥ +${g.perf_min}%/an</div>
+    </div>`;
+  }).join('') + `<div class="agd-sitg-cell">
+    <div class="agd-sitg-val x1">×1.00</div>
+    <div class="agd-sitg-lbl">&lt; +10%/an</div>
+  </div>`;
+
+  // Retraite
+  const objR = agd01.objectif_retraite || {annee: 2041, montant: 500000};
+  const patActuel = etat?.agd_01 ? (divData?.revenu_annuel_total ? 18082 : 18082) : 18082;
+  const annesRestants = objR.annee - new Date().getFullYear();
+  const projEstimee = patActuel * Math.pow(1.10, annesRestants);
+  const pctRetraite = Math.min(100, (patActuel / objR.montant * 100)).toFixed(1);
+
+  // Section Actualités
+  const articles = (actuData?.articles || []).slice(0, 8);
+  const actuHtml = articles.length ? articles.map(a => `
+    <div class="agd-actu-item">
+      <span class="agd-niveau ${a.niveau}">${a.niveau}</span>
+      <div>
+        <div class="agd-actu-titre">${escHtml(a.titre || '')}</div>
+        <div class="agd-actu-src">${escHtml(a.source || '')} · ${_fmtTs(a.publie_a)}</div>
+      </div>
+    </div>`).join('') : '<div style="font-size:.7rem;color:var(--muted);padding:10px 0">Aucune actualité chargée</div>';
+
+  // Section Dividendes
+  const divPositions = (divData?.positions || [])
+    .filter(p => (p.rev_annuel || 0) > 0)
+    .sort((a,b) => (b.rev_annuel||0) - (a.rev_annuel||0))
+    .slice(0, 8);
+  const divCoupes = (divData?.positions || []).filter(p => p.coupe_detectee);
+  const coupesHtml = divCoupes.length
+    ? `<div class="agd-coupe-alert">🚨 COUPE DÉTECTÉE sur ${divCoupes.map(c => c.ticker).join(', ')}</div>` : '';
+  const revMensuel = divData?.revenu_mensuel_total || 0;
+  const revAnnuel  = divData?.revenu_annuel_total  || 0;
+  const ecartObj   = divData?.ecart_objectif ?? (revMensuel - 500);
+  const ecartCls   = ecartObj >= 0 ? 'pos' : 'neg';
+  const ecartStr   = (ecartObj >= 0 ? '+' : '') + ecartObj.toFixed(0) + '€';
+  const divRowsHtml = divPositions.map(p => {
+    const score = p.scoring?.score ?? '—';
+    return `<div class="agd-div-row">
+      <span class="agd-div-ticker">${escHtml(p.ticker)}</span>
+      <span style="font-size:.62rem;color:var(--muted)">${escHtml(p.nom || '')}</span>
+      <span class="agd-div-rev">${fmt(p.rev_annuel, 0)}€/an</span>
+      <span class="agd-div-score">${score}/10</span>
+    </div>`;
+  }).join('');
+
+  // Section Risk Parity
+  const rpClasses = rpData?.classes || [];
+  const rpRebal   = rpData?.rebalancement || [];
+  const rpRowsHtml = rpClasses.map(c => {
+    const w = Math.min(c.contribution_risque_pct, 100);
+    const barColor = c.statut === 'CRITIQUE' ? '#ff4466' : c.statut === 'WARNING' ? '#ff9900' : '#00e5a0';
+    return `<div class="agd-rp-row">
+      <span class="agd-rp-label">${escHtml(c.classe)}</span>
+      <div class="agd-rp-bar-bg">
+        <div class="agd-rp-bar-fill" style="width:${w.toFixed(1)}%;background:${barColor}"></div>
+      </div>
+      <span class="agd-rp-pct" style="color:${barColor}">${c.contribution_risque_pct.toFixed(1)}%</span>
+      <span class="agd-rp-status ${c.statut}">${c.statut}</span>
+    </div>`;
+  }).join('');
+  const rpRebalHtml = rpRebal.length ? `<div class="agd-rp-rebal">
+    ${rpRebal.map(r => `${r.action} ${r.classe} (${r.ticker}) : ${r.delta_pct > 0 ? '+' : ''}${r.delta_pct}pp`).join('<br>')}
+  </div>` : '';
+
+  // Section Benchmark
+  const benchmarks = benchData?.benchmarks || {};
+  const portPerfs  = benchData?.portfolio?.performances || {};
+  const alpha      = benchData?.alpha_reel || {};
+  const sharpe     = benchData?.portfolio?.sharpe;
+  const drawdown   = benchData?.portfolio?.max_drawdown;
+  const benchRows  = Object.entries(benchmarks).map(([label, b]) => {
+    const perf1m = b.performances?.['1m'];
+    const perfYTD = b.performances?.['YTD'];
+    const a = alpha[label];
+    const aCls = a == null ? 'neu' : a > 0 ? 'pos' : 'neg';
+    const aStr = a == null ? '—' : (a > 0 ? '+' : '') + a.toFixed(2) + '%';
+    return `<tr>
+      <td>${escHtml(label)}</td>
+      <td>${perf1m != null ? (perf1m > 0 ? '+' : '') + perf1m.toFixed(2) + '%' : '—'}</td>
+      <td>${perfYTD != null ? (perfYTD > 0 ? '+' : '') + perfYTD.toFixed(2) + '%' : '—'}</td>
+      <td class="${aCls}">${aStr}</td>
+    </tr>`;
+  }).join('');
+  const portPerf1m = portPerfs['1m'];
+  const portPerfAnn = portPerfs['annualise'];
+
+  // Section Comité
+  const votes = (comiteList || []).slice(0, 6);
+  const voteDecCls = dec => {
+    if (!dec) return 'hold';
+    if (dec.includes('CONFIRMÉ')) return 'confirm';
+    if (dec.includes('CONDITIONNEL')) return 'cond';
+    if (dec.includes('VETO')) return 'veto';
+    return 'hold';
+  };
+  const voteDecIcon = dec => {
+    if (!dec) return '🔵';
+    if (dec.includes('CONFIRMÉ'))    return '✅';
+    if (dec.includes('CONDITIONNEL')) return '🟡';
+    if (dec.includes('VETO'))        return '🛑';
+    return '🔵';
+  };
+  const votesHtml = votes.length ? votes.map(v => {
+    const votesStr = (v.votes || []).map(vv => `${vv.votant[0]}:${vv.vote === 'OUI' ? '✓' : vv.vote === 'NON' ? '✗' : '—'}`).join(' ');
+    return `<div class="agd-vote-row">
+      <span class="agd-vote-ticker">${escHtml(v.ticker || '?')}</span>
+      <span class="agd-vote-dec ${voteDecCls(v.decision)}">${voteDecIcon(v.decision)} ${escHtml(v.decision || '?')}</span>
+      <span class="agd-vote-votes">${escHtml(votesStr)}</span>
+      <span class="agd-vote-ts">${_fmtTs(v.timestamp)}</span>
+    </div>`;
+  }).join('') : '<div style="font-size:.7rem;color:var(--muted);padding:8px 0">Aucune séance enregistrée</div>';
+
+  qs('#agd-wrap').innerHTML = `
+    <div class="agd-panel">
+
+      <!-- Identity -->
+      <div class="agd-identity">
+        <div class="agd-identity-top">
+          <div class="agd-avatar">🏛</div>
+          <div>
+            <div class="agd-name">Dr Alexandre Redon</div>
+            <div class="agd-title">Gérant Délégué — AGD-01</div>
+            <div class="agd-xp">Bridgewater Associates · Goldman Sachs · Scion Capital · Berkshire Hathaway<br>20 ans d'expérience institutionnelle · Sérénité · Rigueur · Humilité · Discipline</div>
+          </div>
+        </div>
+        <div class="agd-badges">
+          <span class="agd-badge phd">PhD Finance MIT</span>
+          <span class="agd-badge cfa">CFA Level 3</span>
+          <span class="agd-badge frm">FRM</span>
+          <span class="agd-badge bw">Bridgewater</span>
+        </div>
+
+        <!-- Howell -->
+        <div class="agd-howell ${howellCls}">
+          <span class="agd-howell-label">${howellIcon} ${howell.replace('HOWELL_', '')}</span>
+          <span class="agd-howell-resume">${escHtml(howellResume)}</span>
+        </div>
+
+        <!-- SITG Grille -->
+        <div>
+          <div style="font-size:.56rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px">Grille SITG — Skin In The Game</div>
+          <div class="agd-sitg-row">${sitgHtml}</div>
+        </div>
+
+        <!-- Objectif Retraite -->
+        <div class="agd-retraite">
+          <div class="agd-retraite-header">
+            <span>Objectif Retraite Zoubida — 56 ans (2041)</span>
+            <span class="agd-retraite-val">${fmt(patActuel, 0)}€ / 500 000€</span>
+          </div>
+          <div style="font-size:.6rem;color:var(--muted)">
+            Projection à 10%/an dans ${annesRestants} ans : <b style="color:var(--accent)">${fmt(Math.round(projEstimee), 0)}€</b>
+            &nbsp;·&nbsp; Progression : <b style="color:var(--gold)">${pctRetraite}%</b>
+          </div>
+          <div class="agd-retraite-bar">
+            <div class="agd-retraite-fill" style="width:${pctRetraite}%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actualités -->
+      <div class="agd-card">
+        <div class="agd-card-title">📰 Actualités pertinentes</div>
+        ${actuHtml}
+        <button class="agd-refresh-btn" id="agd-actu-refresh">↻ Actualiser</button>
+      </div>
+
+      <!-- Dividendes -->
+      <div class="agd-card">
+        <div class="agd-card-title">💰 Revenus passifs — Dividendes</div>
+        ${coupesHtml}
+        <div class="agd-div-kpi">
+          <div class="agd-div-kpi-cell">
+            <div class="agd-div-kpi-val">${fmt(revMensuel, 0)}€</div>
+            <div class="agd-div-kpi-lbl">/ mois</div>
+          </div>
+          <div class="agd-div-kpi-cell">
+            <div class="agd-div-kpi-val">${fmt(revAnnuel, 0)}€</div>
+            <div class="agd-div-kpi-lbl">/ an</div>
+          </div>
+          <div class="agd-div-kpi-cell">
+            <div class="agd-div-kpi-val" style="color:${ecartCls === 'pos' ? 'var(--accent)' : 'var(--red)'}">${ecartStr}</div>
+            <div class="agd-div-kpi-lbl">vs obj 500€/m</div>
+          </div>
+        </div>
+        ${divRowsHtml || '<div style="font-size:.7rem;color:var(--muted);padding:6px 0">Données indisponibles</div>'}
+      </div>
+
+      <!-- Risk Parity -->
+      <div class="agd-card">
+        <div class="agd-card-title">⚖️ Risk Parity — Dalio All Weather</div>
+        ${rpRowsHtml || '<div style="font-size:.7rem;color:var(--muted);padding:6px 0">Données indisponibles</div>'}
+        ${rpRebalHtml}
+        ${rpData?.vol_portefeuille_pct != null
+          ? `<div style="font-size:.6rem;color:var(--muted);margin-top:8px">Vol. portefeuille : <b style="color:var(--text)">${rpData.vol_portefeuille_pct}%/an</b> · Cible équipondérée : <b style="color:var(--text)">${rpData.contribution_cible_pct?.toFixed(1)}%</b> par classe</div>`
+          : ''}
+      </div>
+
+      <!-- Benchmark -->
+      <div class="agd-card">
+        <div class="agd-card-title">📊 Benchmark — Alpha réel</div>
+        <table class="agd-bench-table">
+          <thead><tr>
+            <th>Indice</th><th>1 mois</th><th>YTD</th><th>Alpha</th>
+          </tr></thead>
+          <tbody>
+            ${benchRows || '<tr><td colspan="4" style="color:var(--muted);font-size:.65rem">Données indisponibles</td></tr>'}
+          </tbody>
+        </table>
+        ${portPerf1m != null || sharpe != null ? `
+        <div style="display:flex;gap:12px;margin-top:10px;font-size:.62rem;color:var(--muted)">
+          ${portPerf1m != null ? `<span>Portefeuille 1m : <b style="color:${portPerf1m>=0?'var(--accent)':'var(--red)'}">${portPerf1m>=0?'+':''}${portPerf1m.toFixed(2)}%</b></span>` : ''}
+          ${portPerfAnn != null ? `<span>Annualisé : <b style="color:var(--gold)">${portPerfAnn>=0?'+':''}${portPerfAnn.toFixed(2)}%</b></span>` : ''}
+          ${sharpe != null ? `<span>Sharpe : <b style="color:var(--text)">${sharpe.toFixed(2)}</b></span>` : ''}
+          ${drawdown != null ? `<span>Max DD : <b style="color:var(--red)">${drawdown.toFixed(2)}%</b></span>` : ''}
+        </div>` : ''}
+      </div>
+
+      <!-- Comité Sélection -->
+      <div class="agd-card">
+        <div class="agd-card-title">🏛️ Comité Sélection — Votes 3/3</div>
+        ${votesHtml}
+        <div style="margin-top:12px;border-top:1px solid var(--surface2);padding-top:12px">
+          <div style="font-size:.58rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Soumettre un ticker au Comité</div>
+          <div class="agd-form">
+            <div class="agd-form-row">
+              <input id="agd-comite-ticker" class="agd-input" placeholder="Ex: VPK.AS, TTE.PA, O…" style="text-transform:uppercase" />
+              <button id="agd-comite-submit" class="agd-btn" style="white-space:nowrap">Voter →</button>
+            </div>
+            <div id="agd-comite-result" class="agd-result"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Veto décision émotionnelle -->
+      <div class="agd-card">
+        <div class="agd-card-title">🛑 Veto — Évaluation décision par AGD-01</div>
+        <div style="font-size:.62rem;color:var(--muted);margin-bottom:10px">
+          Soumets une décision au Gérant Délégué. Il peut opposer un VETO si elle est émotionnelle ou irrationnelle.
+        </div>
+        <div class="agd-form">
+          <div class="agd-form-row">
+            <input id="agd-veto-ticker" class="agd-input" placeholder="Ticker (ex: NVDA)" style="width:120px;flex-shrink:0;text-transform:uppercase" />
+            <select id="agd-veto-action" class="agd-select">
+              <option value="buy">ACHETER</option>
+              <option value="sell">VENDRE</option>
+              <option value="hold">CONSERVER</option>
+            </select>
+            <input id="agd-veto-montant" class="agd-input" type="number" min="1" placeholder="Montant €" style="width:110px;flex-shrink:0" />
+          </div>
+          <input id="agd-veto-contexte" class="agd-input" placeholder="Pourquoi cette décision ? (optionnel)" />
+          <button id="agd-veto-submit" class="agd-btn">Soumettre au Gérant Délégué</button>
+          <div id="agd-veto-result" class="agd-result"></div>
+        </div>
+      </div>
+
+      <div class="agd-timestamp">Gérant Délégué AGD-01 · Objectif retraite 2041 — non négociable</div>
+    </div>`;
+
+  // Event : refresh actualités
+  const actuBtn = qs('#agd-actu-refresh');
+  if (actuBtn) {
+    actuBtn.addEventListener('click', async () => {
+      actuBtn.textContent = '⌛…';
+      actuBtn.disabled = true;
+      gerantDelegueLoaded = false;
+      await loadGerantDelegue(true);
+      const b = qs('#agd-actu-refresh');
+      if (b) { b.textContent = '↻ Actualiser'; b.disabled = false; }
+    });
+  }
+
+  // Event : Comité Sélection voter
+  const comiteSubmit = qs('#agd-comite-submit');
+  if (comiteSubmit) {
+    comiteSubmit.addEventListener('click', async () => {
+      const ticker = (qs('#agd-comite-ticker')?.value || '').trim().toUpperCase();
+      if (!ticker) return;
+      comiteSubmit.disabled = true;
+      comiteSubmit.textContent = '⌛…';
+      const resEl = qs('#agd-comite-result');
+      try {
+        const resp = await fetch(`${API}/comite-selection/voter`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticker }),
+        });
+        const data = await resp.json();
+        if (resEl) {
+          const dec = data.decision || '?';
+          const cls = dec.includes('CONFIRMÉ') ? 'valide' : dec.includes('VETO') ? 'veto' : 'valide';
+          resEl.className = `agd-result show ${cls}`;
+          const votesStr = (data.votes || []).map(v => `${v.votant} : ${v.vote} — ${v.motif?.slice(0,60) || ''}`).join('\n');
+          resEl.textContent = `${dec}\n${votesStr}`;
+        }
+        gerantDelegueLoaded = false;
+        setTimeout(() => loadGerantDelegue(true), 1500);
+      } catch(e) {
+        if (resEl) { resEl.className = 'agd-result show veto'; resEl.textContent = 'Erreur: ' + e.message; }
+      } finally {
+        comiteSubmit.disabled = false;
+        comiteSubmit.textContent = 'Voter →';
+      }
+    });
+  }
+
+  // Event : Veto décision
+  const vetoSubmit = qs('#agd-veto-submit');
+  if (vetoSubmit) {
+    vetoSubmit.addEventListener('click', async () => {
+      const ticker  = (qs('#agd-veto-ticker')?.value || '').trim().toUpperCase();
+      const action  = qs('#agd-veto-action')?.value || 'buy';
+      const montant = parseFloat(qs('#agd-veto-montant')?.value || '0');
+      const contexte= qs('#agd-veto-contexte')?.value || '';
+      if (!ticker || !montant) return;
+      vetoSubmit.disabled = true;
+      vetoSubmit.textContent = '⌛ Analyse AGD-01…';
+      const resEl = qs('#agd-veto-result');
+      try {
+        const resp = await fetch(`${API}/gerant-delegue/evaluer-decision`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ticker, action, montant, contexte }),
+        });
+        const data = await resp.json();
+        if (resEl) {
+          const dec = data.decision || '?';
+          const cls = dec === 'VETO' ? 'veto' : 'valide';
+          const icon = dec === 'VETO' ? '🛑' : '✅';
+          resEl.className = `agd-result show ${cls}`;
+          resEl.textContent = `${icon} ${dec} — Confiance ${((data.confiance||0)*100).toFixed(0)}%\n${data.raison || ''}\n${data.recommandation ? 'Conseil: ' + data.recommandation : ''}`;
+        }
+      } catch(e) {
+        if (resEl) { resEl.className = 'agd-result show veto'; resEl.textContent = 'Erreur: ' + e.message; }
+      } finally {
+        vetoSubmit.disabled = false;
+        vetoSubmit.textContent = 'Soumettre au Gérant Délégué';
+      }
+    });
+  }
+}
+
+function _fmtTs(ts) {
+  if (!ts) return '—';
+  try {
+    const d = new Date(ts.includes('T') ? ts : ts + 'Z');
+    return d.toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
+  } catch { return ts.slice(0, 16); }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────

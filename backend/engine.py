@@ -287,9 +287,17 @@ class TradingEngine:
         assigned = 0
         for trader in self._traders:
             sym = getattr(trader, "_symbol", None)
-            if sym and sym in histories and hasattr(trader, "_history"):
-                trader._history = list(histories[sym])
-                assigned += 1
+            if sym and hasattr(trader, "_history"):
+                if isinstance(trader._history, dict):
+                    # Multi-symbol trader (e.g. trader_18): preload each symbol separately
+                    for s in trader._history:
+                        if s in histories:
+                            trader._history[s] = list(histories[s])
+                    if any(s in histories for s in trader._history):
+                        assigned += 1
+                elif sym in histories:
+                    trader._history = list(histories[sym])
+                    assigned += 1
         logger.info("Preloaded histories for %d/%d traders", assigned, len(self._traders))
 
     # ------------------------------------------------------------------
@@ -509,6 +517,8 @@ class TradingEngine:
             # Flux 3 : Desk Liquidité — ajuste le budget selon la liquidité globale
             if self._hub:
                 amount *= self._hub.liq_budget_factor
+            if amount < 0.001:
+                return
             cost = amount * price
             if cost > trader.portfolio.cash:
                 return
@@ -519,11 +529,13 @@ class TradingEngine:
         elif act == "sell":
             held = trader.portfolio.positions.get(symbol, 0)
             sell_qty = min(amount, held)
-            if sell_qty <= 0:
+            if sell_qty < 0.001:
                 return
             trader.portfolio.cash += sell_qty * price
             trader.portfolio.positions[symbol] = held - sell_qty
         elif act == "short":
+            if amount < 0.001:
+                return
             # Vente à découvert : le produit crédite le cash, position devient négative
             trader.portfolio.cash += amount * price
             trader.portfolio.positions[symbol] = (
@@ -535,6 +547,8 @@ class TradingEngine:
             if short_held >= 0:
                 return
             cover_qty = min(amount, abs(short_held))
+            if cover_qty < 0.001:
+                return
             buyback_cost = cover_qty * price
             if buyback_cost > trader.portfolio.cash:
                 return
