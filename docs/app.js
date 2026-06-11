@@ -794,13 +794,15 @@ function renderFiscalite(d) {
 async function loadIntelligence(silent = false) {
   if (intelligenceLoaded && !silent) return;
   try {
-    const [actuRes, dspxRes, corrRes, wlRes, comiteRes, screenerRes] = await Promise.allSettled([
+    const [actuRes, dspxRes, corrRes, wlRes, comiteRes, screenerRes, seuilsRes, calRes] = await Promise.allSettled([
       fetch(API+'/actualites').then(r => r.json()),
       fetch(API+'/dspx/etat').then(r => r.json()),
       fetch(API+'/correlations/actoblig').then(r => r.json()),
       fetch(API+'/investissement/watchlist').then(r => r.json()),
       fetch(API+'/comite-selection/historique').then(r => r.json()),
       fetch(API+'/investissement/screener').then(r => r.json()),
+      fetch(API+'/alertes/seuils').then(r => r.json()),
+      fetch(API+'/alertes/calendrier').then(r => r.json()),
     ]);
     intelligenceLoaded = true;
     renderIntelligence(
@@ -810,13 +812,15 @@ async function loadIntelligence(silent = false) {
       wlRes.status==='fulfilled'      ? wlRes.value      : null,
       comiteRes.status==='fulfilled'  ? comiteRes.value  : null,
       screenerRes.status==='fulfilled'? screenerRes.value: null,
+      seuilsRes.status==='fulfilled'  ? seuilsRes.value  : null,
+      calRes.status==='fulfilled'     ? calRes.value     : null,
     );
   } catch {
     if (!silent) qs('#intelligence-wrap').innerHTML = '<div class="error-state">Erreur Intelligence.</div>';
   }
 }
 
-function renderIntelligence(actu, dspx, corr, wl, comite, screener) {
+function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, calData) {
   const articles  = (actu?.articles || []).slice(0,10);
   const watchlist = wl?.watchlist || [];
   const nbBuy  = watchlist.filter(a => a.signal==='BUY').length;
@@ -877,6 +881,85 @@ function renderIntelligence(actu, dspx, corr, wl, comite, screener) {
       '<div style="font-size:.55rem;color:var(--muted);margin-top:4px">Corr > 0 + inflation > 2.5% → REGIME_INFLATION → rotation Or + Infrastructure</div>'
     : '<div class="empty-state">Données corrélations indisponibles</div>') +
     '</div>' +
+
+    // Alertes prix & Calendrier
+    (() => {
+      const seuils     = seuilsData?.seuils || [];
+      const evenements = calData?.evenements || [];
+      const _devSymb   = {EUR:'€', USD:'$', NOK:'kr'};
+      let s = '<div class="intel-card"><div class="intel-card-title">🚨 Alertes prix & Calendrier corporate</div>';
+
+      // Table seuils
+      s += '<div style="font-size:.6rem;color:var(--muted);margin-bottom:6px">Seuils surveillés — anti-spam 1×/jour</div>';
+      if (seuils.length) {
+        s += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.58rem">';
+        s += '<thead><tr style="color:var(--muted);border-bottom:1px solid var(--surface2)">' +
+          '<th style="text-align:left;padding:3px">Ticker</th>' +
+          '<th style="text-align:left;padding:3px">Seuil</th>' +
+          '<th style="text-align:right;padding:3px">Prix actuel</th>' +
+          '<th style="text-align:right;padding:3px">Variation j</th>' +
+          '<th style="text-align:center;padding:3px">Statut</th>' +
+          '</tr></thead><tbody>';
+        seuils.forEach(s2 => {
+          const sym    = _devSymb[s2.devise] || s2.devise;
+          const isAlert = s2.statut === 'ALERTE';
+          const seuiLabel = s2.type === 'SOUS'
+            ? '< ' + s2.seuil + sym
+            : '> ' + s2.seuil + '%/j';
+          const prix   = s2.prix_actuel != null ? s2.prix_actuel.toFixed(2) + sym : '—';
+          const varJ   = s2.variation_jour_pct != null
+            ? (s2.variation_jour_pct >= 0 ? '+' : '') + s2.variation_jour_pct.toFixed(2) + '%'
+            : '—';
+          const varColor = s2.variation_jour_pct != null
+            ? (s2.variation_jour_pct >= 0 ? 'var(--accent)' : 'var(--red)')
+            : 'var(--muted)';
+          const statutHtml = isAlert
+            ? '<span style="color:var(--red);font-weight:700">🔴 ALERTE</span>'
+            : '<span style="color:var(--accent)">🟢 OK</span>';
+          s += '<tr style="border-top:1px solid var(--surface2)' + (isAlert ? ';background:#1a0a0a' : '') + '">' +
+            '<td style="padding:3px;font-weight:700;color:var(--accent)">' + escHtml(s2.ticker) + '</td>' +
+            '<td style="padding:3px;color:var(--muted)">' + seuiLabel + '</td>' +
+            '<td style="text-align:right;padding:3px">' + prix + '</td>' +
+            '<td style="text-align:right;padding:3px;color:' + varColor + '">' + varJ + '</td>' +
+            '<td style="text-align:center;padding:3px">' + statutHtml + '</td>' +
+            '</tr>';
+        });
+        s += '</tbody></table></div>';
+      } else {
+        s += '<div class="empty-state">Données seuils indisponibles</div>';
+      }
+
+      // Table événements corporate
+      s += '<div style="font-size:.6rem;color:var(--muted);margin:10px 0 6px">Prochains événements — 30 jours</div>';
+      if (evenements.length) {
+        s += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.58rem">';
+        s += '<thead><tr style="color:var(--muted);border-bottom:1px solid var(--surface2)">' +
+          '<th style="text-align:left;padding:3px">Ticker</th>' +
+          '<th style="text-align:left;padding:3px">Type</th>' +
+          '<th style="text-align:left;padding:3px">Date</th>' +
+          '<th style="text-align:right;padding:3px">Dans</th>' +
+          '</tr></thead><tbody>';
+        evenements.forEach(ev => {
+          const isProche  = ev.jours_restants <= 2;
+          const typeLabel = ev.type === 'earnings' ? '📋 Earnings' : '💰 Dividende';
+          const joursLbl  = ev.jours_restants === 0 ? 'Aujourd\'hui ⚠️'
+            : ev.jours_restants === 1 ? 'Demain ⚠️'
+            : ev.jours_restants + 'j';
+          s += '<tr style="border-top:1px solid var(--surface2)' + (isProche ? ';background:#1a1000' : '') + '">' +
+            '<td style="padding:3px;font-weight:700;color:var(--accent)">' + escHtml(ev.ticker) + '</td>' +
+            '<td style="padding:3px">' + typeLabel + '</td>' +
+            '<td style="padding:3px">' + escHtml(ev.date) + '</td>' +
+            '<td style="text-align:right;padding:3px;color:' + (isProche ? '#ff9944' : 'var(--muted)') + ';font-weight:' + (isProche ? '700' : 'normal') + '">' + joursLbl + '</td>' +
+            '</tr>';
+        });
+        s += '</tbody></table></div>';
+      } else {
+        s += '<div class="empty-state">Aucun événement dans les 30 prochains jours</div>';
+      }
+
+      s += '</div>';
+      return s;
+    })() +
 
     // Watchlist résumé
     '<div class="intel-card"><div class="intel-card-title">🔍 Watchlist — ' + watchlist.length + ' actifs · Pipeline Graham 17 étapes</div>' +
