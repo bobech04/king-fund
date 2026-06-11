@@ -190,6 +190,16 @@ class MorningBrief:
             brief.get("confidence", 0.5),
             brief.get("summary", ""),
         )
+        try:
+            from data.signal_history import log_signal as _log_signal
+            _log_signal(
+                "morning_brief",
+                brief.get("direction"),
+                brief.get("confidence"),
+                None, None,
+            )
+        except Exception:
+            pass
         return brief
 
     def direction_signal(self, prices: dict) -> float:

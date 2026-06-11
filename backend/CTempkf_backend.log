@@ -1,0 +1,71 @@
+2026-06-11 16:57:47,022 [INFO] Loaded 30 traders
+2026-06-11 16:57:47,094 [INFO] [RESTORE] Restoring 30 traders from last snapshot...
+2026-06-11 16:57:47,094 [INFO] [RESTORE] TRD01  pv=500.00  cash=500.00  positions=0
+2026-06-11 16:57:47,095 [INFO] [RESTORE] TRD02  pv=80.00  cash=80.00  positions=1
+2026-06-11 16:57:47,095 [INFO] [RESTORE] TRD03  pv=0.24  cash=0.24  positions=1
+2026-06-11 16:57:47,095 [INFO] [RESTORE] TRD04  pv=500.09  cash=0.23  positions=1
+2026-06-11 16:57:47,095 [INFO] [RESTORE] TRD05  pv=0.00  cash=0.00  positions=1
+2026-06-11 16:57:47,095 [INFO] [RESTORE] TRD06  pv=500.00  cash=500.00  positions=0
+2026-06-11 16:57:47,095 [INFO] [RESTORE] TRD07  pv=19.56  cash=19.56  positions=1
+2026-06-11 16:57:47,095 [INFO] [RESTORE] TRD08  pv=0.00  cash=0.00  positions=1
+2026-06-11 16:57:47,095 [INFO] [RESTORE] TRD09  pv=500.00  cash=500.00  positions=0
+2026-06-11 16:57:47,095 [INFO] [RESTORE] TRD10  pv=501.09  cash=501.05  positions=1
+2026-06-11 16:57:47,095 [INFO] [RESTORE] TRD11  pv=45.18  cash=6.57  positions=2
+2026-06-11 16:57:47,095 [INFO] [RESTORE] TRD12  pv=495.64  cash=3.99  positions=1
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD13  pv=0.00  cash=0.00  positions=1
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD14  pv=501.63  cash=0.12  positions=1
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD15  pv=86.90  cash=66.39  positions=2
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD16  pv=492.21  cash=0.07  positions=1
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD17  pv=506.31  cash=0.11  positions=1
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD18  pv=0.01  cash=0.01  positions=3
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD19  pv=373.70  cash=373.70  positions=1
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD20  pv=499.45  cash=499.45  positions=0
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD21  pv=199.77  cash=199.77  positions=1
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD22  pv=500.00  cash=500.00  positions=0
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD23  pv=499.69  cash=80.24  positions=1
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD24  pv=128.65  cash=96.97  positions=2
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD25  pv=500.00  cash=500.00  positions=0
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD26  pv=495.31  cash=0.75  positions=1
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD27  pv=488.50  cash=0.88  positions=1
+2026-06-11 16:57:47,096 [INFO] [RESTORE] TRD28  pv=449.02  cash=0.79  positions=1
+2026-06-11 16:57:47,097 [INFO] [RESTORE] TRD29  pv=490.76  cash=0.30  positions=2
+2026-06-11 16:57:47,097 [INFO] [RESTORE] TRD30  pv=488.61  cash=0.47  positions=1
+2026-06-11 16:57:47,097 [INFO] [RESTORE] Done: 30/30 traders restored from last snapshot
+2026-06-11 16:57:47,724 [INFO] Preloaded 623 price points for VPK.AS
+2026-06-11 16:57:47,863 [INFO] Preloaded 1404 price points for GTT.PA
+2026-06-11 16:57:48,027 [INFO] Preloaded 1390 price points for TEL.OL
+2026-06-11 16:57:48,196 [INFO] Preloaded 1624 price points for DNB.OL
+2026-06-11 16:57:48,353 [INFO] Preloaded 2490 price points for TTE.PA
+2026-06-11 16:57:48,534 [INFO] Preloaded 2497 price points for SU.PA
+2026-06-11 16:57:48,701 [INFO] Preloaded 2494 price points for AIR.PA
+2026-06-11 16:57:48,878 [INFO] Preloaded 2267 price points for DSY.PA
+2026-06-11 16:57:49,031 [INFO] Preloaded 1397 price points for BIPC
+2026-06-11 16:57:49,180 [INFO] Preloaded 1509 price points for ADC
+2026-06-11 16:57:49,374 [INFO] Preloaded 1648 price points for SPY
+2026-06-11 16:57:49,525 [INFO] Preloaded 1648 price points for QQQ
+2026-06-11 16:57:49,673 [INFO] Preloaded 1648 price points for GLD
+2026-06-11 16:57:49,844 [INFO] Preloaded 1646 price points for TLT
+2026-06-11 16:57:50,027 [INFO] Preloaded 1648 price points for XLE
+2026-06-11 16:57:50,200 [INFO] Preloaded 1648 price points for XLU
+2026-06-11 16:57:50,368 [INFO] Preloaded 1648 price points for EEM
+2026-06-11 16:57:50,540 [INFO] Preloaded 1646 price points for FXI
+2026-06-11 16:57:50,680 [INFO] Preloaded 1640 price points for INDA
+2026-06-11 16:57:50,838 [INFO] Preloaded 1648 price points for EWZ
+2026-06-11 16:57:50,838 [INFO] Preloaded histories for 30/30 traders
+2026-06-11 16:57:50,847 [INFO] [MessageBus] Initialisé (async=True)
+2026-06-11 16:57:50,848 [INFO] [Bus] engine souscrit à ['alerte_critique', 'alerte_warning', 'signal_marche', 'macro_update']
+2026-06-11 16:57:50,848 [INFO] [InterAgentHub] Initialisé — 5 flux actifs (+ BertezPublisher)
+2026-06-11 16:57:50,871 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-11 16:57:50,871 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-11 16:57:50,871 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-11 16:57:50,871 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-11 16:57:50,872 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-11 16:57:50,872 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-11 16:57:50,872 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-11 16:57:50,872 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-11 16:57:50,872 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+Traceback (most recent call last):
+  File "C:\Users\zoubida\Documents\king-fund\backend\app.py", line 1223, in <module>
+    CronTrigger(hour=18, minute=30, timezone=paris_tz),
+                                             ^^^^^^^^
+NameError: name 'paris_tz' is not defined

@@ -309,6 +309,23 @@ class AgentGerantDelegue:
         else:
             logger.info("[AGD-01] Décision VALIDÉE : %s %s %s€", ticker, action, montant)
 
+        try:
+            from divisions.gerant_delegue.audit_agd import log_decision as _audit
+            _audit(
+                "evaluer_decision",
+                ticker=ticker,
+                action=action,
+                montant=round(montant, 2),
+                decision=result.get("decision"),
+                confiance=result.get("confiance"),
+                raison=result.get("raison"),
+                regles_violees=result.get("regles_violees"),
+                howell_regime=howell.get("regime"),
+                perf_annualisee=round(perf_annualisee, 2),
+            )
+        except Exception as _ae:
+            logger.debug("[AGD-01] Audit write error: %s", _ae)
+
         return result
 
     # ------------------------------------------------------------------
@@ -381,6 +398,21 @@ class AgentGerantDelegue:
         )
         send(message)
         logger.info("[AGD-01] Rapport lundi envoyé Telegram (%d car.)", len(message))
+
+        try:
+            from divisions.gerant_delegue.audit_agd import log_decision as _audit
+            _audit(
+                "rapport_lundi",
+                semaine=semaine,
+                annee=annee,
+                howell_regime=howell.get("regime"),
+                howell_resume=howell.get("resume"),
+                nav=str(donnees.get("nav", "N/A") if donnees else "N/A"),
+                perf_semaine=str(donnees.get("perf_semaine", "N/A") if donnees else "N/A"),
+            )
+        except Exception as _ae:
+            logger.debug("[AGD-01] Audit rapport error: %s", _ae)
+
         return rapport
 
     # ------------------------------------------------------------------
