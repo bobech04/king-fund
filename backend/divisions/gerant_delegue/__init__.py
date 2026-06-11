@@ -1,23 +1,27 @@
 """
 Division Gérant Délégué — King Fund
-Orchestre AGD-01 et les 5 agents du Bloc 1.
+Orchestre AGD-01 et les agents des Blocs 1 et 4.
 """
 from __future__ import annotations
 
-from divisions.gerant_delegue.agd_01        import get_gerant_delegue,     AgentGerantDelegue
-from divisions.gerant_delegue.agent_actualites import get_agent_actualites,  AgentActualites
-from divisions.gerant_delegue.agent_dividendes import get_agent_dividendes,  AgentDividendes
-from divisions.gerant_delegue.agent_risk_parity import get_agent_risk_parity, AgentRiskParity
-from divisions.gerant_delegue.agent_benchmark  import get_agent_benchmark,   AgentBenchmark
-from divisions.gerant_delegue.comite_selection import get_comite_selection,  ComiteSelection
+from divisions.gerant_delegue.agd_01            import get_gerant_delegue,       AgentGerantDelegue
+from divisions.gerant_delegue.agent_actualites   import get_agent_actualites,     AgentActualites
+from divisions.gerant_delegue.agent_dividendes   import get_agent_dividendes,     AgentDividendes
+from divisions.gerant_delegue.agent_risk_parity  import get_agent_risk_parity,    AgentRiskParity
+from divisions.gerant_delegue.agent_benchmark    import get_agent_benchmark,      AgentBenchmark
+from divisions.gerant_delegue.comite_selection   import get_comite_selection,     ComiteSelection
+from divisions.gerant_delegue.agent_alertes_prix import get_agent_alertes_prix,   AgentAlertesPrix
+from divisions.gerant_delegue.agent_calendrier   import get_agent_calendrier,     AgentCalendrier
 
 __all__ = [
-    "get_gerant_delegue",     "AgentGerantDelegue",
-    "get_agent_actualites",   "AgentActualites",
-    "get_agent_dividendes",   "AgentDividendes",
-    "get_agent_risk_parity",  "AgentRiskParity",
-    "get_agent_benchmark",    "AgentBenchmark",
-    "get_comite_selection",   "ComiteSelection",
+    "get_gerant_delegue",       "AgentGerantDelegue",
+    "get_agent_actualites",     "AgentActualites",
+    "get_agent_dividendes",     "AgentDividendes",
+    "get_agent_risk_parity",    "AgentRiskParity",
+    "get_agent_benchmark",      "AgentBenchmark",
+    "get_comite_selection",     "ComiteSelection",
+    "get_agent_alertes_prix",   "AgentAlertesPrix",
+    "get_agent_calendrier",     "AgentCalendrier",
 ]
 
 
@@ -47,6 +51,14 @@ def etat_division() -> dict:
         comite = get_comite_selection().etat()
     except Exception:
         comite = {}
+    try:
+        alertes_prix = get_agent_alertes_prix().etat()
+    except Exception:
+        alertes_prix = []
+    try:
+        calendrier = get_agent_calendrier().prochains_evenements()
+    except Exception:
+        calendrier = []
 
     return {
         "division":      "Gérant Délégué",
@@ -56,4 +68,6 @@ def etat_division() -> dict:
         "risk_parity":   risk_parity,
         "benchmark":     benchmark,
         "comite":        comite,
+        "alertes_prix":  alertes_prix,
+        "calendrier":    calendrier,
     }

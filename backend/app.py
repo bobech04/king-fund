@@ -193,6 +193,32 @@ def run_investissement_screener():
         return jsonify({"erreur": str(e)}), 500
 
 
+# ── Alertes prix & Calendrier ────────────────────────────────────────────────
+
+@app.route("/api/alertes/seuils")
+def get_alertes_seuils():
+    try:
+        from divisions.gerant_delegue.agent_alertes_prix import get_agent_alertes_prix
+        agent = get_agent_alertes_prix()
+        resultats = agent.verifier_seuils()
+        return jsonify({"timestamp": datetime.utcnow().isoformat(), "seuils": resultats})
+    except Exception as e:
+        logger.error("alertes seuils: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/alertes/calendrier")
+def get_alertes_calendrier():
+    try:
+        from divisions.gerant_delegue.agent_calendrier import get_agent_calendrier
+        agent = get_agent_calendrier()
+        evenements = agent.prochains_evenements()
+        return jsonify({"timestamp": datetime.utcnow().isoformat(), "evenements": evenements})
+    except Exception as e:
+        logger.error("alertes calendrier: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
 # ── Patrimoine ────────────────────────────────────────────────────────────────
 
 @app.route("/api/patrimoine")
@@ -880,6 +906,40 @@ _scheduler.add_job(
 )
 
 
+def _job_alertes_prix():
+    """Surveillance seuils prix d'entrée — toutes les 30 min entre 08h–20h."""
+    try:
+        from divisions.gerant_delegue.agent_alertes_prix import get_agent_alertes_prix
+        get_agent_alertes_prix().verifier_seuils()
+    except Exception as exc:
+        logger.debug("[SCHEDULER] Alertes prix: %s", exc)
+
+
+_scheduler.add_job(
+    _job_alertes_prix,
+    CronTrigger(minute="*/30", hour="8-20"),
+    id="alertes_prix_surveillance",
+    replace_existing=True,
+)
+
+
+def _job_calendrier_evenements():
+    """Calendrier corporate — quotidien 08:05, alerte 2 jours avant earnings/dividendes."""
+    try:
+        from divisions.gerant_delegue.agent_calendrier import get_agent_calendrier
+        get_agent_calendrier().verifier_evenements()
+    except Exception as exc:
+        logger.debug("[SCHEDULER] Calendrier: %s", exc)
+
+
+_scheduler.add_job(
+    _job_calendrier_evenements,
+    CronTrigger(hour=8, minute=5),
+    id="calendrier_surveillance",
+    replace_existing=True,
+)
+
+
 # ------------------------------------------------------------------
 # Entry point
 # ------------------------------------------------------------------
@@ -900,6 +960,8 @@ if __name__ == "__main__":
         f"• Rapport lundi 08:00 (AGD-01) + 09:00 (PDF)\n"
         f"• Comité Sélection : chaque soir 23:00\n"
         f"• Actualités : surveillance toutes les 30 min\n"
+        f"• Alertes prix : VPK.AS<44€ · BIPC<35$ · DNB.OL<280kr · TTE.PA>-5%\n"
+        f"• Calendrier : earnings GTT/TEL/TTE/VPK · dividendes O/VZ\n"
         f"Objectif retraite Zoubida 2041 — 500 000€"
     )
     logger.info("Server starting on http://0.0.0.0:5000")
