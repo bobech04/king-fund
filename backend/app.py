@@ -161,6 +161,38 @@ def get_investissement_theses():
         return jsonify({"erreur": str(e)}), 500
 
 
+@app.route("/api/investissement/screener")
+def get_investissement_screener():
+    try:
+        from divisions.research.agent_screener_mondial import get_screener_mondial
+        screener = get_screener_mondial()
+        ts = screener.get_ts_run()
+        return jsonify({
+            "candidats": screener.get_candidats(),
+            "ts_run":    ts.isoformat() if ts else None,
+            "nb_univers": len(__import__("divisions.research.agent_screener_mondial",
+                                         fromlist=["UNIVERSE"]).UNIVERSE),
+        })
+    except Exception as e:
+        logger.error("screener get: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/investissement/screener/run", methods=["POST"])
+def run_investissement_screener():
+    try:
+        from divisions.research.agent_screener_mondial import get_screener_mondial
+        threading.Thread(
+            target=get_screener_mondial().scanner,
+            daemon=True,
+            name="screener-run",
+        ).start()
+        return jsonify({"status": "started", "message": "Scan lancé (~2 min pour ~150 titres)"})
+    except Exception as e:
+        logger.error("screener run: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
 # ── Patrimoine ────────────────────────────────────────────────────────────────
 
 @app.route("/api/patrimoine")
@@ -212,7 +244,363 @@ def get_bus_state():
     hub = getattr(engine, "_hub", None)
     if hub is None:
         return jsonify({"erreur": "InterAgentHub non initialisé"}), 503
-    return jsonify(hub.get_etat())
+    raw = hub.get_etat()
+
+    bs  = raw.get("black_swan", {})
+    dl  = raw.get("desk_liquidite", {})
+    vix_val = bs.get("vix")
+
+    # Flatten CB signals: {code: {sentiment, name, rate}}
+    cb_full: dict = {}
+    try:
+        with hub._lock:
+            cb_full = {
+                code: {
+                    "sentiment": float(d.get("sentiment", 0)),
+                    "name":      code,
+                    "rate":      d.get("taux"),
+                    "headline":  d.get("headline", ""),
+                }
+                for code, d in hub._cb_last_signals.items()
+            }
+    except Exception:
+        cb_full = {
+            code: {"sentiment": float(v), "name": code, "rate": None}
+            for code, v in raw.get("banques_centrales", {}).get("signaux", {}).items()
+        }
+
+    # Derive Howell regime from VIX + liq_budget_factor
+    liq_f = dl.get("budget_factor", 1.0)
+    if vix_val is not None and float(vix_val) >= 30 or liq_f <= 0.65:
+        howell = "HOWELL_DANGER"
+    elif vix_val is not None and float(vix_val) >= 25 or liq_f <= 0.80:
+        howell = "HOWELL_VIGILANCE"
+    elif vix_val is not None and float(vix_val) >= 20 or liq_f <= 0.95:
+        howell = "HOWELL_ATTENTION"
+    else:
+        howell = "HOWELL_SEREIN"
+
+    return jsonify({
+        **raw,
+        # Flat keys expected by frontend
+        "black_swan_halt":   bs.get("halt", False),
+        "vix":               vix_val,
+        "liq_budget_factor": liq_f,
+        "central_banks":     cb_full,
+        "expert_signals":    raw.get("experts_sectoriels", {}).get("signaux", {}),
+        "howell_regime":     howell,
+        "howell_resume":     f"VIX={vix_val:.1f} | Budget×{liq_f:.2f}" if vix_val else f"Budget×{liq_f:.2f}",
+        "bus_stats":         raw.get("bus", {}),
+    })
+
+
+# ── CIO Allocation macro ──────────────────────────────────────────────────────
+
+@app.route("/api/cio/allocation")
+def get_cio_allocation():
+    """
+    Allocation macro dynamique CIO.
+    Régime dérivé du VIX (bus) + mode Bertez (desk liquidité).
+    Régimes : RISK_ON / NEUTRAL / RISK_OFF
+    """
+    try:
+        hub      = getattr(engine, "_hub", None)
+        vix      = hub.last_vix if hub else None
+        halt     = hub.black_swan_halt if hub else False
+
+        bertez_mode = "NEUTRE"
+        try:
+            from divisions.middle_office import get_liquidity_desk
+            data = get_liquidity_desk().get_data()
+            bertez_mode = data.get("bertez_mode") or "NEUTRE"
+        except Exception:
+            pass
+
+        vix_val = float(vix) if vix is not None else 20.0
+
+        if halt or vix_val >= 30 or bertez_mode == "DEFENSIF":
+            regime = "RISK_OFF"
+        elif vix_val < 20 and bertez_mode != "DEFENSIF":
+            regime = "RISK_ON"
+        else:
+            regime = "NEUTRAL"
+
+        _alloc = {
+            "RISK_ON":  {"actions_us": 40, "actions_eu": 20, "obligations": 15,
+                         "or": 10, "cash": 5, "crypto": 5, "commodites": 5},
+            "NEUTRAL":  {"actions_us": 30, "actions_eu": 15, "obligations": 25,
+                         "or": 15, "cash": 10, "crypto": 3, "commodites": 2},
+            "RISK_OFF": {"actions_us": 10, "actions_eu": 5,  "obligations": 35,
+                         "or": 25, "cash": 20, "crypto": 0, "commodites": 5},
+        }
+
+        short_signals = []
+        if regime == "RISK_ON" and vix_val < 18:
+            short_signals = ["NVDA", "SMCI", "QQQ"]
+        elif bertez_mode == "DEFENSIF":
+            short_signals = ["QQQ", "SPY"]
+
+        return jsonify({
+            "regime":        regime,
+            "allocation":    _alloc[regime],
+            "short_signals": short_signals,
+            "vix":           round(vix_val, 1) if vix is not None else None,
+            "bertez_mode":   bertez_mode,
+            "updated_at":    datetime.utcnow().isoformat(),
+        })
+    except Exception as e:
+        logger.error("cio allocation: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+# ── Bertez Analyse ────────────────────────────────────────────────────────────
+
+@app.route("/api/bertez/analyse")
+def get_bertez_analyse():
+    """
+    Signal Bertez (WTI + macro) depuis le desk liquidité.
+    Fournit mode, signal [-1,+1], prix WTI et thèse directionnelle.
+    """
+    try:
+        from divisions.middle_office import get_liquidity_desk
+        data        = get_liquidity_desk().get_data()
+        bertez_sig  = data.get("bertez_signal")
+        bertez_mode = data.get("bertez_mode") or "NEUTRE"
+
+        _theses = {
+            "DEFENSIF": ("WTI+USD fort → STAGFLATION → rotation actifs réels "
+                         "(XLE, GLD, TTE.PA, SU.PA, VPK.AS)"),
+            "OFFENSIF": ("WTI bas+USD faible → REFLATION → actions cycliques "
+                         "(Finance, Tech, AMZN, META)"),
+            "NEUTRE":   "Régime neutre — pas de signal Bertez directionnel fort.",
+        }
+
+        wti = None
+        try:
+            from divisions.middle_office.desk_liquidite.agents.agent_bertez import (
+                get_last_bertez_result,
+            )
+            last = get_last_bertez_result()
+            if last:
+                wti = (
+                    last.get("data", {})
+                    .get("fred", {})
+                    .get("wti_crude", {})
+                    .get("latest")
+                )
+        except Exception:
+            pass
+
+        return jsonify({
+            "mode":      bertez_mode,
+            "signal":    bertez_sig,
+            "wti_price": wti,
+            "these":     _theses.get(bertez_mode, _theses["NEUTRE"]),
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+    except Exception as e:
+        logger.error("bertez analyse: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+# ── DSPX Dispersion ──────────────────────────────────────────────────────────
+
+import time as _time
+_dspx_cache:  dict = {}
+_dspx_cache_ts: float = 0.0
+_DSPX_TTL = 300   # 5 min
+
+@app.route("/api/dspx/etat")
+def get_dspx_etat():
+    """
+    Agent DSPX — dispersion implicite + corrélations rolling 30j.
+    Source : ^DSPX (fallback ^SKEW) via yfinance.
+    Régimes : FORTE / NORMALE / FAIBLE.
+    """
+    global _dspx_cache, _dspx_cache_ts
+    now = _time.monotonic()
+    if _dspx_cache and (now - _dspx_cache_ts) < _DSPX_TTL:
+        return jsonify(_dspx_cache)
+    try:
+        import yfinance as yf
+        import numpy as np
+
+        # Fetch DSPX (fallback SKEW)
+        dspx_val = None
+        for ticker in ("^DSPX", "^SKEW"):
+            try:
+                hist = yf.Ticker(ticker).history(period="60d", interval="1d", auto_adjust=True)
+                if not hist.empty:
+                    dspx_val = float(hist["Close"].iloc[-1])
+                    dspx_series = hist["Close"].dropna().values
+                    break
+            except Exception:
+                continue
+
+        percentile_50j = None
+        regime = "NORMALE"
+        signal = "NEUTRE"
+        if dspx_val is not None and len(dspx_series) >= 2:
+            window = dspx_series[-50:] if len(dspx_series) >= 50 else dspx_series
+            pct = float(np.sum(window <= dspx_val) / len(window) * 100)
+            percentile_50j = round(pct, 1)
+            if pct >= 75:
+                regime = "FORTE"
+                signal = "STOCK_PICKING"
+            elif pct <= 25:
+                regime = "FAIBLE"
+                signal = "BETA_ONLY"
+            else:
+                regime = "NORMALE"
+                signal = "NEUTRE"
+
+        # Rolling 30-day correlations vs basket
+        corr_tickers = ["SPY", "TLT", "GLD", "QQQ", "IWM", "GC=F", "CL=F"]
+        correlations: dict = {}
+        try:
+            import pandas as pd
+            data = yf.download(
+                " ".join(corr_tickers),
+                period="35d",
+                interval="1d",
+                progress=False,
+                auto_adjust=True,
+            )
+            closes = data["Close"] if "Close" in data.columns else data
+            spy_ret = closes["SPY"].pct_change().dropna() if "SPY" in closes.columns else None
+            if spy_ret is not None and len(spy_ret) >= 10:
+                for sym in corr_tickers:
+                    if sym == "SPY" or sym not in closes.columns:
+                        continue
+                    try:
+                        sym_ret = closes[sym].pct_change().dropna()
+                        n = min(len(spy_ret), len(sym_ret), 30)
+                        if n >= 5:
+                            c = float(np.corrcoef(spy_ret.values[-n:], sym_ret.values[-n:])[0, 1])
+                            if not np.isnan(c):
+                                correlations[sym] = round(c, 2)
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        result = {
+            "dspx":          round(dspx_val, 2) if dspx_val is not None else None,
+            "percentile_50j": percentile_50j,
+            "regime":         regime,
+            "signal":         signal,
+            "correlations":   correlations,
+            "timestamp":      datetime.utcnow().isoformat(),
+        }
+        _dspx_cache    = result
+        _dspx_cache_ts = now
+        return jsonify(result)
+    except Exception as e:
+        logger.error("dspx etat: %s", e)
+        if _dspx_cache:
+            return jsonify(_dspx_cache)
+        return jsonify({
+            "dspx": None, "percentile_50j": None,
+            "regime": "INCONNU", "signal": "—", "correlations": {},
+            "erreur": str(e), "timestamp": datetime.utcnow().isoformat(),
+        })
+
+
+# ── Corrélations Actions/Obligations ─────────────────────────────────────────
+
+_corr_cache:    dict = {}
+_corr_cache_ts: float = 0.0
+_CORR_TTL = 3600   # 1 h (données FRED ne changent pas à la minute)
+
+_ACTIFS_INFLATION = [
+    "GC=F", "GLD", "VPK.AS", "GTT.PA", "O", "BIPC", "SU.PA", "TTE.PA",
+]
+_ACTIFS_DECORR = ["TLT", "IEF", "GLD", "VPK.AS"]
+
+@app.route("/api/correlations/actoblig")
+def get_correlations_actoblig():
+    """
+    Corrélations SPY/TLT rolling 20j + 60j + inflation US (FRED CPIAUCSL).
+    Régimes : REGIME_INFLATION / DECORRELATION / NEUTRE.
+    """
+    global _corr_cache, _corr_cache_ts
+    now = _time.monotonic()
+    if _corr_cache and (now - _corr_cache_ts) < _CORR_TTL:
+        return jsonify(_corr_cache)
+    try:
+        import yfinance as yf
+        import numpy as np
+
+        hist = yf.download(
+            "SPY TLT",
+            period="70d",
+            interval="1d",
+            progress=False,
+            auto_adjust=True,
+        )
+        closes = hist["Close"] if "Close" in hist.columns else hist
+        spy = closes["SPY"].pct_change().dropna() if "SPY" in closes.columns else None
+        tlt = closes["TLT"].pct_change().dropna() if "TLT" in closes.columns else None
+
+        corr_20j = corr_60j = None
+        if spy is not None and tlt is not None:
+            n20 = min(len(spy), len(tlt), 20)
+            n60 = min(len(spy), len(tlt), 60)
+            if n20 >= 5:
+                c = np.corrcoef(spy.values[-n20:], tlt.values[-n20:])[0, 1]
+                if not np.isnan(c):
+                    corr_20j = round(float(c), 3)
+            if n60 >= 20:
+                c = np.corrcoef(spy.values[-n60:], tlt.values[-n60:])[0, 1]
+                if not np.isnan(c):
+                    corr_60j = round(float(c), 3)
+
+        # Inflation US — lire depuis le cache Bertez/FRED ou valeur statique récente
+        inflation_us = None
+        try:
+            from divisions.middle_office.desk_liquidite.agents.agent_bertez import (
+                get_last_bertez_result,
+            )
+            last = get_last_bertez_result()
+            if last:
+                # FRED CPIAUCSL change_pct donne ~YoY si période = 12 mois
+                cpi = last.get("data", {}).get("fred", {}).get("energy_cpi", {})
+                if cpi.get("change_12m_pct") is not None:
+                    inflation_us = round(float(cpi["change_12m_pct"]), 2)
+        except Exception:
+            pass
+
+        # Régime
+        if corr_20j is not None and corr_20j > 0 and (inflation_us is None or inflation_us > 2.5):
+            regime = "REGIME_INFLATION"
+            actifs = _ACTIFS_INFLATION
+        elif corr_20j is not None and corr_20j < -0.3:
+            regime = "DECORRELATION"
+            actifs = _ACTIFS_DECORR
+        else:
+            regime = "NEUTRE"
+            actifs = []
+
+        result = {
+            "correlation_20j":    corr_20j,
+            "correlation_60j":    corr_60j,
+            "inflation_us":       inflation_us,
+            "regime":             regime,
+            "actifs_recommandes": actifs,
+            "timestamp":          datetime.utcnow().isoformat(),
+        }
+        _corr_cache    = result
+        _corr_cache_ts = now
+        return jsonify(result)
+    except Exception as e:
+        logger.error("correlations actoblig: %s", e)
+        if _corr_cache:
+            return jsonify(_corr_cache)
+        return jsonify({
+            "correlation_20j": None, "correlation_60j": None,
+            "inflation_us": None, "regime": "INCONNU", "actifs_recommandes": [],
+            "erreur": str(e), "timestamp": datetime.utcnow().isoformat(),
+        })
 
 
 @app.route("/api/maintenance/health")
