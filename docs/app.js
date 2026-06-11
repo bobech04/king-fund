@@ -794,7 +794,7 @@ function renderFiscalite(d) {
 async function loadIntelligence(silent = false) {
   if (intelligenceLoaded && !silent) return;
   try {
-    const [actuRes, dspxRes, corrRes, wlRes, comiteRes, screenerRes, seuilsRes, calRes, alphaRes, veilleRes] = await Promise.allSettled([
+    const [actuRes, dspxRes, corrRes, wlRes, comiteRes, screenerRes, seuilsRes, calRes, alphaRes, veilleRes, auditRes, predRes] = await Promise.allSettled([
       fetch(API+'/actualites').then(r => r.json()),
       fetch(API+'/dspx/etat').then(r => r.json()),
       fetch(API+'/correlations/actoblig').then(r => r.json()),
@@ -805,6 +805,8 @@ async function loadIntelligence(silent = false) {
       fetch(API+'/alertes/calendrier').then(r => r.json()),
       fetch(API+'/alpha-lab/rapport').then(r => r.json()),
       fetch(API+'/veille-strategique').then(r => r.json()),
+      fetch(API+'/agd/audit?limit=20').then(r => r.json()),
+      fetch(API+'/signaux/predictivite').then(r => r.json()),
     ]);
     intelligenceLoaded = true;
     renderIntelligence(
@@ -818,13 +820,15 @@ async function loadIntelligence(silent = false) {
       calRes.status==='fulfilled'     ? calRes.value     : null,
       alphaRes.status==='fulfilled'   ? alphaRes.value   : null,
       veilleRes.status==='fulfilled'  ? veilleRes.value  : null,
+      auditRes.status==='fulfilled'   ? auditRes.value   : null,
+      predRes.status==='fulfilled'    ? predRes.value    : null,
     );
   } catch {
     if (!silent) qs('#intelligence-wrap').innerHTML = '<div class="error-state">Erreur Intelligence.</div>';
   }
 }
 
-function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, calData, alphalab, veilleData) {
+function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, calData, alphalab, veilleData, auditData, predData) {
   const articles  = (actu?.articles || []).slice(0,10);
   const watchlist = wl?.watchlist || [];
   const nbBuy  = watchlist.filter(a => a.signal==='BUY').length;
@@ -1174,6 +1178,88 @@ function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, 
         s += '</div>';
       }
 
+      s += '</div>';
+      return s;
+    })() +
+
+    // ── Journal Audit AGD-01 ─────────────────────────────────────────────────
+    (() => {
+      const entries = auditData?.entries || [];
+      let s = '<div class="intel-card">';
+      s += '<div class="intel-card-title">🔒 Journal Audit AGD-01 <span class="badge badge-neutral">' + entries.length + '</span></div>';
+      if (!entries.length) {
+        s += '<div class="empty-state">Aucune décision enregistrée — log vide</div>';
+      } else {
+        s += '<div style="display:flex;flex-direction:column;gap:4px">';
+        entries.forEach(e => {
+          const isVeto = e.decision === 'VETO';
+          const isRapport = e.event_type === 'rapport_lundi';
+          const badgeCol = isVeto ? 'var(--red)' : isRapport ? 'var(--accent)' : 'var(--green)';
+          const label = e.decision || (isRapport ? 'RAPPORT' : e.event_type?.toUpperCase() || '?');
+          const ts = (e.ts || '').slice(0, 16).replace('T', ' ');
+          const ticker = e.ticker ? '<span style="font-weight:700;color:var(--accent)">' + escHtml(e.ticker) + '</span>' : '';
+          const action = e.action ? ' <span style="color:var(--muted)">' + escHtml(e.action.toUpperCase()) + (e.montant ? ' ' + e.montant + '€' : '') + '</span>' : '';
+          const raison = e.raison ? '<div style="font-size:.52rem;color:var(--muted);margin-top:1px">' + escHtml((e.raison||'').slice(0,100)) + '</div>' : '';
+          const hash = e.prev_hash ? '<span style="font-size:.45rem;color:var(--muted);opacity:.5">⛓ ' + e.prev_hash + '</span>' : '';
+          s += '<div style="display:flex;flex-direction:column;padding:5px 6px;background:var(--card-bg2,#1a1a2e);border-radius:6px;border-left:3px solid ' + badgeCol + '">';
+          s += '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">';
+          s += '<span style="font-size:.5rem;color:var(--muted)">' + ts + '</span>';
+          s += '<span style="font-size:.55rem;font-weight:700;padding:1px 5px;border-radius:3px;background:' + badgeCol + ';color:#000">' + label + '</span>';
+          s += ticker + action + ' ' + hash;
+          s += '</div>';
+          s += raison;
+          s += '</div>';
+        });
+        s += '</div>';
+      }
+      s += '</div>';
+      return s;
+    })() +
+
+    // ── Prédictivité des Signaux ─────────────────────────────────────────────
+    (() => {
+      const stats   = predData?.stats   || {};
+      const history = predData?.history || [];
+      const fmtRate = (taux) => taux != null ? Math.round(taux * 100) + '%' : 'N/A';
+      const rateCol = (taux) => taux == null ? 'var(--muted)' : taux >= 0.6 ? 'var(--green)' : taux >= 0.45 ? 'var(--accent)' : 'var(--red)';
+
+      let s = '<div class="intel-card">';
+      s += '<div class="intel-card-title">📊 Prédictivité des Signaux</div>';
+      s += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">';
+      ['bertez', 'morning_brief'].forEach(k => {
+        const st = stats[k] || {};
+        const pct = fmtRate(st.taux);
+        const col = rateCol(st.taux);
+        const lbl = k === 'bertez' ? '🛢️ Bertez' : '🌅 Morning Brief';
+        s += '<div style="background:var(--card-bg2,#1a1a2e);border-radius:8px;padding:8px;text-align:center">';
+        s += '<div style="font-size:.55rem;color:var(--muted);margin-bottom:3px">' + lbl + '</div>';
+        s += '<div style="font-size:1.4rem;font-weight:700;color:' + col + '">' + pct + '</div>';
+        s += '<div style="font-size:.5rem;color:var(--muted)">' + (st.succes || 0) + '/' + (st.evalues || 0) + ' évalués · ' + (st.total || 0) + ' signaux</div>';
+        s += '</div>';
+      });
+      s += '</div>';
+
+      if (history.length) {
+        s += '<table style="width:100%;border-collapse:collapse;font-size:.52rem">';
+        s += '<thead><tr style="color:var(--muted)">';
+        s += '<th style="text-align:left;padding:2px 4px">Date</th><th style="text-align:left;padding:2px 4px">Signal</th>';
+        s += '<th style="padding:2px 4px">Direction</th><th style="padding:2px 4px">Résultat</th><th style="padding:2px 4px">✓</th>';
+        s += '</tr></thead><tbody>';
+        history.slice(0, 10).forEach(r => {
+          const ok = r.success === 1 ? '✅' : r.success === 0 ? '❌' : '⏳';
+          const outcomeCol = r.success === 1 ? 'var(--green)' : r.success === 0 ? 'var(--red)' : 'var(--muted)';
+          s += '<tr style="border-top:1px solid rgba(255,255,255,.05)">';
+          s += '<td style="padding:2px 4px">' + (r.prediction_date || '') + '</td>';
+          s += '<td style="padding:2px 4px;color:var(--accent)">' + (r.signal_type || '') + '</td>';
+          s += '<td style="padding:2px 4px;text-align:center">' + (r.direction || '—') + '</td>';
+          s += '<td style="padding:2px 4px;text-align:center;color:var(--muted)">' + (r.outcome || '⏳') + '</td>';
+          s += '<td style="padding:2px 4px;text-align:center;color:' + outcomeCol + '">' + ok + '</td>';
+          s += '</tr>';
+        });
+        s += '</tbody></table>';
+      } else {
+        s += '<div class="empty-state" style="font-size:.52rem">Historique vide — les prédictions s\'accumulent chaque jour</div>';
+      }
       s += '</div>';
       return s;
     })() +
