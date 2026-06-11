@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="King Fund" />
   <link rel="manifest" href="manifest.json" />
-  <title>👑 KING FUND</title>
+  <title>👑 KING FUND — Family Office</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
@@ -40,24 +40,24 @@
 <!-- ── STATS BAR ─────────────────────────────────────────────── -->
 <div class="stats-bar">
   <div class="stat">
-    <div class="stat-label">MISE</div>
-    <div class="stat-value">500 €</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">OBJECTIF</div>
-    <div class="stat-value accent">10 000 €</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">WINNERS</div>
-    <div class="stat-value gold" id="winners-count">0</div>
+    <div class="stat-label">NAV</div>
+    <div class="stat-value accent" id="nav-total">—</div>
   </div>
   <div class="stat">
     <div class="stat-label">TOP</div>
     <div class="stat-value green" id="top-value">—</div>
   </div>
   <div class="stat">
+    <div class="stat-label">WINNERS</div>
+    <div class="stat-value gold" id="winners-count">0</div>
+  </div>
+  <div class="stat">
     <div class="stat-label">BERTEZ</div>
     <div class="stat-value muted" id="bertez-mode-val">—</div>
+  </div>
+  <div class="stat">
+    <div class="stat-label">BLACK SWAN</div>
+    <div class="stat-value muted" id="black-swan-val">—</div>
   </div>
 </div>
 
@@ -74,77 +74,90 @@
 <!-- ── OFFLINE BANNER ────────────────────────────────────────── -->
 <div class="banner hidden" id="banner">⚠ WebSocket déconnecté — mode polling</div>
 
-<!-- ── TAB BAR ───────────────────────────────────────────────── -->
+<!-- ── TAB BAR (10 tabs) ─────────────────────────────────────── -->
 <nav class="tab-bar">
-  <button class="tab-btn active" data-tab="classement">🏆 Classement</button>
-  <button class="tab-btn" data-tab="divisions">🏛 Divisions</button>
-  <button class="tab-btn" data-tab="brief">🌅 Morning Brief</button>
-  <button class="tab-btn" data-tab="postmarket">📊 Post-Market</button>
-  <button class="tab-btn" data-tab="diplome">🎓 Diplôme</button>
-  <button class="tab-btn" data-tab="investissement">📈 Investissement</button>
-  <button class="tab-btn" data-tab="patrimoine">💎 Patrimoine</button>
+  <button class="tab-btn active" data-tab="dashboard">📊 Bord</button>
+  <button class="tab-btn" data-tab="protection">🛡 Protection</button>
+  <button class="tab-btn" data-tab="croissance">📈 Croissance</button>
+  <button class="tab-btn" data-tab="fiscalite">📋 Fiscalité</button>
+  <button class="tab-btn" data-tab="intelligence">🧠 Intelligence</button>
+  <button class="tab-btn" data-tab="retraite">🎯 Retraite</button>
+  <button class="tab-btn" data-tab="marches">🌍 Marchés</button>
+  <button class="tab-btn" data-tab="secteurs">🏭 Secteurs</button>
   <button class="tab-btn" data-tab="liquidite">💧 Liquidité</button>
-  <button class="tab-btn" data-tab="gerant-delegue">🏦 Gérant</button>
+  <button class="tab-btn" data-tab="morning-brief">🌅 Brief</button>
 </nav>
 
 <!-- ── MAIN ──────────────────────────────────────────────────── -->
 <main>
 
-  <!-- TAB : CLASSEMENT ──────────────────────────────────────── -->
-  <div class="tab-pane" id="tab-classement">
-    <div class="filter-bar hidden" id="filter-bar">
-      <div class="filter-badge" id="filter-badge"></div>
-      <button class="filter-clear" id="filter-clear">✕ Effacer</button>
-    </div>
-    <div id="leaderboard"></div>
+  <!-- TAB 1 : TABLEAU DE BORD ────────────────────────────────── -->
+  <div class="tab-pane" id="tab-dashboard">
+    <div id="dashboard-wrap"><div class="loading-state">Chargement du tableau de bord…</div></div>
   </div>
 
-  <!-- TAB : DIVISIONS ───────────────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-divisions">
-    <div class="div-perf-wrap">
-      <div class="div-perf-label">PERFORMANCE DES DIVISIONS</div>
-      <div class="div-perf-chart">
-        <canvas id="div-chart"></canvas>
+  <!-- TAB 2 : PILIER 1 — PROTECTION ─────────────────────────── -->
+  <div class="tab-pane hidden" id="tab-protection">
+    <div id="protection-wrap"><div class="loading-state">Chargement Protection…</div></div>
+  </div>
+
+  <!-- TAB 3 : PILIER 2 — CROISSANCE ─────────────────────────── -->
+  <div class="tab-pane hidden" id="tab-croissance">
+    <div id="croissance-wrap">
+      <div class="filter-bar hidden" id="filter-bar">
+        <div class="filter-badge" id="filter-badge"></div>
+        <button class="filter-clear" id="filter-clear">✕ Effacer</button>
       </div>
-    </div>
-    <div class="divisions-grid" id="divisions-grid">
-      <div class="loading-state" style="grid-column:1/-1">Chargement des divisions</div>
-    </div>
-  </div>
-
-  <!-- TAB : MORNING BRIEF ───────────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-brief">
-    <div id="brief-wrap">
-      <div class="loading-state">Chargement du Morning Brief</div>
-    </div>
-  </div>
-
-  <!-- TAB : POST-MARKET ─────────────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-postmarket">
-    <div id="postmarket-wrap">
-      <div class="loading-state">Chargement de la revue post-marché</div>
+      <!-- groupe view toggled by JS -->
+      <div id="croissance-groups"></div>
+      <!-- division performance chart -->
+      <div class="div-perf-wrap" id="div-perf-wrap">
+        <div class="div-perf-label">PERFORMANCE DES DESKS</div>
+        <div class="div-perf-chart">
+          <canvas id="div-chart"></canvas>
+        </div>
+      </div>
+      <div class="divisions-grid" id="divisions-grid">
+        <div class="loading-state" style="grid-column:1/-1">Chargement des divisions</div>
+      </div>
+      <!-- full leaderboard below -->
+      <div id="leaderboard"></div>
     </div>
   </div>
 
-  <!-- TAB : DIPLÔME ─────────────────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-diplome">
-    <div id="diplome-wrap">
-      <div class="loading-state">Chargement du diplôme</div>
-    </div>
+  <!-- TAB 4 : PILIER 3 — FISCALITÉ ──────────────────────────── -->
+  <div class="tab-pane hidden" id="tab-fiscalite">
+    <div id="fiscalite-wrap"><div class="loading-state">Chargement des données fiscales…</div></div>
   </div>
 
-  <!-- TAB : INVESTISSEMENT ──────────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-investissement">
-    <div id="investissement-wrap">
-      <div class="loading-state">Analyse pipeline 17 étapes en cours…</div>
-    </div>
+  <!-- TAB 5 : PILIER 4 — INTELLIGENCE ───────────────────────── -->
+  <div class="tab-pane hidden" id="tab-intelligence">
+    <div id="intelligence-wrap"><div class="loading-state">Chargement Intelligence…</div></div>
   </div>
 
-  <!-- TAB : PATRIMOINE ──────────────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-patrimoine">
-    <div id="patrimoine-wrap">
-      <div class="loading-state">Chargement du patrimoine…</div>
-    </div>
+  <!-- TAB 6 : PILIER 5 — RETRAITE ────────────────────────────── -->
+  <div class="tab-pane hidden" id="tab-retraite">
+    <div id="retraite-wrap"><div class="loading-state">Chargement Retraite…</div></div>
+  </div>
+
+  <!-- TAB 7 : MARCHÉS ────────────────────────────────────────── -->
+  <div class="tab-pane hidden" id="tab-marches">
+    <div id="marches-wrap"><div class="loading-state">Chargement des marchés…</div></div>
+  </div>
+
+  <!-- TAB 8 : SECTEURS ───────────────────────────────────────── -->
+  <div class="tab-pane hidden" id="tab-secteurs">
+    <div id="secteurs-wrap"><div class="loading-state">Chargement des secteurs…</div></div>
+  </div>
+
+  <!-- TAB 9 : LIQUIDITÉ ──────────────────────────────────────── -->
+  <div class="tab-pane hidden" id="tab-liquidite">
+    <div id="liquidite-wrap"><div class="loading-state">Chargement liquidité…</div></div>
+  </div>
+
+  <!-- TAB 10 : MORNING BRIEF ─────────────────────────────────── -->
+  <div class="tab-pane hidden" id="tab-morning-brief">
+    <div id="morning-brief-wrap"><div class="loading-state">Chargement Morning Brief…</div></div>
   </div>
 
   <!-- MODAL APPORT ────────────────────────────────────────────── -->
@@ -176,26 +189,11 @@
     </div>
   </div>
 
-  <!-- TAB : LIQUIDITÉ ────────────────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-liquidite">
-    <div id="liquidite-wrap">
-      <div class="loading-state">Chargement du score de liquidité</div>
-    </div>
-  </div>
-
-  <!-- TAB : GÉRANT DÉLÉGUÉ ────────────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-gerant-delegue">
-    <div id="agd-wrap">
-      <div class="loading-state">Chargement du Gérant Délégué…</div>
-    </div>
-  </div>
-
 </main>
 
 <!-- ── TRADER DETAIL MODAL ───────────────────────────────────── -->
 <div class="overlay hidden" id="overlay">
   <div class="modal" id="modal">
-
     <div class="modal-header">
       <button class="btn-close" id="btn-close">✕</button>
       <div class="modal-title">
@@ -204,9 +202,7 @@
       </div>
       <div class="modal-rank-badge" id="modal-rank-badge"></div>
     </div>
-
     <div class="modal-div-row" id="modal-div-row"></div>
-
     <div class="modal-kpi">
       <div class="kpi-block">
         <div class="kpi-label">VALEUR</div>
@@ -225,7 +221,6 @@
         <div class="kpi-value" id="modal-sitg-value">—</div>
       </div>
     </div>
-
     <div class="modal-progress-wrap">
       <div class="progress-labels">
         <span>500 €</span>
@@ -236,24 +231,20 @@
         <div class="progress-fill" id="modal-progress"></div>
       </div>
     </div>
-
     <div class="modal-section">
       <div class="section-label">ÉVOLUTION</div>
       <div class="chart-container">
         <canvas id="modal-chart"></canvas>
       </div>
     </div>
-
     <div class="modal-section">
       <div class="section-label">POSITIONS</div>
       <div id="modal-positions"></div>
     </div>
-
     <div class="modal-section">
       <div class="section-label">DERNIERS TRADES</div>
       <div id="modal-trades"></div>
     </div>
-
   </div>
 </div>
 
