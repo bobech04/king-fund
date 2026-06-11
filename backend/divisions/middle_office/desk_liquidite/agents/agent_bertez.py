@@ -531,6 +531,20 @@ class BertezEnergyAgent:
         # Cache module pour Morning Brief + Risk Committee
         global _last_result
         _last_result = result
+
+        # Historique prédictif — un enregistrement par jour calendaire
+        try:
+            from data.signal_history import log_signal as _log_sig
+            _log_sig(
+                "bertez",
+                direction=mode.lower(),
+                confidence=abs(bertez_signal),
+                mode=mode,
+                score=score,
+            )
+        except Exception:
+            pass
+
         return result
 
 

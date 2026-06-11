@@ -422,20 +422,59 @@ def get_cio_allocation():
 
         vix_val = float(vix) if vix is not None else 20.0
 
-        if halt or vix_val >= 30 or bertez_mode == "DEFENSIF":
+        # Signal inflation depuis corrélations actions/obligations
+        inflation_regime = False
+        try:
+            from divisions.middle_office.agent_correlations_actoblig import get_agent_correlations
+            corr_data = get_agent_correlations().get_data()
+            inflation_regime = corr_data.get("regime") == "REGIME_INFLATION"
+        except Exception:
+            pass
+
+        # Régimes : RISK_OFF > MMT_INFLATION (Bertez DEFENSIF ou inflation) > RISK_ON > NEUTRAL
+        if halt or vix_val >= 35:
             regime = "RISK_OFF"
-        elif vix_val < 20 and bertez_mode != "DEFENSIF":
+        elif bertez_mode == "DEFENSIF" and vix_val >= 30:
+            regime = "RISK_OFF"
+        elif bertez_mode == "DEFENSIF" or inflation_regime:
+            regime = "MMT_INFLATION"
+        elif vix_val < 20:
             regime = "RISK_ON"
         else:
             regime = "NEUTRAL"
 
+        # Allocations par régime — thèse Bertez MMT inflationniste :
+        # obligations ↓25→12 | or ↑15→22 | commodités ↑2→8
+        # MMT_INFLATION : bucket dédié actions_eu_energie_infra (TTE.PA ENGIE.PA VIE.PA SU.PA VPK.AS)
         _alloc = {
-            "RISK_ON":  {"actions_us": 40, "actions_eu": 20, "obligations": 15,
-                         "or": 10, "cash": 5, "crypto": 5, "commodites": 5},
-            "NEUTRAL":  {"actions_us": 30, "actions_eu": 15, "obligations": 25,
-                         "or": 15, "cash": 10, "crypto": 3, "commodites": 2},
-            "RISK_OFF": {"actions_us": 10, "actions_eu": 5,  "obligations": 35,
-                         "or": 25, "cash": 20, "crypto": 0, "commodites": 5},
+            "RISK_ON": {
+                "actions_us": 40, "actions_eu": 20, "obligations": 15,
+                "or": 10, "cash": 5, "crypto": 5, "commodites": 5,
+            },
+            "MMT_INFLATION": {
+                "actions_us": 22, "actions_eu": 7,
+                "actions_eu_energie_infra": 8,
+                "obligations": 12,
+                "or": 22,
+                "cash": 10, "crypto": 3, "commodites": 8,
+            },
+            "NEUTRAL": {
+                "actions_us": 30, "actions_eu": 15, "obligations": 12,
+                "or": 22, "cash": 10, "crypto": 3, "commodites": 8,
+            },
+            "RISK_OFF": {
+                "actions_us": 10, "actions_eu": 5, "obligations": 35,
+                "or": 25, "cash": 20, "crypto": 0, "commodites": 5,
+            },
+        }
+
+        _tickers = {
+            "MMT_INFLATION": {
+                "actions_eu_energie_infra": ["TTE.PA", "ENGIE.PA", "VIE.PA", "SU.PA", "VPK.AS", "GTT.PA"],
+                "or": ["GLD", "GC=F"],
+                "commodites": ["XLE", "CL=F"],
+            },
+            "RISK_OFF": {"or": ["GLD"], "obligations": ["TLT", "IEF"]},
         }
 
         short_signals = []
@@ -445,15 +484,47 @@ def get_cio_allocation():
             short_signals = ["QQQ", "SPY"]
 
         return jsonify({
-            "regime":        regime,
-            "allocation":    _alloc[regime],
-            "short_signals": short_signals,
-            "vix":           round(vix_val, 1) if vix is not None else None,
-            "bertez_mode":   bertez_mode,
-            "updated_at":    datetime.utcnow().isoformat(),
+            "regime":             regime,
+            "allocation":         _alloc[regime],
+            "tickers_recommandes": _tickers.get(regime, {}),
+            "short_signals":      short_signals,
+            "vix":                round(vix_val, 1) if vix is not None else None,
+            "bertez_mode":        bertez_mode,
+            "inflation_regime":   inflation_regime,
+            "updated_at":         datetime.utcnow().isoformat(),
         })
     except Exception as e:
         logger.error("cio allocation: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+# ── Audit AGD-01 ──────────────────────────────────────────────────────────────
+
+@app.route("/api/agd/audit")
+def get_agd_audit():
+    """Journal immuable AGD-01 — dernières N décisions avec prev_hash chain."""
+    limit = min(int(request.args.get("limit", 30)), 200)
+    try:
+        from divisions.gerant_delegue.audit_agd import get_recent
+        entries = get_recent(limit)
+        return jsonify({"entries": entries, "count": len(entries)})
+    except Exception as e:
+        logger.error("agd audit: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+# ── Prédictivité des signaux ──────────────────────────────────────────────────
+
+@app.route("/api/signaux/predictivite")
+def get_signaux_predictivite():
+    """Taux de réussite Bertez + Morning Brief + historique récent."""
+    try:
+        from data.signal_history import get_stats, get_history
+        stats   = get_stats()
+        history = get_history(limit=20)
+        return jsonify({"stats": stats, "history": history})
+    except Exception as e:
+        logger.error("signaux predictivite: %s", e)
         return jsonify({"erreur": str(e)}), 500
 
 
@@ -1132,6 +1203,25 @@ _scheduler.add_job(
     _job_backup,
     CronTrigger(hour=4, minute=0),
     id="backup_quotidien",
+    replace_existing=True,
+)
+
+
+def _job_check_outcomes():
+    """Évalue quotidiennement les prédictions Bertez/Morning Brief vs SPY (18:30 Paris)."""
+    try:
+        from data.signal_history import check_pending_outcomes
+        n = check_pending_outcomes()
+        if n:
+            logger.info("[SCHEDULER] %d signal outcomes mis à jour", n)
+    except Exception as e:
+        logger.error("[SCHEDULER] check_outcomes: %s", e)
+
+
+_scheduler.add_job(
+    _job_check_outcomes,
+    CronTrigger(hour=18, minute=30, timezone=paris_tz),
+    id="check_signal_outcomes",
     replace_existing=True,
 )
 
