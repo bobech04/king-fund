@@ -794,7 +794,7 @@ function renderFiscalite(d) {
 async function loadIntelligence(silent = false) {
   if (intelligenceLoaded && !silent) return;
   try {
-    const [actuRes, dspxRes, corrRes, wlRes, comiteRes, screenerRes, seuilsRes, calRes, alphaRes] = await Promise.allSettled([
+    const [actuRes, dspxRes, corrRes, wlRes, comiteRes, screenerRes, seuilsRes, calRes, alphaRes, veilleRes] = await Promise.allSettled([
       fetch(API+'/actualites').then(r => r.json()),
       fetch(API+'/dspx/etat').then(r => r.json()),
       fetch(API+'/correlations/actoblig').then(r => r.json()),
@@ -804,6 +804,7 @@ async function loadIntelligence(silent = false) {
       fetch(API+'/alertes/seuils').then(r => r.json()),
       fetch(API+'/alertes/calendrier').then(r => r.json()),
       fetch(API+'/alpha-lab/rapport').then(r => r.json()),
+      fetch(API+'/veille-strategique').then(r => r.json()),
     ]);
     intelligenceLoaded = true;
     renderIntelligence(
@@ -816,13 +817,14 @@ async function loadIntelligence(silent = false) {
       seuilsRes.status==='fulfilled'  ? seuilsRes.value  : null,
       calRes.status==='fulfilled'     ? calRes.value     : null,
       alphaRes.status==='fulfilled'   ? alphaRes.value   : null,
+      veilleRes.status==='fulfilled'  ? veilleRes.value  : null,
     );
   } catch {
     if (!silent) qs('#intelligence-wrap').innerHTML = '<div class="error-state">Erreur Intelligence.</div>';
   }
 }
 
-function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, calData, alphalab) {
+function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, calData, alphalab, veilleData) {
   const articles  = (actu?.articles || []).slice(0,10);
   const watchlist = wl?.watchlist || [];
   const nbBuy  = watchlist.filter(a => a.signal==='BUY').length;
@@ -853,6 +855,47 @@ function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, 
       '<div class="intel-actu-src">' + escHtml(a.source||'') + ' · ' + _fmtTs(a.publie_a) + '</div></div></div>'
     ).join('') : '<div class="empty-state">Aucune actualité disponible</div>') +
     '<button class="agd-refresh-btn" id="intel-actu-refresh">↻ Actualiser</button></div>' +
+
+    // Veille Stratégique RSS
+    (() => {
+      const vArts  = (veilleData?.articles || []).slice(0, 20);
+      const vEtat  = veilleData?.etat || {};
+      const vSrcs  = (vEtat.sources || ['Bertez','Dalio','Howell','InflationGuy']).join(' · ');
+      const vMaj   = vEtat.derniere_maj ? _fmtTs(vEtat.derniere_maj) : '—';
+      const nCls   = n => n==='CRITIQUE'?'critique':n==='IMPORTANT'?'important':'info';
+      let s = '<div class="intel-card">';
+      s += '<div class="intel-card-title">📡 Veille Stratégique — ' + vArts.length + ' articles</div>';
+      s += '<div style="font-size:.55rem;color:var(--muted);margin-bottom:8px">Sources : ' + escHtml(vSrcs) + ' · MàJ ' + vMaj + '</div>';
+      if (vEtat.nb_critique || vEtat.nb_important) {
+        s += '<div class="intel-dspx-row" style="margin-bottom:10px">';
+        s += '<div class="intel-dspx-kpi"><div class="intel-kpi-lbl">CRITIQUE</div><div class="intel-kpi-val" style="color:var(--red)">' + (vEtat.nb_critique||0) + '</div></div>';
+        s += '<div class="intel-dspx-kpi"><div class="intel-kpi-lbl">IMPORTANT</div><div class="intel-kpi-val" style="color:#ff9944">' + (vEtat.nb_important||0) + '</div></div>';
+        s += '<div class="intel-dspx-kpi"><div class="intel-kpi-lbl">INFO</div><div class="intel-kpi-val" style="color:var(--muted)">' + (vEtat.nb_info||0) + '</div></div>';
+        s += '<div class="intel-dspx-kpi"><div class="intel-kpi-lbl">Total</div><div class="intel-kpi-val gold">' + (vEtat.nb_total||0) + '</div></div>';
+        s += '</div>';
+      }
+      if (vArts.length) {
+        s += vArts.map(a => {
+          const themes = (a.themes||[]).join(' · ') || '—';
+          return '<div class="intel-actu-item">' +
+            '<span class="intel-niveau ' + nCls(a.niveau) + '">' + escHtml(a.niveau) + '</span>' +
+            '<div>' +
+              '<div class="intel-actu-titre">' +
+                (a.url ? '<a href="' + escHtml(a.url) + '" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">' + escHtml(a.titre||'') + '</a>' : escHtml(a.titre||'')) +
+              '</div>' +
+              '<div class="intel-actu-src">' + escHtml(a.source||'') +
+                (themes !== '—' ? ' · <span style="color:#4488ff">' + escHtml(themes) + '</span>' : '') +
+              '</div>' +
+            '</div>' +
+          '</div>';
+        }).join('');
+      } else {
+        s += '<div class="empty-state">Aucun article (scraping en cours au prochain cycle H:05)</div>';
+      }
+      s += '<button class="agd-refresh-btn" id="intel-veille-refresh">↻ Actualiser</button>';
+      s += '</div>';
+      return s;
+    })() +
 
     // DSPX
     '<div class="intel-card"><div class="intel-card-title">📊 Agent DSPX — Dispersion & Corrélations</div>' +
@@ -1140,6 +1183,10 @@ function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, 
   qs('#intelligence-wrap').innerHTML = html;
 
   qs('#intel-actu-refresh')?.addEventListener('click', async () => {
+    intelligenceLoaded = false; await loadIntelligence(true);
+  });
+  qs('#intel-veille-refresh')?.addEventListener('click', async () => {
+    await fetch(API+'/veille-strategique?force=1');
     intelligenceLoaded = false; await loadIntelligence(true);
   });
   qs('#intel-comite-submit')?.addEventListener('click', async () => {
