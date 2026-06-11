@@ -452,7 +452,7 @@ def get_cio_allocation():
                 "or": 10, "cash": 5, "crypto": 5, "commodites": 5,
             },
             "MMT_INFLATION": {
-                "actions_us": 22, "actions_eu": 7,
+                "actions_us": 30, "actions_eu": 7,
                 "actions_eu_energie_infra": 8,
                 "obligations": 12,
                 "or": 22,
