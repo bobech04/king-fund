@@ -78,3 +78,10 @@ EIA_API_KEY           = os.getenv("EIA_API_KEY", "")   # gratuit — eia.gov/ope
 GLASSNODE_API_KEY     = os.getenv("GLASSNODE_API_KEY", "")  # gratuit — glassnode.com
 
 RAPPORTS_DIR = Path(os.getenv("RAPPORTS_DIR", Path(__file__).parent.parent / "rapports"))
+
+# ---------------------------------------------------------------------------
+# Sécurité web
+# ---------------------------------------------------------------------------
+
+WEB_PASSWORD = os.getenv("WEB_PASSWORD", "king2026")
+SECRET_KEY   = os.getenv("SECRET_KEY",   "kf-secret-2026-change-moi")

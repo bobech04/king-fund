@@ -1,14 +1,17 @@
+import atexit
 import json
 import os
 import queue
+import signal
 import threading
 import logging
 import sys
 from datetime import datetime
+from functools import wraps
 from pathlib import Path
 
 import requests as _requests
-from flask import Flask, jsonify
+from flask import Flask, jsonify, redirect, render_template_string, request, session, url_for
 from flask_sock import Sock
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
@@ -18,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from engine import TradingEngine
 from data.morning_brief import get_morning_brief
-from config import TICK_INTERVAL
+from config import TICK_INTERVAL, WEB_PASSWORD, SECRET_KEY
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger(__name__)
@@ -48,7 +51,82 @@ def _send_telegram(message: str) -> None:
         logger.warning("Telegram alert failed: %s", exc)
 
 app = Flask(__name__, static_folder="../frontend", static_url_path="")
+app.secret_key = SECRET_KEY
 sock = Sock(app)
+
+# ---------------------------------------------------------------------------
+# Authentification web par session Flask
+# ---------------------------------------------------------------------------
+
+_LOGIN_HTML = """
+<!doctype html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>King Fund — Connexion</title>
+<style>
+  body{font-family:sans-serif;background:#0a0a0f;color:#e8e8f0;display:flex;
+       align-items:center;justify-content:center;min-height:100vh;margin:0}
+  .box{background:#12121a;border:1px solid #2a2a3a;border-radius:12px;
+       padding:40px;width:320px;text-align:center}
+  h2{margin:0 0 24px;font-size:1.4rem;color:#ffd700}
+  input{width:100%;box-sizing:border-box;padding:12px;margin:8px 0 20px;
+        background:#1a1a26;border:1px solid #2a2a3a;border-radius:8px;
+        color:#e8e8f0;font-size:1rem}
+  button{width:100%;padding:12px;background:#ffd700;color:#0a0a0f;
+         border:none;border-radius:8px;font-size:1rem;font-weight:700;cursor:pointer}
+  .err{color:#ff4455;margin-bottom:16px;font-size:.9rem}
+</style></head><body>
+<div class="box">
+  <h2>👑 King Fund</h2>
+  {% if error %}<div class="err">{{ error }}</div>{% endif %}
+  <form method="post">
+    <input type="password" name="password" placeholder="Mot de passe" autofocus>
+    <button type="submit">Connexion</button>
+  </form>
+</div></body></html>
+"""
+
+
+def _requires_login(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not session.get("logged_in"):
+            return redirect(url_for("login"))
+        return f(*args, **kwargs)
+    return decorated
+
+
+@app.before_request
+def _guard_web():
+    """Protège l'interface web (non-API) par session Flask."""
+    if request.path.startswith("/api/") or request.path.startswith("/ws"):
+        return None
+    if request.path in ("/login", "/logout"):
+        return None
+    # Fichiers statiques (CSS, JS, images) — autorisés pour que l'app charge
+    if request.path.startswith("/assets/") or request.path.endswith(
+        (".js", ".css", ".ico", ".png", ".svg", ".webmanifest", ".json")
+    ):
+        return None
+    if not session.get("logged_in"):
+        return redirect(url_for("login"))
+    return None
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    error = None
+    if request.method == "POST":
+        if request.form.get("password") == WEB_PASSWORD:
+            session["logged_in"] = True
+            return redirect("/")
+        error = "Mot de passe incorrect."
+    return render_template_string(_LOGIN_HTML, error=error)
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 engine = TradingEngine()
 _ws_queues: list[queue.Queue] = []
@@ -733,6 +811,34 @@ def get_actualites_critiques():
         return jsonify({"erreur": str(e)}), 500
 
 
+# ── Veille Stratégique RSS ───────────────────────────────────────────────────
+
+@app.route("/api/veille-strategique")
+def get_veille_strategique():
+    try:
+        from flask import request as _req
+        from divisions.gerant_delegue.agent_veille_strategique import get_agent_veille
+        force = _req.args.get("force", "0") == "1"
+        agent = get_agent_veille()
+        articles = agent.analyser(forcer=force)
+        return jsonify({
+            "articles": articles[:30],
+            "etat":     agent.etat(),
+        })
+    except Exception as e:
+        logger.error("veille-strategique: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/veille-strategique/historique")
+def get_veille_historique():
+    try:
+        from divisions.gerant_delegue.agent_veille_strategique import get_agent_veille
+        return jsonify(get_agent_veille().historique(limite=100))
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
 # ── Agent Dividendes ──────────────────────────────────────────────────────────
 
 @app.route("/api/dividendes")
@@ -993,6 +1099,80 @@ _scheduler.add_job(
 )
 
 
+def _job_veille_strategique():
+    """Veille stratégique RSS — toutes les heures."""
+    try:
+        from divisions.gerant_delegue.agent_veille_strategique import get_agent_veille
+        get_agent_veille().analyser(forcer=True)
+    except Exception as exc:
+        logger.debug("[SCHEDULER] Veille stratégique: %s", exc)
+
+
+_scheduler.add_job(
+    _job_veille_strategique,
+    CronTrigger(minute=5),   # toutes les heures à H:05
+    id="veille_strategique_horaire",
+    replace_existing=True,
+)
+
+
+def _job_backup():
+    """Backup quotidien de king_fund.db — 04:00 Paris."""
+    logger.info("[SCHEDULER] Backup quotidien king_fund.db")
+    try:
+        from maintenance.backup import faire_backup
+        dest = faire_backup()
+        _send_telegram(f"💾 <b>Backup OK</b>\n{dest.name}")
+    except Exception as exc:
+        logger.error("[SCHEDULER] ✗ Backup ÉCHEC: %s", exc)
+        _send_telegram(f"⚠️ Backup ÉCHEC : {exc}")
+
+
+_scheduler.add_job(
+    _job_backup,
+    CronTrigger(hour=4, minute=0),
+    id="backup_quotidien",
+    replace_existing=True,
+)
+
+
+# ---------------------------------------------------------------------------
+# Watchdog — alertes Telegram sur arrêt/crash du serveur
+# ---------------------------------------------------------------------------
+
+def _on_shutdown(msg: str = "arrêt normal") -> None:
+    _send_telegram(
+        f"🔴 <b>King Fund — Serveur arrêté</b>\n"
+        f"Motif : {msg}\n"
+        f"{datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+    )
+
+
+def _crash_hook(exc_type, exc_value, exc_tb):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_tb)
+        return
+    import traceback
+    tb_str = "".join(traceback.format_exception(exc_type, exc_value, exc_tb))
+    logger.critical("Exception non gérée:\n%s", tb_str)
+    _send_telegram(
+        f"🚨 <b>King Fund — CRASH SERVEUR</b>\n"
+        f"<code>{str(exc_value)[:300]}</code>"
+    )
+
+
+sys.excepthook = _crash_hook
+
+atexit.register(_on_shutdown, "atexit (arrêt normal ou Ctrl+C)")
+
+for sig in (getattr(signal, "SIGTERM", None), getattr(signal, "SIGBREAK", None)):
+    if sig is not None:
+        try:
+            signal.signal(sig, lambda s, f: (_on_shutdown("SIGTERM/SIGBREAK"), sys.exit(0)))
+        except Exception:
+            pass
+
+
 # ------------------------------------------------------------------
 # Entry point
 # ------------------------------------------------------------------
@@ -1009,12 +1189,12 @@ if __name__ == "__main__":
         f"🟢 <b>King Fund opérationnel</b>\n"
         f"Serveur démarré le {datetime.now().strftime('%d/%m/%Y à %H:%M:%S')}\n"
         f"30 traders actifs — Tick {TICK_INTERVAL}s\n"
-        f"• Gérant Délégué AGD-01 actif\n"
-        f"• Rapport lundi 08:00 (AGD-01) + 09:00 (PDF)\n"
+        f"• AGD-01 actif | Rapport lundi 08:00 + PDF 09:00\n"
         f"• Comité Sélection : chaque soir 23:00\n"
-        f"• Actualités : surveillance toutes les 30 min\n"
+        f"• Actualités : toutes les 30 min\n"
+        f"• Veille stratégique RSS : toutes les heures (Bertez/Dalio/Howell/InflationGuy)\n"
         f"• Alertes prix : VPK.AS<44€ · BIPC<35$ · DNB.OL<280kr · TTE.PA>-5%\n"
-        f"• Calendrier : earnings GTT/TEL/TTE/VPK · dividendes O/VZ\n"
+        f"• Backup quotidien 04:00 | Watchdog actif\n"
         f"Objectif retraite Zoubida 2041 — 500 000€"
     )
     logger.info("Server starting on http://0.0.0.0:5000")
