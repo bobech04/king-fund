@@ -203,6 +203,7 @@ function switchTab(tab) {
   if (tab === 'fiscalite')      loadFiscalite();
   if (tab === 'intelligence')   loadIntelligence();
   if (tab === 'retraite')       loadRetraite();
+  if (tab === 'gouvernance')    loadGouvernance();
   if (tab === 'marches')        loadMarches();
   if (tab === 'secteurs')       loadSecteurs();
   if (tab === 'liquidite')      loadLiquidite();
@@ -373,6 +374,7 @@ function renderDashboard(s, bus, brief) {
         ['fiscalite',  '📋', 'Fiscalité', 'FSC-FRA/ALG'],
         ['intelligence','🧠','Intelligence','Actualités & IA'],
         ['retraite',   '🎯', 'Retraite', 'Projection 56 ans'],
+        ['gouvernance','⚖️','Gouvernance','Hiérarchie & Config'],
         ['marches',    '🌍', 'Marchés', 'Géo EU/US/Asie'],
         ['secteurs',   '🏭', 'Secteurs', 'Énergie/Tech/Santé'],
         ['liquidite',  '💧', 'Liquidité', 'DSPX & Corr.'],
@@ -1625,6 +1627,313 @@ function _drawRetProj(proj, cfg) {
         y:{ticks:{color:'#52526a',font:{size:9},callback:v=>v>=1000?(v/1000).toFixed(0)+'k€':v+'€'},grid:{color:'#1e1e2a'}},
       }},
   });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// TAB GOUVERNANCE — Hiérarchie, Autonomie, Mode Trading, Config
+// ═══════════════════════════════════════════════════════════════════
+
+let gouvernanceLoaded = false;
+
+async function loadGouvernance(silent = false) {
+  if (gouvernanceLoaded && !silent) return;
+  const el = qs('#tab-gouvernance');
+  if (!el) return;
+  try {
+    const [etatRes, logRes, autonLogRes, cfgRes] = await Promise.allSettled([
+      fetch(API + '/gouvernance/etat').then(r => r.json()),
+      fetch(API + '/gouvernance/log?limit=20').then(r => r.json()),
+      fetch(API + '/gouvernance/autonomie/log?limit=15').then(r => r.json()),
+      fetch(API + '/config-user').then(r => r.json()),
+    ]);
+    gouvernanceLoaded = true;
+    renderGouvernance(
+      etatRes.status  === 'fulfilled' ? etatRes.value  : null,
+      logRes.status   === 'fulfilled' ? logRes.value   : [],
+      autonLogRes.status === 'fulfilled' ? autonLogRes.value : [],
+      cfgRes.status   === 'fulfilled' ? cfgRes.value   : null,
+    );
+  } catch {
+    if (!el) return;
+    el.innerHTML = '<div class="error-state">Gouvernance indisponible</div>';
+  }
+}
+
+function renderGouvernance(etat, log, logAuton, cfgData) {
+  const el = qs('#tab-gouvernance');
+  if (!el) return;
+
+  const gov    = etat?.gouvernance || {};
+  const auton  = etat?.autonomie   || {};
+  const mode   = etat?.mode        || {};
+  const cfg    = cfgData?.config   || {};
+
+  const modeReel = mode.mode === 'REEL';
+  const modeCls  = modeReel ? 'gov-badge-reel' : 'gov-badge-sim';
+  const modeIcon = modeReel ? '🔴' : '🟢';
+
+  // ── Hiérarchie visuelle
+  const hierarchieHtml = (gov.hierarchie || []).map(h => {
+    const actif = h.nom === 'Black Swan' ? (gov.black_swan_actif ? ' 🚨 HALT' : '') :
+                  h.nom === 'CIO Macro' ? ` — ${gov.cio_regime || ''}` : '';
+    const borderCls = h.niveau === 1 && gov.black_swan_actif ? 'gov-hier-critical' : '';
+    return `<div class="gov-hier-row ${borderCls}">
+      <div class="gov-hier-badge" style="background:${h.couleur}22;border:1px solid ${h.couleur};color:${h.couleur}">${h.niveau}</div>
+      <div class="gov-hier-info">
+        <span class="gov-hier-nom">${h.nom}${actif}</span>
+        <span class="gov-hier-desc">${h.niveau === 1 ? 'Priorité absolue — stoppe tout' : h.niveau === 2 ? 'Veto émotionnel + risque' : h.niveau === 3 ? 'Régime marché' : '30 agents algorithmiques'}</span>
+      </div>
+      <div class="gov-hier-status">${h.niveau === 1 && gov.black_swan_actif ? '<span class="gov-tag red">HALT</span>' : '<span class="gov-tag green">OK</span>'}</div>
+    </div>`;
+  }).join('');
+
+  // ── Validations en attente
+  const pending = (auton.validations || []).filter(v => v.statut === 'PENDING');
+  const pendingHtml = pending.length === 0
+    ? '<div style="color:var(--muted);font-size:.75rem;padding:8px">Aucune validation en attente</div>'
+    : pending.map(v => {
+        const deadline = new Date(v.deadline_ts);
+        const now = new Date();
+        const heuresRestantes = Math.max(0, Math.floor((deadline - now) / 3_600_000));
+        const urgentCls = heuresRestantes < 6 ? 'gov-urgent' : '';
+        return `<div class="gov-valid-row ${urgentCls}">
+          <div class="gov-valid-header">
+            <span class="gov-valid-id"><code>${v.id}</code></span>
+            <span class="gov-valid-action">${escHtml(v.action)}</span>
+            <span class="gov-valid-deadline">${heuresRestantes}h restantes</span>
+          </div>
+          <div class="gov-valid-desc">${escHtml(v.description)}</div>
+          <div class="gov-valid-actions">
+            <button class="gov-btn-valider" onclick="_validerAction('${v.id}')">✅ Valider</button>
+            <button class="gov-btn-rejeter" onclick="_rejeterAction('${v.id}')">❌ Rejeter</button>
+          </div>
+        </div>`;
+      }).join('');
+
+  // ── Log gouvernance
+  const logHtml = (log || []).slice(0, 15).map(e => {
+    const bloqCls = e.acceptee ? '' : 'gov-log-bloque';
+    const icon    = e.acceptee ? '✅' : '🛑';
+    const niveauLabel = {1:'BS',2:'AGD',3:'CIO',4:'TRD'}[e.niveau] || '?';
+    return `<div class="gov-log-row ${bloqCls}">
+      <span class="gov-log-ts">${(e.ts||'').slice(11,16)}</span>
+      <span class="gov-log-niveau ${bloqCls}">${niveauLabel}</span>
+      <span class="gov-log-auteur">${escHtml(e.auteur||'')}</span>
+      <span class="gov-log-action">${icon} ${escHtml(e.action||'')} ${e.ticker ? escHtml(e.ticker) : ''}</span>
+      ${!e.acceptee ? `<span class="gov-log-bloqueur">← ${escHtml(e.bloquee_par||'')}</span>` : ''}
+    </div>`;
+  }).join('') || '<div style="color:var(--muted);font-size:.75rem;padding:8px">Aucune décision loggée</div>';
+
+  // ── Log autonomie
+  const logAutonHtml = (logAuton || []).slice(0, 10).map(e => {
+    const icon = e.statut === 'VALIDEE' ? '✅' : e.statut === 'REJETEE' ? '❌' : e.statut === 'AUTONOME' ? '⚡' : '⏳';
+    return `<div class="gov-auton-row">
+      <span class="gov-log-ts">${(e.ts||'').slice(0,16).replace('T',' ')}</span>
+      <span>${icon}</span>
+      <span class="gov-log-action">${escHtml(e.action||'')}${e.ticker ? ' — '+escHtml(e.ticker) : ''}</span>
+      <span class="gov-log-auteur">${escHtml(e.decideur||'')}</span>
+    </div>`;
+  }).join('') || '<div style="color:var(--muted);font-size:.75rem;padding:8px">Aucune décision autonome</div>';
+
+  // ── Config user (clés éditables)
+  const cfgEditHtml = _buildConfigEditor(cfg);
+
+  el.innerHTML = `
+  <div class="gov-wrap">
+    <div class="prot-header">
+      <div class="pillar-badge">GOUVERNANCE</div>
+      <div class="pillar-title">⚖️ Gouvernance King Fund</div>
+      <div class="pillar-sub">Hiérarchie · Autonomie 48h · Mode Trading · Configuration</div>
+    </div>
+
+    <!-- Mode Trading badge + bascule -->
+    <div class="gov-mode-bar">
+      <div class="gov-mode-badge ${modeCls}">${modeIcon} MODE ${mode.mode || 'SIMULATION'}</div>
+      ${modeReel ? `<span class="gov-mode-capital">Capital réel : ${fmt(mode.capital_reel||0,0)} €</span>` : ''}
+      <div style="flex:1"></div>
+      ${!modeReel ? `<button class="gov-btn-mode" id="gov-bascule-btn">⚠️ Passer en RÉEL</button>` : `<button class="gov-btn-mode gov-btn-mode-sim" id="gov-sim-btn">↩ Retour SIMULATION</button>`}
+    </div>
+
+    <!-- Hiérarchie d'autorité -->
+    <div class="gov-card">
+      <div class="gov-card-title">🏛️ Hiérarchie d'autorité</div>
+      <div class="gov-hier-list">${hierarchieHtml}</div>
+      ${Object.keys(gov.vetos_agd_actifs||{}).length ? `<div class="gov-veto-bar">🚫 Vetos AGD-01 actifs : ${Object.keys(gov.vetos_agd_actifs).join(', ')}</div>` : ''}
+    </div>
+
+    <!-- Validations en attente -->
+    <div class="gov-card">
+      <div class="gov-card-header">
+        <div class="gov-card-title">⏳ Validations en attente${pending.length ? ` <span class="gov-count">${pending.length}</span>` : ''}</div>
+        <div style="font-size:.65rem;color:var(--muted)">Autonomie si pas de réponse dans ${auton.timeout_heures||48}h</div>
+      </div>
+      <div>${pendingHtml}</div>
+      ${auton.pouvoirs_etendus_actifs ? '<div class="gov-auton-active">⚡ POUVOIRS ÉTENDUS ACTIFS — AGD-01 agit en autonomie</div>' : ''}
+    </div>
+
+    <!-- Logs côte à côte -->
+    <div class="gov-logs-row">
+      <div class="gov-card" style="flex:1;min-width:0">
+        <div class="gov-card-header">
+          <div class="gov-card-title">📋 Journal gouvernance</div>
+          <button class="pat-btn-add" style="font-size:.6rem" onclick="loadGouvernance(true)">↻</button>
+        </div>
+        <div class="gov-log-list">${logHtml}</div>
+      </div>
+      <div class="gov-card" style="flex:1;min-width:0">
+        <div class="gov-card-title">⚡ Journal autonomie AGD-01</div>
+        <div class="gov-log-list">${logAutonHtml}</div>
+      </div>
+    </div>
+
+    <!-- Config utilisateur -->
+    <div class="gov-card" id="gov-config-card">
+      <div class="gov-card-header">
+        <div class="gov-card-title">⚙️ Configuration — rechargée à chaud</div>
+        <div style="display:flex;gap:6px">
+          <button class="pat-btn-add" id="gov-cfg-save-btn">💾 Sauvegarder</button>
+          <button class="pat-btn-add" style="background:var(--card-bg);border:1px solid var(--border)" id="gov-cfg-reload-btn">↻ Recharger</button>
+        </div>
+      </div>
+      <div class="gov-cfg-grid" id="gov-cfg-grid">${cfgEditHtml}</div>
+      <div style="font-size:.6rem;color:var(--muted);margin-top:6px">Fichier : ${escHtml(cfgData?.fichier || 'config_user.json')}</div>
+    </div>
+
+    <!-- Modal bascule RÉEL -->
+    <div id="gov-mode-overlay" class="apport-overlay hidden">
+      <div class="apport-modal" style="max-width:400px">
+        <div class="apport-modal-title" style="color:var(--red)">⚠️ Bascule MODE RÉEL</div>
+        <div style="font-size:.75rem;color:var(--muted);margin-bottom:12px">Cette action est irréversible sans nouvelle confirmation. L'historique simulation est préservé.</div>
+        <label class="apport-label">Capital réel à injecter (€)</label>
+        <input id="gov-capital-input" class="apport-input" type="number" min="1" step="1" placeholder="500">
+        <div class="apport-actions">
+          <button class="apport-btn-cancel" id="gov-mode-cancel">Annuler</button>
+          <button class="apport-btn-save" style="background:var(--red)" id="gov-mode-confirm">Confirmer</button>
+        </div>
+      </div>
+    </div>
+  </div>`;
+
+  // Events
+  qs('#gov-bascule-btn')?.addEventListener('click', () => {
+    qs('#gov-mode-overlay').classList.remove('hidden');
+    qs('#gov-capital-input').focus();
+  });
+  qs('#gov-mode-cancel')?.addEventListener('click', () => qs('#gov-mode-overlay').classList.add('hidden'));
+  qs('#gov-mode-confirm')?.addEventListener('click', _demanderModeReel);
+  qs('#gov-sim-btn')?.addEventListener('click', _retourSimulation);
+  qs('#gov-cfg-save-btn')?.addEventListener('click', _sauvegarderConfig);
+  qs('#gov-cfg-reload-btn')?.addEventListener('click', async () => {
+    await fetch(API + '/config-user/reload', {method:'POST'});
+    gouvernanceLoaded = false;
+    loadGouvernance(true);
+  });
+}
+
+function _buildConfigEditor(cfg) {
+  const EDITABLE = [
+    {key:'stop_loss_global_pct',        label:'Stop loss global (%)',        type:'number', step:1},
+    {key:'budget_max_par_trade_eur',    label:'Budget max / trade (€)',      type:'number', step:1},
+    {key:'budget_journalier_eur',       label:'Budget journalier (€)',       type:'number', step:10},
+    {key:'autonomie.timeout_heures',    label:'Autonomie — timeout (h)',     type:'number', step:1},
+    {key:'autonomie.budget_max_autonome_eur', label:'Autonomie — budget max (€)', type:'number', step:10},
+    {key:'gouvernance.veto_agd_duree_minutes', label:'Veto AGD-01 — durée (min)',  type:'number', step:5},
+    {key:'gouvernance.log_tous_trades', label:'Loguer tous les trades',      type:'bool'},
+    {key:'gouvernance.activer_hook_engine', label:'Hook gouvernance actif',  type:'bool'},
+    {key:'notifications.telegram_actif', label:'Telegram actif',            type:'bool'},
+  ];
+
+  return EDITABLE.map(field => {
+    const keys = field.key.split('.');
+    let val = cfg;
+    keys.forEach(k => { val = val?.[k]; });
+
+    const inputId = 'cfg-' + field.key.replace(/\./g, '-');
+    if (field.type === 'bool') {
+      return `<div class="gov-cfg-row">
+        <label class="gov-cfg-label" for="${inputId}">${escHtml(field.label)}</label>
+        <input id="${inputId}" type="checkbox" data-key="${field.key}" class="gov-cfg-check" ${val ? 'checked' : ''}>
+      </div>`;
+    }
+    return `<div class="gov-cfg-row">
+      <label class="gov-cfg-label" for="${inputId}">${escHtml(field.label)}</label>
+      <input id="${inputId}" type="${field.type}" step="${field.step||1}" data-key="${field.key}" class="gov-cfg-input" value="${val ?? ''}">
+    </div>`;
+  }).join('');
+}
+
+async function _sauvegarderConfig() {
+  const inputs  = qsa('#gov-cfg-grid .gov-cfg-input');
+  const checks  = qsa('#gov-cfg-grid .gov-cfg-check');
+  const updates = {};
+  inputs.forEach(inp => {
+    const v = parseFloat(inp.value);
+    if (!isNaN(v)) updates[inp.dataset.key] = v;
+  });
+  checks.forEach(chk => {
+    updates[chk.dataset.key] = chk.checked;
+  });
+  try {
+    const r = await fetch(API + '/config-user', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({updates}),
+    });
+    const data = await r.json();
+    if (data.status === 'ok') {
+      gouvernanceLoaded = false;
+      loadGouvernance(true);
+    }
+  } catch(e) { alert('Erreur: ' + e); }
+}
+
+async function _validerAction(vid) {
+  try {
+    await fetch(API + '/gouvernance/validation/' + vid + '/valider', {method:'POST'});
+    gouvernanceLoaded = false;
+    loadGouvernance(true);
+  } catch(e) { alert('Erreur: ' + e); }
+}
+
+async function _rejeterAction(vid) {
+  const raison = prompt('Raison du rejet (optionnel) :') || '';
+  try {
+    await fetch(API + '/gouvernance/validation/' + vid + '/rejeter', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({raison}),
+    });
+    gouvernanceLoaded = false;
+    loadGouvernance(true);
+  } catch(e) { alert('Erreur: ' + e); }
+}
+
+async function _demanderModeReel() {
+  const capital = parseFloat(qs('#gov-capital-input')?.value);
+  if (!capital || capital <= 0) { alert('Capital invalide'); return; }
+  try {
+    const r = await fetch(API + '/gouvernance/mode/basculer-reel', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({capital}),
+    });
+    const data = await r.json();
+    if (data.validation_id) {
+      qs('#gov-mode-overlay').classList.add('hidden');
+      alert(`✅ Demande envoyée — ID: ${data.validation_id}\nConfirmez via Telegram ou l'API dans les 24h.`);
+    } else {
+      alert('Erreur: ' + (data.erreur || 'inconnue'));
+    }
+  } catch(e) { alert('Erreur: ' + e); }
+}
+
+async function _retourSimulation() {
+  if (!confirm('Repasser en mode SIMULATION ?')) return;
+  try {
+    await fetch(API + '/gouvernance/mode/retour-simulation', {method:'POST'});
+    gouvernanceLoaded = false;
+    loadGouvernance(true);
+  } catch(e) { alert('Erreur: ' + e); }
 }
 
 // ═══════════════════════════════════════════════════════════════════

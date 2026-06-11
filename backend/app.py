@@ -458,6 +458,171 @@ def post_rapport_annuel_generer():
         return jsonify({"erreur": str(e)}), 500
 
 
+# ---------------------------------------------------------------------------
+# Gouvernance — hiérarchie, autonomie, mode trading, config user
+# ---------------------------------------------------------------------------
+
+@app.route("/api/gouvernance/etat")
+def get_gouvernance_etat():
+    try:
+        from divisions.gouvernance.gouvernance import get_gouvernance_engine
+        from divisions.gouvernance.autonomie   import get_autonomie_manager
+        from divisions.gouvernance.mode_trading import get_mode_trading
+        return jsonify({
+            "gouvernance": get_gouvernance_engine().get_etat(),
+            "autonomie":   get_autonomie_manager().get_etat(),
+            "mode":        get_mode_trading().get_etat(),
+        })
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/gouvernance/log")
+def get_gouvernance_log():
+    from flask import request
+    limit = int(request.args.get("limit", 50))
+    try:
+        from divisions.gouvernance.gouvernance import get_gouvernance_engine
+        return jsonify(get_gouvernance_engine().get_log(limit))
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/gouvernance/validation/<vid>/valider", methods=["POST"])
+def valider_action(vid):
+    try:
+        from divisions.gouvernance.autonomie import get_autonomie_manager
+        ok = get_autonomie_manager().confirmer(vid)
+        return jsonify({"status": "ok" if ok else "not_found"})
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/gouvernance/validation/<vid>/rejeter", methods=["POST"])
+def rejeter_action(vid):
+    from flask import request
+    body = request.get_json(silent=True) or {}
+    try:
+        from divisions.gouvernance.autonomie import get_autonomie_manager
+        ok = get_autonomie_manager().rejeter(vid, body.get("raison", ""))
+        return jsonify({"status": "ok" if ok else "not_found"})
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/gouvernance/autonomie/etat")
+def get_autonomie_etat():
+    try:
+        from divisions.gouvernance.autonomie import get_autonomie_manager
+        return jsonify(get_autonomie_manager().get_etat())
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/gouvernance/autonomie/log")
+def get_autonomie_log():
+    from flask import request
+    limit = int(request.args.get("limit", 50))
+    try:
+        from divisions.gouvernance.autonomie import get_autonomie_manager
+        return jsonify(get_autonomie_manager().get_log_autonomie(limit))
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/gouvernance/mode")
+def get_mode_trading_etat():
+    try:
+        from divisions.gouvernance.mode_trading import get_mode_trading
+        return jsonify(get_mode_trading().get_etat())
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/gouvernance/mode/basculer-reel", methods=["POST"])
+def demander_mode_reel():
+    from flask import request
+    body = request.get_json(silent=True) or {}
+    try:
+        capital = float(body.get("capital", 0))
+        if capital <= 0:
+            return jsonify({"erreur": "capital doit être > 0"}), 400
+        from divisions.gouvernance.mode_trading import get_mode_trading
+        vid = get_mode_trading().demander_bascule_reel(capital)
+        return jsonify({"status": "ok", "validation_id": vid, "message": "Alerte Telegram envoyée — confirmez dans les 24h"})
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/gouvernance/mode/confirmer/<vid>", methods=["POST"])
+def confirmer_mode_reel(vid):
+    try:
+        from divisions.gouvernance.mode_trading import get_mode_trading
+        etat = get_mode_trading().confirmer_bascule(vid)
+        return jsonify({"status": "ok", "mode": etat})
+    except ValueError as e:
+        return jsonify({"erreur": str(e)}), 400
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/gouvernance/mode/annuler/<vid>", methods=["POST"])
+def annuler_mode_reel(vid):
+    try:
+        from divisions.gouvernance.mode_trading import get_mode_trading
+        ok = get_mode_trading().annuler_bascule(vid)
+        return jsonify({"status": "ok" if ok else "not_found"})
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/gouvernance/mode/retour-simulation", methods=["POST"])
+def retour_simulation():
+    try:
+        from divisions.gouvernance.mode_trading import get_mode_trading
+        etat = get_mode_trading().revenir_simulation()
+        return jsonify({"status": "ok", "mode": etat})
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/config-user")
+def get_config_user():
+    try:
+        from data.config_user import get_config, get_config_file_path
+        return jsonify({"config": get_config(), "fichier": get_config_file_path()})
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/config-user", methods=["POST"])
+def post_config_user():
+    from flask import request
+    body = request.get_json(silent=True) or {}
+    try:
+        from data.config_user import update_config, update_config_bulk
+        # Mode bulk : {"updates": {"cle.sous_cle": valeur, ...}}
+        if "updates" in body:
+            cfg = update_config_bulk(body["updates"])
+        elif "key" in body and "value" in body:
+            cfg = update_config(body["key"], body["value"])
+        else:
+            return jsonify({"erreur": "Fournir 'key'+'value' ou 'updates'"}), 400
+        return jsonify({"status": "ok", "config": cfg})
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/config-user/reload", methods=["POST"])
+def reload_config_user():
+    try:
+        from data.config_user import reload_config
+        cfg = reload_config()
+        return jsonify({"status": "ok", "config": cfg})
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
 @app.route("/api/bus/state")
 def get_bus_state():
     hub = getattr(engine, "_hub", None)
@@ -1396,6 +1561,62 @@ _scheduler.add_job(
     _job_suivi_pru,
     CronTrigger(minute="*/30", hour="9-18"),
     id="suivi_pru_alertes",
+    replace_existing=True,
+)
+
+
+def _job_autonomie_check():
+    """Vérifie les validations expirées → AGD-01 passe en autonomie si 48h dépassées."""
+    try:
+        from divisions.gouvernance.autonomie import get_autonomie_manager
+        expirees = get_autonomie_manager().check_timeouts()
+        if expirees:
+            logger.warning("[SCHEDULER] AUTONOMIE — %d validation(s) expirée(s)", len(expirees))
+    except Exception as exc:
+        logger.debug("[SCHEDULER] Autonomie: %s", exc)
+
+
+_scheduler.add_job(
+    _job_autonomie_check,
+    CronTrigger(minute=15),   # toutes les heures à H:15
+    id="autonomie_check_timeouts",
+    replace_existing=True,
+)
+
+
+def _job_sync_gouvernance():
+    """Synchronise le régime CIO → moteur de gouvernance (toutes les heures)."""
+    try:
+        from divisions.gouvernance.gouvernance import get_gouvernance_engine, NiveauAutorite
+        gov = get_gouvernance_engine()
+        # Sync régime CIO
+        try:
+            from app import engine as _engine  # noqa — référence circulaire ok ici
+            hub = getattr(_engine, "_hub", None)
+            if hub:
+                bs_halt = hub.black_swan_halt
+                vix = hub.last_vix if hasattr(hub, "last_vix") else None
+                gov.notifier_black_swan(bs_halt, vix)
+        except Exception:
+            pass
+        # Sync régime CIO Macro depuis dernier appel /api/cio/allocation
+        try:
+            import json
+            from pathlib import Path
+            cio_cache = Path(__file__).parent.parent / "data" / "cio_allocation_cache.json"
+            if cio_cache.exists():
+                data = json.loads(cio_cache.read_text(encoding="utf-8"))
+                gov.notifier_regime_cio(data.get("regime", "NEUTRAL"))
+        except Exception:
+            pass
+    except Exception as exc:
+        logger.debug("[SCHEDULER] Sync gouvernance: %s", exc)
+
+
+_scheduler.add_job(
+    _job_sync_gouvernance,
+    CronTrigger(minute=30),   # toutes les heures à H:30
+    id="sync_gouvernance",
     replace_existing=True,
 )
 

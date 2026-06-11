@@ -124,6 +124,15 @@ class TradingEngine:
             logger.warning("[Engine] InterAgentHub indisponible : %s", _hub_err)
             self._hub = None
 
+        # Gouvernance hiérarchique (hook avant chaque trade)
+        try:
+            from divisions.gouvernance.gouvernance import get_gouvernance_engine
+            self._gouvernance = get_gouvernance_engine()
+            logger.info("[Engine] GouvernanceEngine initialisé")
+        except Exception as _gov_err:
+            logger.warning("[Engine] GouvernanceEngine indisponible : %s", _gov_err)
+            self._gouvernance = None
+
     # ------------------------------------------------------------------
     # Setup
     # ------------------------------------------------------------------
@@ -353,6 +362,19 @@ class TradingEngine:
                             trader, action, expert_sig, prices
                         )
                         if action and action.get("action") != "hold":
+                            # ── Hook gouvernance hiérarchique ──────────────
+                            gov = getattr(self, "_gouvernance", None)
+                            if gov:
+                                ok, bloqueur = gov.autoriser_trade(
+                                    trader.id, action,
+                                    action.get("symbol", sym or ""),
+                                )
+                                if not ok:
+                                    logger.debug(
+                                        "[GOV] TRD%02d bloqué par %s",
+                                        trader.id, bloqueur,
+                                    )
+                                    continue
                             self._execute_trade(trader, action, prices, now, conn)
                     trader.portfolio.portfolio_value = trader.portfolio.value(prices)
                     self._save_snapshot(trader, now, conn)
