@@ -794,27 +794,29 @@ function renderFiscalite(d) {
 async function loadIntelligence(silent = false) {
   if (intelligenceLoaded && !silent) return;
   try {
-    const [actuRes, dspxRes, corrRes, wlRes, comiteRes] = await Promise.allSettled([
+    const [actuRes, dspxRes, corrRes, wlRes, comiteRes, screenerRes] = await Promise.allSettled([
       fetch(API+'/actualites').then(r => r.json()),
       fetch(API+'/dspx/etat').then(r => r.json()),
       fetch(API+'/correlations/actoblig').then(r => r.json()),
       fetch(API+'/investissement/watchlist').then(r => r.json()),
       fetch(API+'/comite-selection/historique').then(r => r.json()),
+      fetch(API+'/investissement/screener').then(r => r.json()),
     ]);
     intelligenceLoaded = true;
     renderIntelligence(
-      actuRes.status==='fulfilled' ? actuRes.value : null,
-      dspxRes.status==='fulfilled' ? dspxRes.value : null,
-      corrRes.status==='fulfilled' ? corrRes.value : null,
-      wlRes.status==='fulfilled'   ? wlRes.value   : null,
-      comiteRes.status==='fulfilled'? comiteRes.value: null,
+      actuRes.status==='fulfilled'    ? actuRes.value    : null,
+      dspxRes.status==='fulfilled'    ? dspxRes.value    : null,
+      corrRes.status==='fulfilled'    ? corrRes.value    : null,
+      wlRes.status==='fulfilled'      ? wlRes.value      : null,
+      comiteRes.status==='fulfilled'  ? comiteRes.value  : null,
+      screenerRes.status==='fulfilled'? screenerRes.value: null,
     );
   } catch {
     if (!silent) qs('#intelligence-wrap').innerHTML = '<div class="error-state">Erreur Intelligence.</div>';
   }
 }
 
-function renderIntelligence(actu, dspx, corr, wl, comite) {
+function renderIntelligence(actu, dspx, corr, wl, comite, screener) {
   const articles  = (actu?.articles || []).slice(0,10);
   const watchlist = wl?.watchlist || [];
   const nbBuy  = watchlist.filter(a => a.signal==='BUY').length;
@@ -907,6 +909,52 @@ function renderIntelligence(actu, dspx, corr, wl, comite) {
     '<div class="agd-form-row"><input id="intel-comite-ticker" class="agd-input" placeholder="Ex: VPK.AS" style="text-transform:uppercase" />' +
     '<button id="intel-comite-submit" class="agd-btn">Voter →</button></div>' +
     '<div id="intel-comite-result" class="agd-result"></div></div></div>' +
+
+    // ── Screener Mondial ──────────────────────────────────────────
+    (() => {
+      const candidats  = screener?.candidats || [];
+      const tsRun      = screener?.ts_run || null;
+      const nbUnivers  = screener?.nb_univers || 150;
+      let s = '<div class="intel-card"><div class="intel-card-title">🌍 Screener Mondial — Top Graham (' + nbUnivers + ' titres)</div>';
+      s += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">';
+      s += '<div style="font-size:.58rem;color:var(--muted)">Dernier scan : ' + (tsRun ? _fmtTs(tsRun) : 'Jamais effectué') + '</div>';
+      s += '<button id="intel-screener-run" class="agd-refresh-btn" style="margin:0">▶ Lancer le screener</button>';
+      s += '</div>';
+      s += '<div id="intel-screener-status"></div>';
+      if (candidats.length) {
+        s += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.58rem">';
+        s += '<thead><tr style="color:var(--muted);border-bottom:1px solid var(--surface2)">' +
+          '<th style="text-align:left;padding:4px 3px">#</th>' +
+          '<th style="text-align:left;padding:4px 3px">Ticker</th>' +
+          '<th style="text-align:left;padding:4px 3px">Nom</th>' +
+          '<th style="text-align:left;padding:4px 3px">Marché</th>' +
+          '<th style="text-align:right;padding:4px 3px">Graham</th>' +
+          '<th style="text-align:right;padding:4px 3px">PER</th>' +
+          '<th style="text-align:right;padding:4px 3px">PBR</th>' +
+          '<th style="text-align:right;padding:4px 3px">Div%</th>' +
+          '</tr></thead><tbody>';
+        candidats.forEach((c, i) => {
+          const sc = c.score_graham != null ? c.score_graham : 0;
+          const scColor = sc >= 60 ? 'var(--accent)' : sc >= 40 ? '#ff9944' : 'var(--muted)';
+          s += '<tr style="border-top:1px solid var(--surface2)">' +
+            '<td style="padding:4px 3px;color:var(--muted)">' + (i+1) + '</td>' +
+            '<td style="padding:4px 3px;font-weight:700;color:var(--accent)">' + escHtml(c.ticker) + '</td>' +
+            '<td style="padding:4px 3px">' + escHtml(c.nom || '') + '</td>' +
+            '<td style="padding:4px 3px;color:var(--muted);font-size:.54rem">' + escHtml(c.marche || '') + '</td>' +
+            '<td style="text-align:right;padding:4px 3px;color:' + scColor + ';font-weight:700">' + (c.score_graham != null ? c.score_graham.toFixed(1) : '—') + '</td>' +
+            '<td style="text-align:right;padding:4px 3px">' + (c.per != null ? Number(c.per).toFixed(1) : '—') + '</td>' +
+            '<td style="text-align:right;padding:4px 3px">' + (c.pbr != null ? Number(c.pbr).toFixed(2) : '—') + '</td>' +
+            '<td style="text-align:right;padding:4px 3px;color:var(--accent)">' + (c.dividende != null ? Number(c.dividende).toFixed(1) + '%' : '—') + '</td>' +
+            '</tr>';
+        });
+        s += '</tbody></table></div>';
+      } else {
+        s += '<div class="empty-state" style="padding:16px 0">Aucun scan effectué — lancez le screener pour voir les opportunités Graham.</div>';
+      }
+      s += '</div>';
+      return s;
+    })() +
+
     '</div>';
 
   qs('#intelligence-wrap').innerHTML = html;
@@ -928,6 +976,23 @@ function renderIntelligence(actu, dspx, corr, wl, comite) {
     } catch(e) {
       if (resEl) { resEl.className = 'agd-result show veto'; resEl.textContent = 'Erreur: '+e.message; }
     } finally { btn.disabled = false; btn.textContent = 'Voter →'; }
+  });
+
+  qs('#intel-screener-run')?.addEventListener('click', async () => {
+    const btn    = qs('#intel-screener-run');
+    const statEl = qs('#intel-screener-status');
+    btn.disabled = true; btn.textContent = '⌛ Scan en cours…';
+    if (statEl) { statEl.className = 'agd-result show valide'; statEl.textContent = '⏳ Scan lancé — ~2 min pour ' + (screener?.nb_univers||150) + ' titres. Revenez actualiser dans 2 min.'; }
+    try {
+      await fetch(API+'/investissement/screener/run', {method:'POST'});
+    } catch(e) {
+      if (statEl) { statEl.className = 'agd-result show veto'; statEl.textContent = 'Erreur: '+e.message; }
+    } finally {
+      setTimeout(() => {
+        const b = qs('#intel-screener-run');
+        if (b) { b.disabled = false; b.textContent = '▶ Lancer le screener'; }
+      }, 5000);
+    }
   });
 }
 
