@@ -1220,7 +1220,7 @@ def _job_check_outcomes():
 
 _scheduler.add_job(
     _job_check_outcomes,
-    CronTrigger(hour=18, minute=30, timezone=paris_tz),
+    CronTrigger(hour=18, minute=30),
     id="check_signal_outcomes",
     replace_existing=True,
 )
