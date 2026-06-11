@@ -636,6 +636,27 @@ def get_maintenance_health():
     return jsonify(_health(engine, DB_PATH, len(_ws_queues)))
 
 
+# ---------------------------------------------------------------------------
+# Alpha Lab — Pilier 4 Intelligence
+# ---------------------------------------------------------------------------
+
+
+@app.route("/api/alpha-lab/rapport")
+def get_alpha_lab_rapport():
+    """Rapport complet Alpha Lab : signaux backtestés + scores facteurs watchlist."""
+    try:
+        from flask import request as _req
+        force = _req.args.get("force", "0") == "1"
+        from divisions.alpha_lab.valide_signaux import generer_rapport
+        from divisions.alpha_lab.agent_facteurs import get_agent_facteurs
+        rapport_signaux = generer_rapport(force=force)
+        rapport_facteurs = get_agent_facteurs().scorer_watchlist(force=force)
+        return jsonify({"signaux": rapport_signaux, "facteurs": rapport_facteurs})
+    except Exception as exc:
+        logger.error("alpha-lab/rapport: %s", exc)
+        return jsonify({"erreur": str(exc)}), 500
+
+
 # ── Gérant Délégué — AGD-01 ───────────────────────────────────────────────────
 
 @app.route("/api/gerant-delegue/etat")
@@ -936,6 +957,38 @@ _scheduler.add_job(
     _job_calendrier_evenements,
     CronTrigger(hour=8, minute=5),
     id="calendrier_surveillance",
+    replace_existing=True,
+)
+
+
+def _job_alpha_lab():
+    """Alpha Lab rapport mensuel — 1er du mois 07:00 Paris → envoyé à AGD-01 via Telegram."""
+    logger.info("[SCHEDULER] Alpha Lab rapport mensuel")
+    try:
+        from divisions.alpha_lab.valide_signaux import generer_rapport
+        from divisions.gerant_delegue.notifier import send
+        rapport = generer_rapport(force=True)
+        valides  = ", ".join(rapport.get("valides",  []) or ["aucun"])
+        bruits   = ", ".join(rapport.get("bruits",   []) or ["aucun"])
+        overfits = ", ".join(rapport.get("overfits", []) or ["aucun"])
+        ts = rapport.get("ts", "")[:10]
+        msg = (
+            f"🔬 <b>Alpha Lab — Rapport Mensuel</b>\n"
+            f"✅ Signaux VALIDES : {valides}\n"
+            f"📊 Bruit : {bruits}\n"
+            f"⚠️ Overfittés : {overfits}\n"
+            f"Période : {ts}"
+        )
+        send(msg)
+        logger.info("[SCHEDULER] ✓ Alpha Lab rapport mensuel envoyé Telegram")
+    except Exception as exc:
+        logger.error("[SCHEDULER] ✗ Alpha Lab: %s", exc)
+
+
+_scheduler.add_job(
+    _job_alpha_lab,
+    CronTrigger(day=1, hour=7, minute=0),
+    id="alpha_lab_mensuel",
     replace_existing=True,
 )
 

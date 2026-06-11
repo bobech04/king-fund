@@ -794,7 +794,7 @@ function renderFiscalite(d) {
 async function loadIntelligence(silent = false) {
   if (intelligenceLoaded && !silent) return;
   try {
-    const [actuRes, dspxRes, corrRes, wlRes, comiteRes, screenerRes, seuilsRes, calRes] = await Promise.allSettled([
+    const [actuRes, dspxRes, corrRes, wlRes, comiteRes, screenerRes, seuilsRes, calRes, alphaRes] = await Promise.allSettled([
       fetch(API+'/actualites').then(r => r.json()),
       fetch(API+'/dspx/etat').then(r => r.json()),
       fetch(API+'/correlations/actoblig').then(r => r.json()),
@@ -803,6 +803,7 @@ async function loadIntelligence(silent = false) {
       fetch(API+'/investissement/screener').then(r => r.json()),
       fetch(API+'/alertes/seuils').then(r => r.json()),
       fetch(API+'/alertes/calendrier').then(r => r.json()),
+      fetch(API+'/alpha-lab/rapport').then(r => r.json()),
     ]);
     intelligenceLoaded = true;
     renderIntelligence(
@@ -814,13 +815,14 @@ async function loadIntelligence(silent = false) {
       screenerRes.status==='fulfilled'? screenerRes.value: null,
       seuilsRes.status==='fulfilled'  ? seuilsRes.value  : null,
       calRes.status==='fulfilled'     ? calRes.value     : null,
+      alphaRes.status==='fulfilled'   ? alphaRes.value   : null,
     );
   } catch {
     if (!silent) qs('#intelligence-wrap').innerHTML = '<div class="error-state">Erreur Intelligence.</div>';
   }
 }
 
-function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, calData) {
+function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, calData, alphalab) {
   const articles  = (actu?.articles || []).slice(0,10);
   const watchlist = wl?.watchlist || [];
   const nbBuy  = watchlist.filter(a => a.signal==='BUY').length;
@@ -1038,6 +1040,101 @@ function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, 
       return s;
     })() +
 
+    // ── Alpha Lab — Pilier 4 Intelligence ────────────────────────────────────
+    (() => {
+      if (!alphalab) return '<div class="intel-card"><div class="intel-card-title">🔬 Alpha Lab — Backtests & Facteurs</div><div class="empty-state">Données Alpha Lab indisponibles (premier chargement ~60 s)</div><button class="agd-refresh-btn" id="alpha-lab-refresh">↻ Charger</button></div>';
+
+      const signaux  = alphalab.signaux   || {};
+      const facteurs = alphalab.facteurs  || {};
+      const sigs     = signaux.signaux    || {};
+      const valides  = signaux.valides    || [];
+      const bruits   = signaux.bruits     || [];
+      const overfits = signaux.overfits   || [];
+      const actifs   = facteurs.actifs    || [];
+      const tsS      = signaux.ts ? signaux.ts.slice(0,10) : '—';
+
+      const verdictColor = v => v==='VALIDE'?'var(--accent)':v==='OVERFITTE'?'#ff9944':'var(--muted)';
+      const verdictIcon  = v => v==='VALIDE'?'✅':v==='OVERFITTE'?'⚠️':'🔇';
+
+      let s = '<div class="intel-card">';
+      s += '<div class="intel-card-title">🔬 Alpha Lab — Backtests Signaux & Facteurs Académiques</div>';
+      s += '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">';
+      s += '<div style="font-size:.58rem;color:var(--muted)">Données au ' + tsS + ' · Walk-forward 5 splits · t-stat seuil 2.0</div>';
+      s += '<button class="agd-refresh-btn" id="alpha-lab-refresh" style="margin:0">↻ Recalculer</button>';
+      s += '</div>';
+
+      // Résumé verdict
+      s += '<div class="intel-dspx-row" style="margin-bottom:10px">';
+      s += '<div class="intel-dspx-kpi"><div class="intel-kpi-lbl">✅ VALIDES</div><div class="intel-kpi-val" style="color:var(--accent)">' + valides.length + '</div></div>';
+      s += '<div class="intel-dspx-kpi"><div class="intel-kpi-lbl">🔇 BRUIT</div><div class="intel-kpi-val" style="color:var(--muted)">' + bruits.length + '</div></div>';
+      s += '<div class="intel-dspx-kpi"><div class="intel-kpi-lbl">⚠️ OVERFITS</div><div class="intel-kpi-val" style="color:#ff9944">' + overfits.length + '</div></div>';
+      s += '<div class="intel-dspx-kpi"><div class="intel-kpi-lbl">Signaux</div><div class="intel-kpi-val gold">' + Object.keys(sigs).length + '</div></div>';
+      s += '</div>';
+
+      // Table signaux
+      if (Object.keys(sigs).length) {
+        s += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.56rem">';
+        s += '<thead><tr style="color:var(--muted);border-bottom:1px solid var(--surface2)">' +
+          '<th style="text-align:left;padding:3px 2px">Signal</th>' +
+          '<th style="text-align:right;padding:3px 2px">Sharpe IS</th>' +
+          '<th style="text-align:right;padding:3px 2px">Sharpe OOS</th>' +
+          '<th style="text-align:right;padding:3px 2px">t-stat</th>' +
+          '<th style="text-align:right;padding:3px 2px">MDD</th>' +
+          '<th style="text-align:center;padding:3px 4px">Verdict</th>' +
+          '</tr></thead><tbody>';
+        Object.entries(sigs).forEach(([name, d]) => {
+          s += '<tr style="border-top:1px solid var(--surface2)">' +
+            '<td style="padding:3px 2px;font-weight:600">' + escHtml(name) + '</td>' +
+            '<td style="text-align:right;padding:3px 2px">' + (d.sharpe_is != null ? d.sharpe_is.toFixed(2) : '—') + '</td>' +
+            '<td style="text-align:right;padding:3px 2px;color:' + (d.sharpe_oos >= 0.5 ? 'var(--accent)' : d.sharpe_oos >= 0.25 ? '#ff9944' : 'var(--muted)') + '">' + (d.sharpe_oos != null ? d.sharpe_oos.toFixed(2) : '—') + '</td>' +
+            '<td style="text-align:right;padding:3px 2px;color:' + (Math.abs(d.t_stat||0) >= 2 ? 'var(--accent)' : 'var(--muted)') + '">' + (d.t_stat != null ? d.t_stat.toFixed(2) : '—') + '</td>' +
+            '<td style="text-align:right;padding:3px 2px;color:var(--red)">' + (d.max_drawdown != null ? (d.max_drawdown*100).toFixed(1)+'%' : '—') + '</td>' +
+            '<td style="text-align:center;padding:3px 4px;font-weight:700;color:' + verdictColor(d.verdict) + '">' + verdictIcon(d.verdict) + ' ' + escHtml(d.verdict||'?') + '</td>' +
+            '</tr>';
+        });
+        s += '</tbody></table></div>';
+      } else {
+        s += '<div class="empty-state">Aucun signal backtesté disponible</div>';
+      }
+
+      // Facteurs — top 5 actifs
+      if (actifs.length) {
+        s += '<div style="margin-top:12px;border-top:1px solid var(--surface2);padding-top:8px">';
+        s += '<div style="font-size:.60rem;font-weight:600;margin-bottom:6px;color:var(--fg)">📐 Scores Factoriels Watchlist — Top actifs</div>';
+        s += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.55rem">';
+        s += '<thead><tr style="color:var(--muted);border-bottom:1px solid var(--surface2)">' +
+          '<th style="text-align:left;padding:3px 2px">Ticker</th>' +
+          '<th style="text-align:right;padding:3px 2px">Value</th>' +
+          '<th style="text-align:right;padding:3px 2px">Momentum</th>' +
+          '<th style="text-align:right;padding:3px 2px">Quality</th>' +
+          '<th style="text-align:right;padding:3px 2px">LowVol</th>' +
+          '<th style="text-align:right;padding:3px 2px">Score</th>' +
+          '<th style="text-align:right;padding:3px 2px">Rang</th>' +
+          '</tr></thead><tbody>';
+        actifs.slice(0, 13).forEach(a => {
+          const sc = a.scores || {};
+          const comp = a.composite || 0;
+          const rank = a.composite_rank != null ? a.composite_rank : null;
+          const compColor = comp >= 65 ? 'var(--accent)' : comp >= 45 ? '#ff9944' : 'var(--muted)';
+          s += '<tr style="border-top:1px solid var(--surface2)">' +
+            '<td style="padding:3px 2px;font-weight:700;color:var(--accent)">' + escHtml(a.ticker||'') + '</td>' +
+            '<td style="text-align:right;padding:3px 2px">' + (sc.value  != null ? sc.value.toFixed(0)    : '—') + '</td>' +
+            '<td style="text-align:right;padding:3px 2px">' + (sc.momentum != null ? sc.momentum.toFixed(0) : '—') + '</td>' +
+            '<td style="text-align:right;padding:3px 2px">' + (sc.quality != null ? sc.quality.toFixed(0)  : '—') + '</td>' +
+            '<td style="text-align:right;padding:3px 2px">' + (sc.lowvol  != null ? sc.lowvol.toFixed(0)   : '—') + '</td>' +
+            '<td style="text-align:right;padding:3px 2px;font-weight:700;color:' + compColor + '">' + comp.toFixed(0) + '</td>' +
+            '<td style="text-align:right;padding:3px 2px;color:var(--muted)">' + (rank != null ? rank.toFixed(0) + '%' : '—') + '</td>' +
+            '</tr>';
+        });
+        s += '</tbody></table></div>';
+        s += '<div style="font-size:.52rem;color:var(--muted);margin-top:4px">Value (P/B+P/E) · Momentum (12-1 mois) · Quality (ROE+dette) · LowVol (vol 252j inv) — Poids égaux 25 %</div>';
+        s += '</div>';
+      }
+
+      s += '</div>';
+      return s;
+    })() +
+
     '</div>';
 
   qs('#intelligence-wrap').innerHTML = html;
@@ -1076,6 +1173,14 @@ function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, 
         if (b) { b.disabled = false; b.textContent = '▶ Lancer le screener'; }
       }, 5000);
     }
+  });
+
+  qs('#alpha-lab-refresh')?.addEventListener('click', async () => {
+    const btn = qs('#alpha-lab-refresh');
+    if (btn) { btn.disabled = true; btn.textContent = '⌛ Calcul…'; }
+    intelligenceLoaded = false;
+    await loadIntelligence(true);
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Recalculer'; }
   });
 }
 
