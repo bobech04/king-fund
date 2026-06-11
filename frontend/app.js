@@ -1420,6 +1420,9 @@ function renderRetraite(d, divData) {
     '<div class="pat-apports-list">' + apportsHtml + '</div>' +
     '</div>' +
 
+    // PRU section (loaded async)
+    '<div id="pru-section"><div class="pru-loading">Chargement PRU…</div></div>' +
+
     '</div>';
 
   // Draw charts
@@ -1430,10 +1433,160 @@ function renderRetraite(d, divData) {
     qs('#apport-overlay').classList.remove('hidden');
     qs('#apport-montant').focus();
   });
+
+  // Load PRU section async
+  _loadPRU();
 }
 
 function _destroyRetChart(key) {
   if (_retraiteCharts[key]) { _retraiteCharts[key].destroy(); _retraiteCharts[key] = null; }
+}
+
+// ── Suivi PRU ────────────────────────────────────────────────────────────────
+
+async function _loadPRU() {
+  try {
+    const data = await fetch(API + '/patrimoine/positions-pru').then(r => r.json());
+    _renderPRU(data);
+  } catch {
+    const el = qs('#pru-section');
+    if (el) el.innerHTML = '<div class="pat-card"><div class="pat-card-title">📊 Suivi PRU</div><div style="color:var(--muted);font-size:.75rem;padding:8px">Données PRU indisponibles</div></div>';
+  }
+}
+
+function _renderPRU(data) {
+  const el = qs('#pru-section');
+  if (!el) return;
+  const positions = data?.positions || {};
+  const entries = Object.values(positions);
+
+  const pvTotal = entries.reduce((s, p) => s + (p.pv_latente || 0), 0);
+  const pvCls   = pvTotal >= 0 ? 'pos' : 'neg';
+
+  let rowsHtml = '';
+  if (!entries.length) {
+    rowsHtml = '<div style="color:var(--muted);font-size:.75rem;text-align:center;padding:12px">Aucune position enregistrée — ajouter via ＋</div>';
+  } else {
+    rowsHtml = entries.map(p => {
+      const qty  = p.quantite || 0;
+      const pru  = p.pru || 0;
+      const prix = p.prix_actuel;
+      const pv   = p.pv_latente;
+      const pct  = p.pv_pct;
+      const obj  = p.objectif;
+      const sl   = p.stop_loss;
+      const pvCls2 = pv == null ? '' : pv >= 0 ? 'pos' : 'neg';
+
+      // Progress bar vs objectif
+      let barHtml = '';
+      if (prix && obj && pru) {
+        const pct_bar = Math.min(100, Math.max(0, ((prix - pru) / (obj - pru)) * 100));
+        barHtml = `<div class="pru-obj-bar"><div class="pru-obj-fill" style="width:${pct_bar.toFixed(1)}%"></div></div>`;
+      }
+
+      // Badges alertes
+      let alertBadge = '';
+      if (prix && obj && prix >= obj)  alertBadge += '<span class="pru-badge obj">🎯 OBJ</span>';
+      if (prix && sl && prix <= sl)    alertBadge += '<span class="pru-badge sl">🛑 STOP</span>';
+
+      return `<div class="pru-row">
+        <div class="pru-row-header">
+          <span class="pru-ticker">${escHtml(p.ticker)}</span>
+          <span class="pru-nom">${escHtml(p.nom||p.ticker)}</span>
+          ${alertBadge}
+        </div>
+        <div class="pru-row-data">
+          <div class="pru-cell"><div class="pru-lbl">Qté</div><div class="pru-val">${qty.toFixed(qty<10?4:2)}</div></div>
+          <div class="pru-cell"><div class="pru-lbl">PRU</div><div class="pru-val">${fmt(pru,3)}</div></div>
+          <div class="pru-cell"><div class="pru-lbl">Prix actuel</div><div class="pru-val">${prix != null ? fmt(prix,3) : '—'}</div></div>
+          <div class="pru-cell"><div class="pru-lbl">PV/MV latente</div><div class="pru-val ${pvCls2}">${pv != null ? (pv>=0?'+':'')+fmt(pv,2)+'€' : '—'}${pct != null ? ` (${pct>=0?'+':''}${pct.toFixed(1)}%)` : ''}</div></div>
+          <div class="pru-cell"><div class="pru-lbl">Objectif</div><div class="pru-val" style="color:var(--accent)">${obj != null ? fmt(obj,3) : '—'}</div></div>
+          <div class="pru-cell"><div class="pru-lbl">Stop loss</div><div class="pru-val" style="color:var(--red)">${sl != null ? fmt(sl,3) : '—'}</div></div>
+        </div>
+        ${barHtml}
+      </div>`;
+    }).join('');
+  }
+
+  el.innerHTML =
+    '<div class="pat-card" id="pru-card">' +
+    '<div class="pat-card-header">' +
+    '<div class="pat-card-title">📊 Suivi PRU — Positions Réelles</div>' +
+    '<div style="display:flex;gap:6px">' +
+    '<button class="pat-btn-add" id="pru-add-btn" title="Ajouter transaction">＋ Transaction</button>' +
+    '<button class="pat-btn-add" id="pru-refresh-btn" title="Rafraîchir" style="background:var(--card-bg);border:1px solid var(--border)">↻</button>' +
+    '</div></div>' +
+    (entries.length ? `<div class="pru-total ${pvCls}">PV/MV latente totale : ${pvTotal>=0?'+':''}${fmt(pvTotal,2)} €</div>` : '') +
+    '<div class="pru-list">' + rowsHtml + '</div>' +
+    '</div>' +
+
+    // Modal ajout transaction
+    '<div id="pru-overlay" class="apport-overlay hidden">' +
+    '<div class="apport-modal" style="max-width:420px">' +
+    '<div class="apport-modal-title">Nouvelle Transaction PRU</div>' +
+    '<label class="apport-label">Ticker (ex: STLA.MI)</label>' +
+    '<input id="pru-ticker" class="apport-input" type="text" placeholder="STLA.MI">' +
+    '<label class="apport-label">Nom (optionnel)</label>' +
+    '<input id="pru-nom" class="apport-input" type="text" placeholder="Stellantis">' +
+    '<label class="apport-label">Type</label>' +
+    '<select id="pru-type" class="apport-input"><option value="achat">Achat</option><option value="vente">Vente</option></select>' +
+    '<label class="apport-label">Quantité</label>' +
+    '<input id="pru-qty" class="apport-input" type="number" step="0.0001" placeholder="10">' +
+    '<label class="apport-label">Prix unitaire (€)</label>' +
+    '<input id="pru-prix" class="apport-input" type="number" step="0.0001" placeholder="12.50">' +
+    '<label class="apport-label">Objectif (€, optionnel)</label>' +
+    '<input id="pru-obj" class="apport-input" type="number" step="0.0001" placeholder="16.00">' +
+    '<label class="apport-label">Stop Loss (€, optionnel)</label>' +
+    '<input id="pru-sl" class="apport-input" type="number" step="0.0001" placeholder="10.00">' +
+    '<label class="apport-label">Note</label>' +
+    '<input id="pru-note" class="apport-input" type="text" placeholder="Achat dividendes…">' +
+    '<div class="apport-actions">' +
+    '<button class="apport-btn-cancel" id="pru-cancel-btn">Annuler</button>' +
+    '<button class="apport-btn-save" id="pru-save-btn">Enregistrer</button>' +
+    '</div></div></div>';
+
+  qs('#pru-add-btn')?.addEventListener('click', () => {
+    qs('#pru-overlay').classList.remove('hidden');
+    qs('#pru-ticker').focus();
+  });
+  qs('#pru-cancel-btn')?.addEventListener('click', () => qs('#pru-overlay').classList.add('hidden'));
+  qs('#pru-refresh-btn')?.addEventListener('click', () => _loadPRU());
+  qs('#pru-save-btn')?.addEventListener('click', _savePRUTransaction);
+}
+
+async function _savePRUTransaction() {
+  const ticker = qs('#pru-ticker')?.value.trim().toUpperCase();
+  const nom    = qs('#pru-nom')?.value.trim();
+  const type   = qs('#pru-type')?.value;
+  const qty    = parseFloat(qs('#pru-qty')?.value);
+  const prix   = parseFloat(qs('#pru-prix')?.value);
+  const obj    = parseFloat(qs('#pru-obj')?.value) || null;
+  const sl     = parseFloat(qs('#pru-sl')?.value)  || null;
+  const note   = qs('#pru-note')?.value.trim();
+
+  if (!ticker || !qty || !prix || isNaN(qty) || isNaN(prix)) {
+    alert('Ticker, quantité et prix sont obligatoires');
+    return;
+  }
+  try {
+    await fetch(API + '/patrimoine/positions-pru/transaction', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ticker, type, quantite: qty, prix_unitaire: prix, note}),
+    });
+    // Configurer objectif/stop si renseignés
+    if (obj !== null || sl !== null || nom) {
+      await fetch(API + '/patrimoine/positions-pru/config', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ticker, nom: nom||ticker, objectif: obj, stop_loss: sl}),
+      });
+    }
+    qs('#pru-overlay').classList.add('hidden');
+    _loadPRU();
+  } catch (e) {
+    alert('Erreur : ' + e);
+  }
 }
 
 function _drawRetPie(actifs, total) {

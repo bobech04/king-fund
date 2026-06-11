@@ -2227,3 +2227,104 @@ body::after {
   margin-top: 4px;
 }
 .agd-refresh-btn:hover { color: var(--text); border-color: var(--accent); }
+
+
+/* __ PRU — Suivi Prix de Revient Unitaire ______________________________________ */
+.pru-loading {
+  color: var(--muted);
+  font-size: .75rem;
+  padding: 12px;
+  text-align: center;
+}
+.pru-total {
+  font-size: .78rem;
+  font-weight: 700;
+  padding: 6px 0 10px;
+  letter-spacing: .03em;
+}
+.pru-total.pos { color: var(--accent); }
+.pru-total.neg { color: var(--red); }
+.pru-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pru-row {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.pru-row-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.pru-ticker {
+  font-size: .8rem;
+  font-weight: 700;
+  color: var(--gold);
+  letter-spacing: .04em;
+}
+.pru-nom {
+  font-size: .68rem;
+  color: var(--muted);
+  flex: 1;
+}
+.pru-row-data {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+@media (min-width: 600px) {
+  .pru-row-data { grid-template-columns: repeat(6, 1fr); }
+}
+.pru-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pru-lbl {
+  font-size: .57rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+.pru-val {
+  font-size: .72rem;
+  font-weight: 600;
+  color: var(--text);
+}
+.pru-val.pos { color: var(--accent); }
+.pru-val.neg { color: var(--red); }
+.pru-badge {
+  font-size: .58rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: .03em;
+}
+.pru-badge.obj {
+  background: rgba(0,229,160,.15);
+  color: var(--accent);
+  border: 1px solid rgba(0,229,160,.3);
+}
+.pru-badge.sl {
+  background: rgba(255,68,102,.15);
+  color: var(--red);
+  border: 1px solid rgba(255,68,102,.3);
+}
+.pru-obj-bar {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+.pru-obj-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00e5a0, #ffd700);
+  border-radius: 2px;
+  transition: width .4s ease;
+}

@@ -343,6 +343,121 @@ def update_patrimoine_config():
         return jsonify({"erreur": str(e)}), 500
 
 
+@app.route("/api/patrimoine/positions-pru")
+def get_positions_pru():
+    from data.suivi_pru import get_suivi_pru
+    try:
+        return jsonify(get_suivi_pru())
+    except Exception as e:
+        logger.error("positions-pru: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/patrimoine/positions-pru/transaction", methods=["POST"])
+def add_pru_transaction():
+    from data.suivi_pru import ajouter_transaction
+    from flask import request
+    body = request.get_json(silent=True) or {}
+    try:
+        tx = ajouter_transaction(
+            ticker        = body["ticker"],
+            type_tx       = body["type"],
+            quantite      = float(body["quantite"]),
+            prix_unitaire = float(body["prix_unitaire"]),
+            compte        = body.get("compte", "cto"),
+            note          = body.get("note", ""),
+            date_tx       = body.get("date"),
+        )
+        return jsonify({"status": "ok", "transaction": tx})
+    except (KeyError, ValueError) as e:
+        return jsonify({"erreur": str(e)}), 400
+    except Exception as e:
+        logger.error("pru/transaction: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/patrimoine/positions-pru/config", methods=["POST"])
+def config_pru_position():
+    from data.suivi_pru import configurer_position
+    from flask import request
+    body = request.get_json(silent=True) or {}
+    try:
+        pos = configurer_position(
+            ticker     = body["ticker"],
+            nom        = body.get("nom"),
+            objectif   = body.get("objectif"),
+            stop_loss  = body.get("stop_loss"),
+            note       = body.get("note"),
+        )
+        return jsonify({"status": "ok", "position": pos})
+    except KeyError as e:
+        return jsonify({"erreur": str(e)}), 400
+    except Exception as e:
+        logger.error("pru/config: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/patrimoine/positions-pru/<ticker>", methods=["DELETE"])
+def delete_pru_position(ticker):
+    from data.suivi_pru import supprimer_position
+    ok = supprimer_position(ticker)
+    return jsonify({"status": "ok" if ok else "not_found"})
+
+
+@app.route("/api/rapports/mensuel/dernier")
+def get_rapport_mensuel_dernier():
+    from pathlib import Path
+    rep_dir = Path(__file__).parent.parent / "rapports" / "mensuel"
+    try:
+        fichiers = sorted(rep_dir.glob("rapport_mensuel_*.pdf"), key=lambda f: f.stat().st_mtime, reverse=True)
+        if not fichiers:
+            fichiers = sorted(rep_dir.glob("rapport_mensuel_*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+        if not fichiers:
+            return jsonify({"erreur": "Aucun rapport mensuel généré"}), 404
+        f = fichiers[0]
+        return jsonify({"chemin_pdf": str(f), "nom": f.name, "taille_ko": round(f.stat().st_size / 1024, 1), "ts": datetime.fromtimestamp(f.stat().st_mtime).isoformat()})
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/rapports/mensuel/generer", methods=["POST"])
+def post_rapport_mensuel_generer():
+    try:
+        from divisions.rapports.rapport_mensuel import generer_rapport as _gen_mensuel
+        chemin = _gen_mensuel(engine)
+        return jsonify({"status": "ok", "chemin_pdf": chemin})
+    except Exception as e:
+        logger.error("rapport mensuel: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/rapports/annuel/dernier")
+def get_rapport_annuel_dernier():
+    from pathlib import Path
+    rep_dir = Path(__file__).parent.parent / "rapports" / "annuel"
+    try:
+        fichiers = sorted(rep_dir.glob("rapport_annuel_*.pdf"), key=lambda f: f.stat().st_mtime, reverse=True)
+        if not fichiers:
+            fichiers = sorted(rep_dir.glob("rapport_annuel_*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+        if not fichiers:
+            return jsonify({"erreur": "Aucun rapport annuel généré"}), 404
+        f = fichiers[0]
+        return jsonify({"chemin_pdf": str(f), "nom": f.name, "taille_ko": round(f.stat().st_size / 1024, 1), "ts": datetime.fromtimestamp(f.stat().st_mtime).isoformat()})
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/rapports/annuel/generer", methods=["POST"])
+def post_rapport_annuel_generer():
+    try:
+        from divisions.rapports.rapport_annuel import generer_rapport as _gen_annuel
+        chemin = _gen_annuel(engine)
+        return jsonify({"status": "ok", "chemin_pdf": chemin})
+    except Exception as e:
+        logger.error("rapport annuel: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
 @app.route("/api/bus/state")
 def get_bus_state():
     hub = getattr(engine, "_hub", None)
@@ -1226,6 +1341,65 @@ _scheduler.add_job(
 )
 
 
+def _job_rapport_mensuel():
+    """Rapport mensuel automatique — 1er du mois 07:30 Paris."""
+    logger.info("[SCHEDULER] Rapport mensuel — 1er du mois")
+    try:
+        from divisions.rapports.rapport_mensuel import generer_rapport as _gen_mensuel
+        chemin = _gen_mensuel(engine)
+        logger.info("[SCHEDULER] ✓ Rapport mensuel → %s", chemin)
+    except Exception as exc:
+        logger.error("[SCHEDULER] ✗ Rapport mensuel ÉCHEC: %s", exc)
+        _send_telegram(f"⚠️ Rapport mensuel ÉCHEC : {exc}")
+
+
+_scheduler.add_job(
+    _job_rapport_mensuel,
+    CronTrigger(day=1, hour=7, minute=30),
+    id="rapport_mensuel",
+    replace_existing=True,
+)
+
+
+def _job_rapport_annuel():
+    """Rapport annuel bilan + fiscalité — 31 décembre 18:00 Paris."""
+    logger.info("[SCHEDULER] Rapport annuel — 31 décembre")
+    try:
+        from divisions.rapports.rapport_annuel import generer_rapport as _gen_annuel
+        chemin = _gen_annuel(engine)
+        logger.info("[SCHEDULER] ✓ Rapport annuel → %s", chemin)
+    except Exception as exc:
+        logger.error("[SCHEDULER] ✗ Rapport annuel ÉCHEC: %s", exc)
+        _send_telegram(f"⚠️ Rapport annuel ÉCHEC : {exc}")
+
+
+_scheduler.add_job(
+    _job_rapport_annuel,
+    CronTrigger(month=12, day=31, hour=18, minute=0),
+    id="rapport_annuel",
+    replace_existing=True,
+)
+
+
+def _job_suivi_pru():
+    """Vérification alertes PRU — toutes les 30 min entre 09h–18h."""
+    try:
+        from data.suivi_pru import verifier_alertes
+        alertes = verifier_alertes()
+        if alertes:
+            logger.info("[SCHEDULER] PRU — %d alerte(s) déclenchée(s)", len(alertes))
+    except Exception as exc:
+        logger.debug("[SCHEDULER] PRU: %s", exc)
+
+
+_scheduler.add_job(
+    _job_suivi_pru,
+    CronTrigger(minute="*/30", hour="9-18"),
+    id="suivi_pru_alertes",
+    replace_existing=True,
+)
+
+
 # ---------------------------------------------------------------------------
 # Watchdog — alertes Telegram sur arrêt/crash du serveur
 # ---------------------------------------------------------------------------
@@ -1280,6 +1454,9 @@ if __name__ == "__main__":
         f"Serveur démarré le {datetime.now().strftime('%d/%m/%Y à %H:%M:%S')}\n"
         f"30 traders actifs — Tick {TICK_INTERVAL}s\n"
         f"• AGD-01 actif | Rapport lundi 08:00 + PDF 09:00\n"
+        f"• Rapport mensuel : 1er du mois 07:30 (Claude + PDF)\n"
+        f"• Rapport annuel : 31 déc. 18:00 (bilan + fiscalité FSC-FRA-01)\n"
+        f"• Suivi PRU : alertes objectif/stop-loss toutes les 30 min\n"
         f"• Comité Sélection : chaque soir 23:00\n"
         f"• Actualités : toutes les 30 min\n"
         f"• Veille stratégique RSS : toutes les heures (Bertez/Dalio/Howell/InflationGuy)\n"
