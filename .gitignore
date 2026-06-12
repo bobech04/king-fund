@@ -22,3 +22,8 @@ logs/
 
 # Claude Code
 .claude/
+
+# Runtime data
+data/
+rapports/bus/
+backend/config_user.json
