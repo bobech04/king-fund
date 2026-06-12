@@ -129,7 +129,7 @@ def get_suivi_pru() -> dict:
             pos["pv_pct"]     = None
 
     return {
-        "positions":    positions,
+        "positions":    {t: p for t, p in positions.items() if p.get("quantite", 0) > 0},
         "transactions": list(reversed(transactions[-50:])),
         "timestamp":    datetime.utcnow().isoformat(),
     }

@@ -341,6 +341,27 @@ def update_patrimoine_config():
         return jsonify({"erreur": str(e)}), 500
 
 
+@app.route("/api/patrimoine/actifs/<actif_id>", methods=["PUT"])
+def update_patrimoine_actif(actif_id):
+    from data.patrimoine import update_actif
+    body = request.get_json(silent=True) or {}
+    try:
+        valeur = float(body.get("valeur_eur", 0))
+        actif = update_actif(actif_id, valeur)
+        if actif is None:
+            return jsonify({"erreur": "actif non trouvé"}), 404
+        return jsonify({"status": "ok", "actif": actif})
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/patrimoine/actifs/<actif_id>", methods=["DELETE"])
+def delete_patrimoine_actif(actif_id):
+    from data.patrimoine import delete_actif
+    ok = delete_actif(actif_id)
+    return jsonify({"status": "ok" if ok else "not_found"})
+
+
 @app.route("/api/patrimoine/positions-pru")
 def get_positions_pru():
     from data.suivi_pru import get_suivi_pru

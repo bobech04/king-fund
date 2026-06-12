@@ -734,7 +734,7 @@ function renderFiscalite(d) {
 
     // FSC-FRA-01
     '<div class="fisc-card"><div class="fisc-code-badge fra">FSC-FRA-01</div>' +
-    '<div class="fisc-card-title">🇫🇷 Flat Tax PFU 30% — Or · Stellantis · Cash</div>' +
+    '<div class="fisc-card-title">🇫🇷 Flat Tax PFU 30% — Or · Actions · Cash</div>' +
     '<div class="fisc-ref">' + escHtml(fscFra.reference || 'CGI Art. 200 A — PFU 30% = 12.8% IR + 17.2% PS') + '</div>' +
     '<div class="fisc-actif-section">' +
     '<div class="fisc-actif-label">🥇 ' + escHtml(orFisc.actif || 'Or physique') + '</div>' +
@@ -743,9 +743,12 @@ function renderFiscalite(d) {
     (orB.exonere ? '<span class="green">EXONÉRÉ</span>' : 'Abattement ' + escHtml(orB.abattement_acquis||'') + ' acquis') +
     '<div class="fisc-detail">' + escHtml(orB.detail||'') + '</div></div>' +
     '<div class="fisc-conseil">' + escHtml(orFisc.conseil||'') + '</div></div>' +
-    '<div class="fisc-actif-section"><div class="fisc-actif-label">🚗 ' + escHtml(stFisc.actif||'Stellantis') + '</div>' +
-    '<div class="fisc-option">Dividendes : <strong>' + fmt(stFisc.dividendes_estimes||0,2) + ' €/an</strong> → PFU : <strong>' + fmt(stFisc.pfu_annuel||0,2) + ' €/an</strong></div>' +
-    '<div class="fisc-detail">' + escHtml(stFisc.detail||'') + '</div></div></div>' +
+    (stFisc && (stFisc.dividendes_estimes||0) > 0 ?
+      '<div class="fisc-actif-section"><div class="fisc-actif-label">🚗 ' + escHtml(stFisc.actif||'Stellantis') + '</div>' +
+      '<div class="fisc-option">Dividendes : <strong>' + fmt(stFisc.dividendes_estimes,2) + ' €/an</strong> → PFU : <strong>' + fmt(stFisc.pfu_annuel,2) + ' €/an</strong></div>' +
+      '<div class="fisc-detail">' + escHtml(stFisc.detail||'') + '</div></div>'
+      : '') +
+    '</div>' +
 
     // PEA
     '<div class="fisc-card"><div class="fisc-code-badge fra">PEA</div>' +
@@ -783,7 +786,7 @@ function renderFiscalite(d) {
     '<div class="fisc-option"><span class="fisc-badge">4. DZD rapatriement</span>15 000 €/an maximum — planifier sur plusieurs années</div></div>' +
     '<div class="fisc-actif-section"><div class="fisc-actif-label">💡 Optimisations clés</div>' +
     '<div class="fisc-option">· Maximiser PEA avant retraite (plafond 150 000 €) — croissance en franchise IR</div>' +
-    '<div class="fisc-option">· Stellantis dans PEA : économie estimée +' + fmt(peaFisc.economie_stellantis_an||0,2) + ' €/an vs CTO</div>' +
+    ((peaFisc.economie_stellantis_an||0) > 0 ? '<div class="fisc-option">· Actions dans PEA : économie estimée +' + fmt(peaFisc.economie_stellantis_an,2) + ' €/an vs CTO</div>' : '') +
     '<div class="fisc-option">· Micro-foncier locatif : abattement 30% si revenus < 15 000 €/an</div>' +
     '<div class="fisc-option">· IFI : seuil 1.3 M€ net — résidence principale exonérée à 30%</div></div></div>' +
     '</div>';
@@ -1460,7 +1463,7 @@ function _renderPRU(data) {
   const el = qs('#pru-section');
   if (!el) return;
   const positions = data?.positions || {};
-  const entries = Object.values(positions);
+  const entries = Object.values(positions).filter(p => (p.quantite || 0) > 0);
 
   const pvTotal = entries.reduce((s, p) => s + (p.pv_latente || 0), 0);
   const pvCls   = pvTotal >= 0 ? 'pos' : 'neg';

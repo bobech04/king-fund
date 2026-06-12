@@ -23,7 +23,7 @@ _DEFAULTS: dict = {
     "actifs": [
         {"id": "cash",       "nom": "Cash",               "valeur_eur": 450.0, "categorie": "liquidites",  "couleur": "#00e5a0"},
         {"id": "or",         "nom": "Or physique",        "valeur_eur": 570.0, "categorie": "metaux",      "couleur": "#ffd700"},
-        {"id": "stellantis", "nom": "Actions Stellantis", "valeur_eur": 62.0,  "categorie": "actions",     "couleur": "#4488ff"},
+        {"id": "epargne_dzd","nom": "Épargne Dinars DZD", "valeur_eur": 17000.0,"categorie": "epargne",    "couleur": "#b44cff"},
         {"id": "pea",        "nom": "PEA",                "valeur_eur": 0.0,   "categorie": "pea",         "couleur": "#ff6b35"},
         {"id": "immo",       "nom": "Immobilier",         "valeur_eur": 0.0,   "categorie": "immobilier",  "couleur": "#ff4488",
          "meta": {"type": "residence_principale", "annees_detention": 0, "credit_restant": 0.0}},
@@ -144,7 +144,7 @@ def _fiscalite(actifs: list[dict]) -> dict:
     ps_net_pct = max(0.0, round(17.2 * (1 - ab_ps / 100), 2))
     immo_taux_pv = round(ir_net_pct + ps_net_pct, 2)
 
-    fsc_fra_01 = {
+    fsc_fra_01: dict = {
         "regime":    "Prélèvement Forfaitaire Unique (PFU) — Flat Tax 30%",
         "taux":      "12.8% IR + 17.2% PS = 30% total",
         "reference": "Art. 200 A CGI — Loi de finances 2018",
@@ -164,14 +164,6 @@ def _fiscalite(actifs: list[dict]) -> dict:
                 "detail":            "Art. 150 UA CGI — exonération totale après 22 ans de détention",
             },
             "conseil": "Régime PV préférable si détenu > 22 ans (exonération totale)",
-        },
-        "stellantis": {
-            "actif":              f"Actions Stellantis ({st_val:.0f}€)",
-            "dividendes_estimes": st_div,
-            "pfu_annuel":         st_pfu,
-            "pfu_pea_annuel":     st_pfu_pea,
-            "detail":             f"Dividende STLAM ~4%/an → PFU CTO : {st_pfu}€/an · dans PEA : {st_pfu_pea}€/an",
-            "conseil":            "Loger Stellantis dans le PEA — économie de 12.8% IR sur dividendes et PV",
         },
         "cash": {
             "actif":  f"Cash ({actifs_map.get('cash', {}).get('valeur_eur', 0):.0f}€)",
@@ -240,6 +232,16 @@ def _fiscalite(actifs: list[dict]) -> dict:
         "reference": "Art. 150 U à 150 VH CGI — Plus-values immobilières",
     }
 
+    if st_val > 0:
+        fsc_fra_01["stellantis"] = {
+            "actif":              f"Actions Stellantis ({st_val:.0f}€)",
+            "dividendes_estimes": st_div,
+            "pfu_annuel":         st_pfu,
+            "pfu_pea_annuel":     st_pfu_pea,
+            "detail":             f"Dividende STLAM ~4%/an → PFU CTO : {st_pfu}€/an · dans PEA : {st_pfu_pea}€/an",
+            "conseil":            "Loger dans le PEA — économie de 12.8% IR sur dividendes et PV",
+        }
+
     return {"fsc_fra_01": fsc_fra_01, "pea": pea_fisc, "immo": immo_fisc}
 
 
@@ -275,6 +277,29 @@ def get_patrimoine() -> dict:
         "fiscalite":      _fiscalite(actifs),
         "timestamp":      datetime.utcnow().isoformat(),
     }
+
+
+def update_actif(actif_id: str, valeur_eur: float) -> dict | None:
+    """Met à jour la valeur d'un actif existant."""
+    data = _load()
+    for a in data.get("actifs", []):
+        if a["id"] == actif_id:
+            a["valeur_eur"] = round(max(0.0, valeur_eur), 2)
+            _save(data)
+            return a
+    return None
+
+
+def delete_actif(actif_id: str) -> bool:
+    """Supprime un actif de la liste."""
+    data = _load()
+    actifs = data.get("actifs", [])
+    new_actifs = [a for a in actifs if a["id"] != actif_id]
+    if len(new_actifs) < len(actifs):
+        data["actifs"] = new_actifs
+        _save(data)
+        return True
+    return False
 
 
 def add_apport(montant: float, note: str = "") -> dict:
