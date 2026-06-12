@@ -1,0 +1,64 @@
+{
+  "positions": {
+    "VPK.AS": {
+      "ticker": "VPK.AS",
+      "nom": "Vopak",
+      "objectif": 50.0,
+      "stop_loss": 40.55,
+      "note": "",
+      "pru": 46.29,
+      "quantite": 1.0
+    }
+  },
+  "transactions": [
+    {
+      "id": "583cda6b",
+      "ticker": "STLA.MI",
+      "date": "2026-06-11",
+      "type": "achat",
+      "quantite": 10.0,
+      "prix_unitaire": 12.5,
+      "pru_reference": 0.0,
+      "pv_realisee": null,
+      "compte": "cto",
+      "note": "Achat initial"
+    },
+    {
+      "id": "2d42dfd3",
+      "ticker": "STLA.MI",
+      "date": "2026-06-11",
+      "type": "achat",
+      "quantite": 5.0,
+      "prix_unitaire": 13.0,
+      "pru_reference": 12.5,
+      "pv_realisee": null,
+      "compte": "cto",
+      "note": ""
+    },
+    {
+      "id": "c81d8990",
+      "ticker": "STLA.MI",
+      "date": "2026-06-11",
+      "type": "vente",
+      "quantite": 5.0,
+      "prix_unitaire": 14.0,
+      "pru_reference": 12.6667,
+      "pv_realisee": 6.67,
+      "compte": "cto",
+      "note": ""
+    },
+    {
+      "id": "81ef3684",
+      "ticker": "VPK.AS",
+      "date": "2026-06-12",
+      "type": "achat",
+      "quantite": 1.0,
+      "prix_unitaire": 46.29,
+      "pru_reference": 0.0,
+      "pv_realisee": null,
+      "compte": "cto",
+      "note": ""
+    }
+  ],
+  "alertes_envoyees": {}
+}

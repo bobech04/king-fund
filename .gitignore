@@ -23,7 +23,10 @@ logs/
 # Claude Code
 .claude/
 
-# Runtime data
+# Runtime data (sauf positions PRU versionnées)
 data/
+!data/
+!data/patrimoine/
+!data/patrimoine/suivi_pru.json
 rapports/bus/
 backend/config_user.json
