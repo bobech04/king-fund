@@ -2456,3 +2456,105 @@ body::after {
   text-align:right;
 }
 .gov-cfg-check { width:16px; height:16px; accent-color:var(--accent); cursor:pointer; }
+
+
+/* ════════════════════════════════════════════════════════════════
+   MOBILE RESPONSIVE — OPTIMISATIONS 375px
+   ════════════════════════════════════════════════════════════════ */
+
+/* Tap improvements : supprimer délai + highlight indésirable */
+button, [role="button"] {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Canvas : toujours contenu dans son parent */
+canvas { max-width: 100%; }
+
+/* ── Header : éviter le débordement horizontal à 375px ───────── */
+@media (max-width: 420px) {
+  .battle-day  { display: none; }
+  .update-time { display: none; }
+  .header-clock { min-width: 48px; }
+}
+
+/* ── Tab bar : cible tactile 44 px (iOS/Android recommandation) */
+.tab-btn {
+  height: 44px;
+  min-width: 44px;
+}
+
+/* ── Stats bar : tronquer les valeurs longues (ex. STAGFLATION) */
+.stat { overflow: hidden; }
+.stat-value {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+@media (max-width: 380px) {
+  .stat-value       { font-size: 0.72rem; }
+  .stat-value.muted { font-size: 0.62rem; }
+}
+
+/* ── Modal KPI : 2 colonnes sur petit écran (4 blocs = 2×2) ──── */
+@media (max-width: 480px) {
+  .modal-kpi { grid-template-columns: 1fr 1fr; }
+}
+
+/* ── Trade rows : masquer l'heure et adapter le grid à 375px ─── */
+@media (max-width: 400px) {
+  .trade-row {
+    grid-template-columns: 40px 1fr auto auto;
+    gap: 4px;
+    padding: 6px 8px;
+    font-size: 0.69rem;
+  }
+  .trade-time { display: none; }
+}
+
+/* ── Tables : défilement horizontal sur mobile ────────────────── */
+@media (max-width: 600px) {
+  .agd-bench-table {
+    display: block;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* ── Formulaires : empiler les champs côte-à-côte sur mobile ─── */
+@media (max-width: 480px) {
+  .agd-form-row { flex-direction: column; }
+}
+
+/* ── Inputs : min 16px pour éviter le zoom automatique iOS ────── */
+@media (max-width: 768px) {
+  input[type="text"],
+  input[type="number"],
+  input[type="email"],
+  input[type="password"],
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* ── Safe area (iPhone X+ encoche / Dynamic Island) ───────────── */
+@media (max-width: 600px) {
+  main { padding-bottom: env(safe-area-inset-bottom, 0px); }
+}
+
+/* ── Toast : réduire l'emprise sur petit écran (était 300px = 80%) */
+@media (max-width: 420px) {
+  #toast-container {
+    max-width: 240px;
+    top: 8px;
+    right: 8px;
+  }
+  .toast {
+    padding: 8px 10px;
+    gap: 8px;
+  }
+  .toast-title { font-size: 0.65rem; }
+  .toast-msg   { font-size: 0.60rem; }
+}
