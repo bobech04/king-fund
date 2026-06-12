@@ -191,7 +191,25 @@ class ComiteSelection:
         else:
             score = float(score_raw or 0)
 
-        # Fallback : appel direct au pipeline si score toujours nul
+        # Fallback 1 : watchlist manager (cache ou calcul si absent)
+        if score == 0:
+            try:
+                from divisions.investissement.watchlist import get_watchlist_manager
+                wl = get_watchlist_manager()
+                cached = wl.get_cached_result(ticker)
+                if not cached:
+                    wl.analyser_watchlist(force=False)
+                    cached = wl.get_cached_result(ticker)
+                if cached:
+                    s = cached.get("score", 0)
+                    score = round(s / 10.0, 2) if s > 10 else float(s or 0)
+                    donnees = {**donnees, **cached}
+                    logger.info("[Comite] Research watchlist %s → score %.2f signal %s",
+                                ticker, score, cached.get("signal", "?"))
+            except Exception as _we:
+                logger.warning("[Comite] Watchlist indisponible: %s", _we)
+
+        # Fallback 2 : appel direct au pipeline si score toujours nul
         if score == 0:
             try:
                 from divisions.investissement.pipeline import get_pipeline

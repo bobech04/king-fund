@@ -68,6 +68,10 @@ class WatchlistManager:
             results.append(r)
         return results
 
+    def get_cached_result(self, ticker: str) -> dict | None:
+        with self._lock:
+            return self._cache.get(ticker)
+
     def _analyser_un(self, ticker: str, item: dict) -> dict[str, Any]:
         ts = datetime.now(timezone.utc).isoformat()
         try:

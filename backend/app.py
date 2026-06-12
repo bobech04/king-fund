@@ -1233,6 +1233,17 @@ def post_comite_voter():
     if not ticker:
         return jsonify({"erreur": "ticker requis"}), 400
     try:
+        # Enrichit avec les données watchlist si disponibles en cache
+        try:
+            from divisions.investissement.watchlist import get_watchlist_manager
+            wl_mgr = get_watchlist_manager()
+            cached = wl_mgr.get_cached_result(ticker)
+            logger.info("[Comite] Enrichissement %s — cache keys: %s — cached score: %s",
+                        ticker, list(wl_mgr._cache.keys())[:5], cached.get("score") if cached else "ABSENT")
+            if cached:
+                body = {**cached, **body}
+        except Exception as _ce:
+            logger.warning("[Comite] Enrichissement watchlist erreur: %s", _ce)
         from divisions.gerant_delegue import get_comite_selection
         verdict = get_comite_selection().voter(ticker, body)
         return jsonify(verdict)
