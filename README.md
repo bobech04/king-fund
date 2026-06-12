@@ -41,6 +41,8 @@ python -X utf8 backend/app.py
 ```
 
 > **Accès mobile (Wi-Fi local) :** `http://192.168.1.X:5000` — puis *Ajouter à l'écran d'accueil* pour une icône PWA.
+>
+> **GitHub Pages (sans serveur local) :** [https://bobech04.github.io/king-fund/](https://bobech04.github.io/king-fund/) — ajoutez `?api=http://192.168.1.X:5000/api` pour connecter votre backend.
 
 ---
 
