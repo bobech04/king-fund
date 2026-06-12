@@ -48,8 +48,12 @@
 
 ### Depuis n'importe où (GitHub Pages)
 
-Le dashboard est aussi disponible en ligne via GitHub Pages (accès sans serveur local, données en lecture seule).  
-Pour qu'il se connecte à votre serveur, ajoutez `?api=http://192.168.1.X:5000/api` à la fin de l'URL GitHub Pages.
+Le dashboard est aussi disponible en ligne : [https://bobech04.github.io/king-fund/](https://bobech04.github.io/king-fund/)
+
+Sans serveur local, les données ne se chargent pas. Pour connecter votre backend, ajoutez `?api=http://192.168.1.X:5000/api` à la fin de l'URL :
+```
+https://bobech04.github.io/king-fund/?api=http://192.168.1.X:5000/api
+```
 
 ---
 
