@@ -83,5 +83,14 @@ RAPPORTS_DIR = Path(os.getenv("RAPPORTS_DIR", Path(__file__).parent.parent / "ra
 # Sécurité web
 # ---------------------------------------------------------------------------
 
-WEB_PASSWORD = os.getenv("WEB_PASSWORD", "king2026")
-SECRET_KEY   = os.getenv("SECRET_KEY",   "kf-secret-2026-change-moi")
+def _require_env(var: str) -> str:
+    val = os.getenv(var, "")
+    if not val:
+        raise RuntimeError(
+            f"Variable d'environnement '{var}' manquante ou vide.\n"
+            f"Vérifier backend/.env et s'assurer que load_dotenv() s'exécute avant l'import de config."
+        )
+    return val
+
+WEB_PASSWORD = _require_env("WEB_PASSWORD")
+SECRET_KEY   = _require_env("SECRET_KEY")
