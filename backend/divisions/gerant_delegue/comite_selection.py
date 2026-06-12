@@ -35,6 +35,7 @@ from divisions.gerant_delegue.notifier import alerte, send
 logger = logging.getLogger(__name__)
 
 _RAPPORTS_DIR = Path(__file__).resolve().parents[4] / "rapports" / "comite"
+_DB_PATH      = Path(__file__).resolve().parents[3] / "database" / "king_fund.db"
 
 _SYSTEM_FISCALISTE = """\
 Tu es le Fiscaliste du King Fund.
@@ -117,6 +118,53 @@ class ComiteSelection:
         self._client    = None
         self._init_claude()
         _RAPPORTS_DIR.mkdir(parents=True, exist_ok=True)
+        self._init_db()
+
+    def _init_db(self) -> None:
+        try:
+            import sqlite3
+            with sqlite3.connect(str(_DB_PATH)) as con:
+                con.execute("""
+                    CREATE TABLE IF NOT EXISTS decisions_agd (
+                        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                        ts                  TEXT NOT NULL,
+                        ticker              TEXT NOT NULL,
+                        decision            TEXT NOT NULL,
+                        go_nogo             TEXT NOT NULL,
+                        nb_oui              INTEGER NOT NULL,
+                        vote_research       TEXT,
+                        motif_research      TEXT,
+                        vote_cio            TEXT,
+                        motif_cio           TEXT,
+                        vote_fiscaliste     TEXT,
+                        motif_fiscaliste    TEXT,
+                        conditions          TEXT,
+                        prix_entree         REAL,
+                        frais               REAL,
+                        montant_investi     REAL,
+                        sizing_autorise     REAL,
+                        quantite            INTEGER,
+                        cash_restant_sizing REAL,
+                        objectif            REAL,
+                        stop_loss           REAL,
+                        donnees             TEXT
+                    )
+                """)
+                # Migration colonnes manquantes / suppression montant ambigu
+                existing = {r[1] for r in con.execute("PRAGMA table_info(decisions_agd)").fetchall()}
+                for col, ddl in [
+                    ("frais",               "ALTER TABLE decisions_agd ADD COLUMN frais REAL"),
+                    ("montant_investi",      "ALTER TABLE decisions_agd ADD COLUMN montant_investi REAL"),
+                    ("sizing_autorise",      "ALTER TABLE decisions_agd ADD COLUMN sizing_autorise REAL"),
+                    ("quantite",             "ALTER TABLE decisions_agd ADD COLUMN quantite INTEGER"),
+                    ("cash_restant_sizing",  "ALTER TABLE decisions_agd ADD COLUMN cash_restant_sizing REAL"),
+                ]:
+                    if col not in existing:
+                        con.execute(ddl)
+                if "montant" in existing:
+                    con.execute("ALTER TABLE decisions_agd DROP COLUMN montant")
+        except Exception as e:
+            logger.warning("[Comite] init_db: %s", e)
 
     # ------------------------------------------------------------------
     # Claude
@@ -410,7 +458,52 @@ class ComiteSelection:
                 encoding="utf-8",
             )
         except Exception as e:
-            logger.debug("[Comite] Persistance: %s", e)
+            logger.debug("[Comite] Persistance JSON: %s", e)
+
+        try:
+            import sqlite3
+            go_nogo = "GO" if verdict["decision"].startswith("BUY") else "NO-GO"
+            votes_by_name = {v["votant"]: v for v in verdict["votes"]}
+            donnees = verdict.get("donnees", {})
+
+            prix_entree_val     = donnees.get("prix_actuel")
+            frais_val           = 1.00
+            sizing_autorise_val = donnees.get("sizing_autorise", 50.00)
+            if prix_entree_val and sizing_autorise_val:
+                quantite_val        = int(sizing_autorise_val // prix_entree_val)
+                montant_investi_val = round(prix_entree_val * quantite_val + frais_val, 2)
+                cash_restant_val    = round(sizing_autorise_val - montant_investi_val, 2)
+            else:
+                quantite_val = montant_investi_val = cash_restant_val = None
+
+            with sqlite3.connect(str(_DB_PATH)) as con:
+                con.execute("""
+                    INSERT INTO decisions_agd
+                      (ts, ticker, decision, go_nogo, nb_oui,
+                       vote_research, motif_research,
+                       vote_cio, motif_cio,
+                       vote_fiscaliste, motif_fiscaliste,
+                       conditions, prix_entree, frais, montant_investi,
+                       sizing_autorise, quantite, cash_restant_sizing,
+                       objectif, stop_loss, donnees)
+                    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                """, (
+                    verdict["timestamp"], verdict["ticker"],
+                    verdict["decision"], go_nogo, verdict["nb_oui"],
+                    votes_by_name.get("Research", {}).get("vote"),
+                    votes_by_name.get("Research", {}).get("motif"),
+                    votes_by_name.get("CIO", {}).get("vote"),
+                    votes_by_name.get("CIO", {}).get("motif"),
+                    votes_by_name.get("Fiscaliste", {}).get("vote"),
+                    votes_by_name.get("Fiscaliste", {}).get("motif"),
+                    json.dumps(verdict.get("conditions", []), ensure_ascii=False),
+                    prix_entree_val, frais_val, montant_investi_val,
+                    sizing_autorise_val, quantite_val, cash_restant_val,
+                    donnees.get("objectif"), donnees.get("stop_loss"),
+                    json.dumps(verdict, ensure_ascii=False, default=str),
+                ))
+        except Exception as e:
+            logger.debug("[Comite] Persistance SQLite decisions_agd: %s", e)
 
     def historique(self, n: int = 20) -> list[dict]:
         with self._lock:
