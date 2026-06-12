@@ -1347,13 +1347,15 @@ function renderRetraite(d, divData) {
   if (!d) { qs('#retraite-wrap').innerHTML = '<div class="error-state">Données patrimoine indisponibles.</div>'; return; }
   const actifs   = d.actifs   || [];
   const total    = d.total_eur || 0;
+  const totalInv = d.total_investissable ?? total;
+  const reserves = d.reserves || [];
   const proj     = d.projection || [];
   const apports  = d.apports  || [];
   const cfg      = d.config   || {};
   const valRet   = d.valeur_retraite || 0;
   const anneeRet = (cfg.annee_base||2026) + ((cfg.age_retraite||56) - (cfg.age_actuel||35));
   const apportMens = d.apport_mensuel_effectif || cfg.apport_mensuel || 500;
-  const pctRet   = Math.min(100, (total / (valRet||500000) * 100)).toFixed(1);
+  const pctRet   = Math.min(100, (totalInv / (valRet||500000) * 100)).toFixed(1);
 
   const revMensuel = divData?.revenu_mensuel_total || 0;
   const revAnnuel  = divData?.revenu_annuel_total  || 0;
@@ -1379,18 +1381,32 @@ function renderRetraite(d, divData) {
 
     // KPIs
     '<div class="pat-kpi-row">' +
-    '<div class="pat-kpi"><div class="pat-kpi-label">PATRIMOINE ACTUEL</div><div class="pat-kpi-val" style="color:var(--accent)">' + fmt(total,0) + ' €</div></div>' +
+    '<div class="pat-kpi"><div class="pat-kpi-label">BASE INVESTISSABLE</div><div class="pat-kpi-val" style="color:var(--accent)">' + fmt(totalInv,0) + ' €</div>' +
+      (total !== totalInv ? '<div class="pat-kpi-sub">Total : ' + fmt(total,0) + ' €</div>' : '') +
+    '</div>' +
     '<div class="pat-kpi"><div class="pat-kpi-label">OBJECTIF RETRAITE</div><div class="pat-kpi-val" style="color:var(--gold)">' + fmt(valRet,0) + ' €</div><div class="pat-kpi-sub">' + anneeRet + '</div></div>' +
     '<div class="pat-kpi"><div class="pat-kpi-label">APPORT MENSUEL</div><div class="pat-kpi-val">' + fmt(apportMens,0) + ' €<span style="font-size:.6rem;color:var(--muted)">/mois</span></div></div>' +
     '<div class="pat-kpi"><div class="pat-kpi-label">PROGRESSION</div><div class="pat-kpi-val" style="color:var(--accent)">' + pctRet + '%</div></div>' +
     '</div>' +
 
+    // Réserves hors fonds
+    (reserves.length ? '<div class="pat-card" style="border-left:3px solid #b44cff;margin-bottom:12px">' +
+    '<div class="pat-card-title" style="color:#b44cff">🏠 Réserves hors fonds (non-investissables)</div>' +
+    reserves.map(r =>
+      '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">' +
+      '<div><div style="font-size:.78rem;color:var(--text)">' + escHtml(r.nom) + '</div>' +
+      (r.note ? '<div style="font-size:.65rem;color:var(--muted);margin-top:2px">' + escHtml(r.note) + '</div>' : '') +
+      '</div><div style="font-size:.85rem;font-weight:700;color:#b44cff">' + fmt(r.valeur_eur,0) + ' €</div></div>'
+    ).join('') +
+    '<div style="font-size:.62rem;color:var(--muted);margin-top:8px">Ces actifs n\'alimentent pas la projection retraite.</div>' +
+    '</div>' : '') +
+
     // Barre progression
     '<div class="ret-prog-card">' +
-    '<div style="font-size:.6rem;color:var(--muted);margin-bottom:6px">Progression vers objectif retraite ' + (cfg.age_retraite||56) + ' ans</div>' +
+    '<div style="font-size:.6rem;color:var(--muted);margin-bottom:6px">Progression base investissable vers objectif retraite ' + (cfg.age_retraite||56) + ' ans</div>' +
     '<div class="ret-prog-bar"><div class="ret-prog-fill" style="width:' + pctRet + '%"></div></div>' +
     '<div style="display:flex;justify-content:space-between;font-size:.6rem;color:var(--muted);margin-top:4px">' +
-    '<span>' + fmt(total,0) + ' € actuel</span><span>' + fmt(valRet,0) + ' € objectif</span></div>' +
+    '<span>' + fmt(totalInv,0) + ' € investissable</span><span>' + fmt(valRet,0) + ' € objectif</span></div>' +
     '</div>' +
 
     // Graphiques
