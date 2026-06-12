@@ -76,7 +76,7 @@ _IMPORTANT_KW_EXTRA = [
     "pivot", "tournant", "renversement", "reversal",
 ]
 
-_HEADERS = {"User-Agent": "king-fund-veille/1.0 (+zoubida.kocheida@hotmail.com)"}
+_HEADERS = {"User-Agent": "king-fund-veille/1.0"}
 _CACHE_TTL = 3600  # 1h
 
 
