@@ -199,6 +199,14 @@ def _narrative_fallback(donnees: dict) -> str:
     )
 
 
+def _s(text: str) -> str:
+    """Assainit un texte pour les polices Helvetica fpdf2 (ISO-8859-1)."""
+    return (text.replace("—", "-").replace("–", "-")
+                .replace("€", "EUR").replace("≥", ">=").replace("≤", "<=")
+                .replace("→", "->").replace("←", "<-").replace("•", "*")
+                .encode("latin-1", "replace").decode("latin-1"))
+
+
 def _generer_pdf(chemin: Path, donnees: dict, narrative: str) -> None:
     from fpdf import FPDF
     ts  = datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -209,27 +217,31 @@ def _generer_pdf(chemin: Path, donnees: dict, narrative: str) -> None:
 
     # ── En-tête
     pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 10, "KING FUND — Rapport Mensuel", ln=True, align="C")
+    pdf.cell(0, 10, "KING FUND - Rapport Mensuel", ln=True, align="C")
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"Généré le {ts} | {donnees['mois']} | J{donnees['battle_day']}", ln=True, align="C")
+    pdf.cell(0, 6, _s(f"Genere le {ts} | {donnees['mois']} | J{donnees['battle_day']}"), ln=True, align="C")
     pdf.ln(6)
 
     # ── Narrative
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "Résumé Exécutif AGD-01", ln=True)
+    pdf.cell(0, 8, "Resume Executif AGD-01", ln=True)
     pdf.set_font("Helvetica", "", 10)
-    for ligne in narrative.split("\n"):
-        safe = ligne.encode("latin-1", "replace").decode("latin-1")
-        pdf.multi_cell(0, 5, safe)
+    for ligne in narrative.replace("\r", "").split("\n"):
+        safe = _s(ligne.strip())
+        if safe:
+            pdf.set_x(pdf.l_margin)
+            pdf.multi_cell(0, 5, safe)
+        else:
+            pdf.ln(3)
     pdf.ln(4)
 
     # ── KPIs performance
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, "Performance du Mois", ln=True)
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"  NAV totale : {donnees['nav_total']:,.0f}€  |  PnL : {donnees['pnl_total']:+,.0f}€  |  Perf moy : {donnees['perf_pct']:+.1f}%", ln=True)
-    pdf.cell(0, 6, f"  Alpha vs CAC40 : {donnees['alpha_cac40']}%  |  Alpha vs SP500 : {donnees['alpha_sp500']}%", ln=True)
-    pdf.cell(0, 6, f"  Gagnants (≥10 000€) : {donnees['gagnants']}/{donnees['nb_traders']}", ln=True)
+    pdf.cell(0, 6, _s(f"  NAV totale : {donnees['nav_total']:,.0f}EUR  |  PnL : {donnees['pnl_total']:+,.0f}EUR  |  Perf moy : {donnees['perf_pct']:+.1f}%"), ln=True)
+    pdf.cell(0, 6, _s(f"  Alpha vs CAC40 : {donnees['alpha_cac40']}%  |  Alpha vs SP500 : {donnees['alpha_sp500']}%"), ln=True)
+    pdf.cell(0, 6, _s(f"  Gagnants (>=10 000 EUR) : {donnees['gagnants']}/{donnees['nb_traders']}"), ln=True)
     pdf.ln(4)
 
     # ── Top 5 / Flop 5
@@ -237,26 +249,24 @@ def _generer_pdf(chemin: Path, donnees: dict, narrative: str) -> None:
     pdf.cell(0, 8, "Top 5 Traders", ln=True)
     pdf.set_font("Helvetica", "", 10)
     for t in donnees["top5"]:
-        pdf.cell(0, 6, f"  TRD{t.get('id',0):02d} — {t.get('name','?')[:25]} — PnL {t.get('pnl',0):+,.0f}€", ln=True)
+        pdf.cell(0, 6, _s(f"  TRD{t.get('id',0):02d} - {t.get('name','?')[:25]} - PnL {t.get('pnl',0):+,.0f}EUR"), ln=True)
     pdf.ln(2)
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, "Flop 5 Traders", ln=True)
     pdf.set_font("Helvetica", "", 10)
     for t in donnees["flop5"]:
-        pdf.cell(0, 6, f"  TRD{t.get('id',0):02d} — {t.get('name','?')[:25]} — PnL {t.get('pnl',0):+,.0f}€", ln=True)
+        pdf.cell(0, 6, _s(f"  TRD{t.get('id',0):02d} - {t.get('name','?')[:25]} - PnL {t.get('pnl',0):+,.0f}EUR"), ln=True)
     pdf.ln(4)
 
     # ── Décisions AGD-01
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "Décisions AGD-01 ce mois", ln=True)
+    pdf.cell(0, 8, "Decisions AGD-01 ce mois", ln=True)
     pdf.set_font("Helvetica", "", 9)
     if donnees["decisions_agd"]:
         for d in donnees["decisions_agd"][:10]:
-            line = f"  [{d['ts']}] {d['type']} : {d['decision'][:60]}"
-            safe = line.encode("latin-1", "replace").decode("latin-1")
-            pdf.cell(0, 5, safe, ln=True)
+            pdf.cell(0, 5, _s(f"  [{d['ts']}] {d['type']} : {d['decision'][:60]}"), ln=True)
     else:
-        pdf.cell(0, 5, "  Aucune décision enregistrée ce mois", ln=True)
+        pdf.cell(0, 5, "  Aucune decision enregistree ce mois", ln=True)
     pdf.ln(4)
 
     # ── Alpha Lab
@@ -264,9 +274,9 @@ def _generer_pdf(chemin: Path, donnees: dict, narrative: str) -> None:
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, "Verdict Alpha Lab", ln=True)
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"  Signaux VALIDES : {', '.join(al.get('valides', []) or ['aucun'])}", ln=True)
-    pdf.cell(0, 6, f"  Bruit : {', '.join(al.get('bruits', []) or ['aucun'])}", ln=True)
-    pdf.cell(0, 6, f"  Overfittés : {', '.join(al.get('overfits', []) or ['aucun'])}", ln=True)
+    pdf.cell(0, 6, _s(f"  Signaux VALIDES : {', '.join(al.get('valides', []) or ['aucun'])}"), ln=True)
+    pdf.cell(0, 6, _s(f"  Bruit : {', '.join(al.get('bruits', []) or ['aucun'])}"), ln=True)
+    pdf.cell(0, 6, _s(f"  Overfites : {', '.join(al.get('overfits', []) or ['aucun'])}"), ln=True)
     pdf.ln(4)
 
     # ── Retraite
@@ -280,9 +290,9 @@ def _generer_pdf(chemin: Path, donnees: dict, narrative: str) -> None:
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, f"Evolution vers Retraite 56 ans ({annee_ret})", ln=True)
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"  Patrimoine actuel : {total_pat:,.0f}€", ln=True)
-    pdf.cell(0, 6, f"  Objectif retraite : {val_ret:,.0f}€", ln=True)
-    pdf.cell(0, 6, f"  Progression : {pct_ret:.1f}%", ln=True)
+    pdf.cell(0, 6, _s(f"  Patrimoine actuel : {total_pat:,.0f}EUR"), ln=True)
+    pdf.cell(0, 6, _s(f"  Objectif retraite : {val_ret:,.0f}EUR"), ln=True)
+    pdf.cell(0, 6, _s(f"  Progression : {pct_ret:.1f}%"), ln=True)
 
     pdf.output(str(chemin))
 

@@ -181,24 +181,34 @@ def _generer_pdf(chemin: Path, donnees: dict, narrative: str) -> None:
     from fpdf import FPDF
     ts = datetime.now().strftime("%d/%m/%Y %H:%M")
 
+    def _s(text: str) -> str:
+        return (text.replace("—", "-").replace("–", "-")
+                    .replace("€", "EUR").replace("≥", ">=").replace("≤", "<=")
+                    .replace("→", "->").replace("•", "*")
+                    .encode("latin-1", "replace").decode("latin-1"))
+
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
 
     # ── En-tête
     pdf.set_font("Helvetica", "B", 20)
-    pdf.cell(0, 12, f"KING FUND — Bilan Annuel {donnees['annee']}", ln=True, align="C")
+    pdf.cell(0, 12, f"KING FUND - Bilan Annuel {donnees['annee']}", ln=True, align="C")
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"Généré le {ts} — Document fiscal à conserver", ln=True, align="C")
+    pdf.cell(0, 6, f"Genere le {ts} - Document fiscal a conserver", ln=True, align="C")
     pdf.ln(6)
 
     # ── Narrative
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, "Bilan Annuel & Analyse AGD-01", ln=True)
     pdf.set_font("Helvetica", "", 10)
-    for ligne in narrative.split("\n"):
-        safe = ligne.encode("latin-1", "replace").decode("latin-1")
-        pdf.multi_cell(0, 5, safe)
+    for ligne in narrative.replace("\r", "").split("\n"):
+        safe = _s(ligne.strip())
+        if safe:
+            pdf.set_x(pdf.l_margin)
+            pdf.multi_cell(0, 5, safe)
+        else:
+            pdf.ln(3)
     pdf.ln(4)
 
     # ── Performance annuelle
@@ -206,13 +216,13 @@ def _generer_pdf(chemin: Path, donnees: dict, narrative: str) -> None:
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, f"Performance Annuelle {donnees['annee']}", ln=True)
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"  NAV totale : {donnees['nav_total']:,.0f}€  |  PnL : {donnees['pnl_total']:+,.0f}€  |  Perf : {donnees['perf_pct']:+.1f}%", ln=True)
-    pdf.cell(0, 6, f"  Alpha vs CAC40 : {bench.get('alpha_vs_cac40','N/A')}%  |  Alpha vs SP500 : {bench.get('alpha_vs_sp500','N/A')}%", ln=True)
+    pdf.cell(0, 6, _s(f"  NAV totale : {donnees['nav_total']:,.0f}EUR  |  PnL : {donnees['pnl_total']:+,.0f}EUR  |  Perf : {donnees['perf_pct']:+.1f}%"), ln=True)
+    pdf.cell(0, 6, _s(f"  Alpha vs CAC40 : {bench.get('alpha_vs_cac40','N/A')}%  |  Alpha vs SP500 : {bench.get('alpha_vs_sp500','N/A')}%"), ln=True)
     pdf.ln(4)
 
     # ── FISCALITÉ — section centrale
     pdf.set_font("Helvetica", "B", 14)
-    pdf.cell(0, 10, "FISCALITÉ — FSC-FRA-01 — Déclaration Impôts", ln=True)
+    pdf.cell(0, 10, "FISCALITE - FSC-FRA-01 - Declaration Impots", ln=True)
     pdf.set_fill_color(240, 240, 255)
 
     fsc = donnees.get("fsc_fra_01", {})
@@ -223,8 +233,8 @@ def _generer_pdf(chemin: Path, donnees: dict, narrative: str) -> None:
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(0, 7, "1. Plus-values réalisées (CTO)", ln=True)
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"  Total plus-values CTO {donnees['annee']} : {donnees['pv_totale_cto']:+,.0f}€", ln=True)
-    pdf.cell(0, 6, f"  Flat Tax PFU estimée (30%) : {donnees['flat_tax_estime']:,.0f}€", ln=True)
+    pdf.cell(0, 6, _s(f"  Total plus-values CTO {donnees['annee']} : {donnees['pv_totale_cto']:+,.0f}EUR"), ln=True)
+    pdf.cell(0, 6, _s(f"  Flat Tax PFU estimee (30%) : {donnees['flat_tax_estime']:,.0f}EUR"), ln=True)
     pdf.cell(0, 6, "  → A reporter en case 3VG (gains) ou 3VH (pertes) de la déclaration 2042-C", ln=True)
     pdf.ln(2)
 
@@ -234,27 +244,28 @@ def _generer_pdf(chemin: Path, donnees: dict, narrative: str) -> None:
     pdf.set_font("Helvetica", "B", 11)
     pdf.cell(0, 7, "2. Or physique", ln=True)
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"  Actif : {or_info.get('actif', 'Or physique')}", ln=True)
-    pdf.cell(0, 6, f"  Option A — Taxe forfaitaire 11.5% sur cession : {opt_a.get('impot', 'N/A')}€", ln=True)
-    pdf.cell(0, 6, f"  Option B — Abattement acquis : {opt_b.get('abattement_acquis', 'N/A')} (exonéré : {opt_b.get('exonere', False)})", ln=True)
-    pdf.cell(0, 6, f"  Conseil : {or_info.get('conseil', '')[:80]}", ln=True)
+    pdf.cell(0, 6, _s(f"  Actif : {or_info.get('actif', 'Or physique')}"), ln=True)
+    pdf.cell(0, 6, f"  Option A - Taxe forfaitaire 11.5% sur cession : {opt_a.get('impot', 'N/A')}e", ln=True)
+    pdf.cell(0, 6, f"  Option B - Abattement acquis : {opt_b.get('abattement_acquis', 'N/A')} (exonere : {opt_b.get('exonere', False)})", ln=True)
+    pdf.cell(0, 6, _s(f"  Conseil : {or_info.get('conseil', '')[:80]}"), ln=True)
     pdf.ln(2)
 
-    # Stellantis
-    pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, "3. Actions Stellantis", ln=True)
-    pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"  Dividendes estimés : {st_info.get('dividendes_estimes', 0):.2f}€  |  PFU annuel : {st_info.get('pfu_annuel', 0):.2f}€", ln=True)
-    pdf.cell(0, 6, f"  Conseil : {st_info.get('conseil', '')[:80]}", ln=True)
-    pdf.ln(2)
+    # Actions (Stellantis ou autre — seulement si position active)
+    if st_info and st_info.get("dividendes_estimes", 0) > 0:
+        pdf.set_font("Helvetica", "B", 11)
+        pdf.cell(0, 7, _s(f"3. {st_info.get('actif', 'Actions')[:40]}"), ln=True)
+        pdf.set_font("Helvetica", "", 10)
+        pdf.cell(0, 6, _s(f"  Dividendes estimes : {st_info.get('dividendes_estimes', 0):.2f}EUR  |  PFU annuel : {st_info.get('pfu_annuel', 0):.2f}EUR"), ln=True)
+        pdf.cell(0, 6, _s(f"  Conseil : {st_info.get('conseil', '')[:80]}"), ln=True)
+        pdf.ln(2)
 
     # Convention DZD
     pdf.set_font("Helvetica", "B", 11)
-    pdf.cell(0, 7, "4. Épargne DZD — Convention Franco-Algérienne", ln=True)
+    pdf.cell(0, 7, "4. Epargne DZD - Convention Franco-Algerienne", ln=True)
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, "  Rapatriement max : 15 000€/an — Banques agréées : CPA/BEA/BNA/BADR", ln=True)
-    pdf.cell(0, 6, "  CERFA 3916 obligatoire — Déclaration compte bancaire étranger", ln=True)
-    pdf.cell(0, 6, "  Convention DZ-FR 17/10/1999 Art.18 — Revenus imposés en France", ln=True)
+    pdf.cell(0, 6, "  Rapatriement max : 15 000e/an - Banques agreees : CPA/BEA/BNA/BADR", ln=True)
+    pdf.cell(0, 6, "  CERFA 3916 obligatoire - Declaration compte bancaire etranger", ln=True)
+    pdf.cell(0, 6, "  Convention DZ-FR 17/10/1999 Art.18 - Revenus imposes en France", ln=True)
     pdf.ln(4)
 
     # ── Retraite
@@ -267,10 +278,10 @@ def _generer_pdf(chemin: Path, donnees: dict, narrative: str) -> None:
     pct_ret   = min(100, total_pat / max(1, val_ret) * 100)
 
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, f"Patrimoine — Projection Retraite {annee_ret}", ln=True)
+    pdf.cell(0, 8, f"Patrimoine - Projection Retraite {annee_ret}", ln=True)
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"  Patrimoine {donnees['annee']} : {total_pat:,.0f}€", ln=True)
-    pdf.cell(0, 6, f"  Objectif retraite 56 ans ({annee_ret}) : {val_ret:,.0f}€", ln=True)
+    pdf.cell(0, 6, _s(f"  Patrimoine {donnees['annee']} : {total_pat:,.0f}EUR"), ln=True)
+    pdf.cell(0, 6, _s(f"  Objectif retraite 56 ans ({annee_ret}) : {val_ret:,.0f}EUR"), ln=True)
     pdf.cell(0, 6, f"  Progression : {pct_ret:.1f}%", ln=True)
 
     pdf.output(str(chemin))

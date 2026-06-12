@@ -36,6 +36,13 @@ def generer_rapport(engine) -> str:
 # PDF — fpdf2
 # ---------------------------------------------------------------------------
 
+def _s(text: str) -> str:
+    return (text.replace("—", "-").replace("–", "-")
+                .replace("€", "EUR").replace("≥", ">=").replace("≤", "<=")
+                .replace("→", "->").replace("•", "*")
+                .encode("latin-1", "replace").decode("latin-1"))
+
+
 def _generer_pdf(chemin: Path, engine) -> None:
     from fpdf import FPDF
     from config import STARTING_CAPITAL, TARGET_CAPITAL, BATTLE_DAYS
@@ -52,9 +59,9 @@ def _generer_pdf(chemin: Path, engine) -> None:
 
     # ── En-tête ──────────────────────────────────────────────────────────────
     pdf.set_font("Helvetica", "B", 18)
-    pdf.cell(0, 10, "KING FUND — Rapport Investisseur", ln=True, align="C")
+    pdf.cell(0, 10, "KING FUND - Rapport Investisseur", ln=True, align="C")
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"Généré le {ts} | Semaine {datetime.now().strftime('W%W-%Y')} | Jour de bataille J{battle_day}/{BATTLE_DAYS}", ln=True, align="C")
+    pdf.cell(0, 6, _s(f"Genere le {ts} | Semaine {datetime.now().strftime('W%W-%Y')} | Jour J{battle_day}/{BATTLE_DAYS}"), ln=True, align="C")
     pdf.ln(6)
 
     # ── KPIs globaux ─────────────────────────────────────────────────────────
@@ -66,8 +73,8 @@ def _generer_pdf(chemin: Path, engine) -> None:
     pdf.set_font("Helvetica", "B", 12)
     pdf.cell(0, 8, "KPIs Globaux", ln=True)
     pdf.set_font("Helvetica", "", 10)
-    pdf.cell(0, 6, f"  NAV totale : {total_nav:,.0f} € | PnL total : {total_pnl:+,.0f} € | Perf moy : {avg_pnl_pct:+.1f}%", ln=True)
-    pdf.cell(0, 6, f"  Gagnants (≥{TARGET_CAPITAL}€) : {winners}/30 | Capital de départ : {STARTING_CAPITAL}€/trader", ln=True)
+    pdf.cell(0, 6, _s(f"  NAV totale : {total_nav:,.0f}EUR | PnL total : {total_pnl:+,.0f}EUR | Perf moy : {avg_pnl_pct:+.1f}%"), ln=True)
+    pdf.cell(0, 6, _s(f"  Gagnants (>={TARGET_CAPITAL}EUR) : {winners}/30 | Capital de depart : {STARTING_CAPITAL}EUR/trader"), ln=True)
     pdf.ln(4)
 
     # ── Top 10 leaderboard ───────────────────────────────────────────────────
@@ -78,26 +85,26 @@ def _generer_pdf(chemin: Path, engine) -> None:
     pdf.cell(20, 6, "TRD", border=1)
     pdf.cell(50, 6, "Nom", border=1)
     pdf.cell(35, 6, "Division", border=1)
-    pdf.cell(30, 6, "Valeur (€)", border=1)
+    pdf.cell(30, 6, "Valeur (EUR)", border=1)
     pdf.cell(25, 6, "PnL %", border=1, ln=True)
     pdf.set_font("Helvetica", "", 9)
     for t in board[:10]:
         pdf.cell(12, 6, str(t["rank"]), border=1)
         pdf.cell(20, 6, f"TRD{t['id']:02d}", border=1)
-        pdf.cell(50, 6, t["name"][:22], border=1)
-        pdf.cell(35, 6, t.get("division", "")[:18], border=1)
+        pdf.cell(50, 6, _s(t["name"][:22]), border=1)
+        pdf.cell(35, 6, _s(t.get("division", "")[:18]), border=1)
         pdf.cell(30, 6, f"{t['value']:,.0f}", border=1)
         pdf.cell(25, 6, f"{t['pnl_pct']:+.1f}%", border=1, ln=True)
     pdf.ln(4)
 
     # ── Top 5 / Bottom 5 ─────────────────────────────────────────────────────
     pdf.set_font("Helvetica", "B", 12)
-    pdf.cell(0, 8, "Sélection naturelle", ln=True)
+    pdf.cell(0, 8, "Selection naturelle", ln=True)
     pdf.set_font("Helvetica", "", 10)
     top5 = post_market.get("top5", [])
     bot5 = post_market.get("bottom5", [])
-    pdf.cell(0, 6, "TOP 5 : " + ", ".join(f"TRD{t['id']:02d}({t['value']:.0f}€)" for t in top5[:5]), ln=True)
-    pdf.cell(0, 6, "BOT 5 : " + ", ".join(f"TRD{t['id']:02d}({t['value']:.0f}€)" for t in bot5[:5]), ln=True)
+    pdf.cell(0, 6, _s("TOP 5 : " + ", ".join(f"TRD{t['id']:02d}({t['value']:.0f}EUR)" for t in top5[:5])), ln=True)
+    pdf.cell(0, 6, _s("BOT 5 : " + ", ".join(f"TRD{t['id']:02d}({t['value']:.0f}EUR)" for t in bot5[:5])), ln=True)
 
     # ── Divisions ─────────────────────────────────────────────────────────────
     pdf.ln(4)
@@ -105,7 +112,7 @@ def _generer_pdf(chemin: Path, engine) -> None:
     pdf.cell(0, 8, "Performance par Division", ln=True)
     pdf.set_font("Helvetica", "", 10)
     for div in post_market.get("divisions_ranked", []):
-        pdf.cell(0, 6, f"  {div['name']} : {div.get('avg_pnl_pct', 0):+.1f}% moy", ln=True)
+        pdf.cell(0, 6, _s(f"  {div['name']} : {div.get('avg_pnl_pct', 0):+.1f}% moy"), ln=True)
 
     pdf.output(str(chemin))
 
