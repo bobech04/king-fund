@@ -2,6 +2,12 @@
 
 Moteur de battle trading autonome. **30 traders IA** partent chacun de **500 €** et visent **10 000 €** en 30 jours — avec un Gérant Délégué (AGD-01), un Comité de Sélection, et un suivi patrimonial complet.
 
+![Dashboard desktop](docs/screenshots/dashboard_desktop.png)
+
+<p align="center">
+  <img src="docs/screenshots/dashboard_mobile.png" alt="Dashboard mobile 375px" width="220"/>
+</p>
+
 ---
 
 ## Démarrage rapide
