@@ -6,7 +6,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_RAPPORTS_DIR = Path(__file__).resolve().parents[3] / "rapports" / "mensuel"
+_RAPPORTS_DIR = Path.home() / "rapports" / "mensuel"
 _AUDIT_FILE   = Path(__file__).resolve().parents[3] / "logs" / "audit_agd01.jsonl"
 
 

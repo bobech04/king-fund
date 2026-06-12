@@ -6,8 +6,8 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-# Dossier de sortie : king-fund/rapports/investisseur/
-_RAPPORTS_DIR = Path(__file__).resolve().parents[3] / "rapports" / "investisseur"
+# Dossier de sortie : ~/rapports/investisseur/ (cohérent avec l'ancienne installation)
+_RAPPORTS_DIR = Path.home() / "rapports" / "investisseur"
 
 
 def generer_rapport(engine) -> str:

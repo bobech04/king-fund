@@ -6,7 +6,7 @@ from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
-_RAPPORTS_DIR = Path(__file__).resolve().parents[3] / "rapports" / "annuel"
+_RAPPORTS_DIR = Path.home() / "rapports" / "annuel"
 
 
 def generer_rapport(engine) -> str:
