@@ -1681,7 +1681,7 @@ if __name__ == "__main__":
         f"• Comité Sélection : chaque soir 23:00\n"
         f"• Actualités : toutes les 30 min\n"
         f"• Veille stratégique RSS : toutes les heures (Bertez/Dalio/Howell/InflationGuy)\n"
-        f"• Alertes prix : VPK.AS<44€ · BIPC<35$ · DNB.OL<280kr · TTE.PA>-5%\n"
+        f"• Alertes prix : VPK.AS&lt;44€ · BIPC&lt;35$ · DNB.OL&lt;280kr · TTE.PA&gt;-5%\n"
         f"• Backup quotidien 04:00 | Watchdog actif\n"
         f"Objectif retraite Zoubida 2041 — 500 000€"
     )
