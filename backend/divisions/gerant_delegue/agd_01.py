@@ -127,6 +127,7 @@ class AgentGerantDelegue:
 
     def _claude(self, prompt: str, max_tokens: int = 600) -> str:
         if self._client is None:
+            logger.warning("[AGD-01] _client is None — Claude non initialisé")
             return "{}"
         try:
             from agents.formation import enrichir_systeme
@@ -289,7 +290,7 @@ class AgentGerantDelegue:
             objectif          = OBJECTIF_RETRAITE_MONTANT,
             annee_retraite    = OBJECTIF_RETRAITE_ANNEE,
         )
-        raw = self._claude(prompt, max_tokens=400)
+        raw = self._claude(prompt, max_tokens=800)
         try:
             import json
             result = json.loads(raw)
