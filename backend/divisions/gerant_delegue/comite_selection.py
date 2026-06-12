@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import sys
 import threading
 import time
@@ -69,6 +70,12 @@ Donne ton vote fiscal en JSON :
   "cerfa_3916_requis": true | false,
   "risque_double_imposition": true | false
 }}"""
+
+_SYSTEM_CIO = """\
+Tu es le CIO du King Fund.
+Spécialité : allocation macro globale, thèse Bertez (WTI/dollar), DSPX dispersion.
+Contraintes : alignement macro obligatoire avant tout BUY, risque géopolitique, régime Howell.
+Réponds en JSON valide uniquement. Pas de texte libre."""
 
 _PROMPT_CIO = """\
 Tu es le CIO du King Fund (allocation macro, thèse Bertez WTI/dollar, DSPX dispersion).
@@ -125,6 +132,13 @@ class ComiteSelection:
         except Exception as e:
             logger.warning("[Comite] Claude non disponible: %s", e)
 
+    @staticmethod
+    def _parse_json_claude(raw: str) -> dict:
+        """Extrait le JSON d'une réponse Claude même si enveloppé en markdown."""
+        cleaned = re.sub(r"^```(?:json)?\s*\n?", "", raw.strip())
+        cleaned = re.sub(r"\n?```\s*$", "", cleaned.strip())
+        return json.loads(cleaned.strip())
+
     def _claude(self, system: str, prompt: str, max_tokens: int = 300) -> dict:
         if self._client is None:
             return {"vote": "ABSTENTION", "motif": "Agent indisponible", "conditions": []}
@@ -141,7 +155,10 @@ class ComiteSelection:
                 messages   = [{"role": "user", "content": prompt}],
             )
             raw = msg.content[0].text.strip()
-            return json.loads(raw)
+            return self._parse_json_claude(raw)
+        except json.JSONDecodeError as e:
+            logger.warning("[Comite] JSON invalide (Claude): %s | raw=%r", e, raw[:200] if 'raw' in dir() else "")
+            return {"vote": "ABSTENTION", "motif": "Réponse non parseable", "conditions": []}
         except Exception as e:
             logger.warning("[Comite] Claude erreur: %s", e)
             return {"vote": "ABSTENTION", "motif": f"Erreur Claude: {e}", "conditions": []}
@@ -151,7 +168,32 @@ class ComiteSelection:
     # ------------------------------------------------------------------
 
     def _vote_research(self, ticker: str, donnees: dict) -> dict:
-        score  = donnees.get("score_final") or donnees.get("score_pipeline") or 0
+        # Cherche dans plusieurs clés possibles (watchlist retourne "score" sur 0-100)
+        score_raw = (
+            donnees.get("score_final")
+            or donnees.get("score_pipeline")
+            or donnees.get("score")
+            or donnees.get("score_graham")
+            or 0
+        )
+        # Normalise : si > 10 c'est l'échelle 0-100, on ramène sur 0-10
+        if isinstance(score_raw, (int, float)) and score_raw > 10:
+            score = round(score_raw / 10.0, 2)
+        else:
+            score = float(score_raw or 0)
+
+        # Fallback : appel direct au pipeline si score toujours nul
+        if score == 0:
+            try:
+                from divisions.investissement.pipeline import get_pipeline
+                res = get_pipeline().analyser_titre(ticker)
+                s = res.get("score", 0)
+                score = round(s / 10.0, 2) if s > 10 else float(s or 0)
+                donnees = {**donnees, **res}
+                logger.debug("[Comite] Research fallback pipeline %s → score %.2f", ticker, score)
+            except Exception as _pe:
+                logger.debug("[Comite] Fallback pipeline indisponible: %s", _pe)
+
         signal = donnees.get("signal", "N/A")
         marge  = donnees.get("marge_securite_analyste") or donnees.get("marge_securite_dcf") or 0
 
@@ -231,7 +273,7 @@ class ComiteSelection:
             pays           = donnees.get("pays", "N/A"),
         )
 
-        result = self._claude(_PROMPT_CIO, prompt, max_tokens=300)
+        result = self._claude(_SYSTEM_CIO, prompt, max_tokens=300)
         return {"votant": "CIO", **result}
 
     # ------------------------------------------------------------------
