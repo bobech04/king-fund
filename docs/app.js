@@ -799,7 +799,7 @@ function renderFiscalite(d) {
 async function loadIntelligence(silent = false) {
   if (intelligenceLoaded && !silent) return;
   try {
-    const [actuRes, dspxRes, corrRes, wlRes, comiteRes, screenerRes, seuilsRes, calRes, alphaRes, veilleRes, auditRes, predRes] = await Promise.allSettled([
+    const [actuRes, dspxRes, corrRes, wlRes, comiteRes, screenerRes, seuilsRes, calRes, alphaRes, veilleRes, auditRes, predRes, agdDecRes] = await Promise.allSettled([
       fetch(API+'/actualites').then(r => r.json()),
       fetch(API+'/dspx/etat').then(r => r.json()),
       fetch(API+'/correlations/actoblig').then(r => r.json()),
@@ -812,6 +812,7 @@ async function loadIntelligence(silent = false) {
       fetch(API+'/veille-strategique').then(r => r.json()),
       fetch(API+'/agd/audit?limit=20').then(r => r.json()),
       fetch(API+'/signaux/predictivite').then(r => r.json()),
+      fetch(API+'/comite-selection/decisions-agd').then(r => r.json()),
     ]);
     intelligenceLoaded = true;
     renderIntelligence(
@@ -827,13 +828,14 @@ async function loadIntelligence(silent = false) {
       veilleRes.status==='fulfilled'  ? veilleRes.value  : null,
       auditRes.status==='fulfilled'   ? auditRes.value   : null,
       predRes.status==='fulfilled'    ? predRes.value    : null,
+      agdDecRes.status==='fulfilled'  ? agdDecRes.value  : null,
     );
   } catch {
     if (!silent) qs('#intelligence-wrap').innerHTML = '<div class="error-state">Erreur Intelligence.</div>';
   }
 }
 
-function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, calData, alphalab, veilleData, auditData, predData) {
+function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, calData, alphalab, veilleData, auditData, predData, agdDecisions) {
   const articles  = (actu?.articles || []).slice(0,10);
   const watchlist = wl?.watchlist || [];
   const nbBuy  = watchlist.filter(a => a.signal==='BUY').length;
@@ -1264,6 +1266,64 @@ function renderIntelligence(actu, dspx, corr, wl, comite, screener, seuilsData, 
         s += '</tbody></table>';
       } else {
         s += '<div class="empty-state" style="font-size:.52rem">Historique vide — les prédictions s\'accumulent chaque jour</div>';
+      }
+      s += '</div>';
+      return s;
+    })() +
+
+    // ── Décisions AGD — Table decisions_agd ──────────────────────────────────
+    (() => {
+      const rows = Array.isArray(agdDecisions) ? agdDecisions : [];
+      let s = '<div class="intel-card">';
+      s += '<div class="intel-card-title">🗳️ Décisions AGD — Comité Sélection <span class="badge badge-neutral">' + rows.length + '</span></div>';
+      if (!rows.length) {
+        s += '<div class="empty-state">Aucune décision enregistrée — lancez un vote pour commencer</div>';
+      } else {
+        s += '<div style="overflow-x:auto">';
+        s += '<table style="width:100%;border-collapse:collapse;font-size:.5rem">';
+        s += '<thead><tr style="color:var(--muted);border-bottom:1px solid rgba(255,255,255,.1)">';
+        ['Date', 'Ticker', 'GO/NO-GO', 'Décision', 'Research', 'CIO', 'Fiscaliste', 'Conditions'].forEach(h => {
+          s += '<th style="text-align:left;padding:3px 5px;white-space:nowrap">' + h + '</th>';
+        });
+        s += '</tr></thead><tbody>';
+        rows.forEach(r => {
+          const isGo = r.go_nogo === 'GO';
+          const goBg = isGo ? '#00e5a0' : '#ff4444';
+          const goFg = '#000';
+          const decCol = r.decision === 'BUY CONFIRMÉ' ? 'var(--green)' :
+                         r.decision === 'BUY CONDITIONNEL' ? 'var(--accent)' :
+                         r.decision === 'VETO' ? 'var(--red)' : 'var(--muted)';
+          const voteIcon = v => v === 'OUI' ? '✅' : v === 'NON' ? '❌' : '⚪';
+          const ts = (r.ts || '').slice(0, 16).replace('T', ' ');
+          const conds = Array.isArray(r.conditions) && r.conditions.length
+            ? r.conditions.slice(0,2).join(' / ')
+            : '—';
+          s += '<tr style="border-top:1px solid rgba(255,255,255,.05)">';
+          s += '<td style="padding:3px 5px;white-space:nowrap;color:var(--muted)">' + ts + '</td>';
+          s += '<td style="padding:3px 5px;font-weight:700;color:var(--accent)">' + escHtml(r.ticker || '') + '</td>';
+          s += '<td style="padding:3px 5px"><span style="font-size:.52rem;font-weight:700;padding:2px 7px;border-radius:4px;background:' + goBg + ';color:' + goFg + '">' + (r.go_nogo || '?') + '</span></td>';
+          s += '<td style="padding:3px 5px;color:' + decCol + ';font-weight:600">' + escHtml(r.decision || '') + '</td>';
+          s += '<td style="padding:3px 5px;text-align:center">' + voteIcon(r.vote_research) + ' <span style="color:var(--muted)">' + escHtml((r.motif_research||'').slice(0,50)) + '</span></td>';
+          s += '<td style="padding:3px 5px;text-align:center">' + voteIcon(r.vote_cio) + ' <span style="color:var(--muted)">' + escHtml((r.motif_cio||'').slice(0,50)) + '</span></td>';
+          s += '<td style="padding:3px 5px;text-align:center">' + voteIcon(r.vote_fiscaliste) + ' <span style="color:var(--muted)">' + escHtml((r.motif_fiscaliste||'').slice(0,50)) + '</span></td>';
+          s += '<td style="padding:3px 5px;color:var(--muted);font-style:italic">' + escHtml(conds) + '</td>';
+          s += '</tr>';
+          // Ligne détail trading (prix_entree, frais, montant_investi, sizing, quantite, restant)
+          if (r.prix_entree != null || r.montant_investi != null) {
+            const fmtE = v => v != null ? v.toFixed(2) + '€' : '—';
+            s += '<tr style="background:rgba(255,255,255,.02)">';
+            s += '<td colspan="8" style="padding:2px 5px 4px 18px;font-size:.46rem;color:var(--muted)">';
+            s += '↳ Prix entrée: <b style="color:var(--accent)">' + fmtE(r.prix_entree) + '</b>';
+            s += ' · Qté: <b>' + (r.quantite != null ? r.quantite : '—') + '</b>';
+            s += ' · Frais: ' + fmtE(r.frais);
+            s += ' · <b>Investi: ' + fmtE(r.montant_investi) + '</b>';
+            s += ' · Sizing: ' + fmtE(r.sizing_autorise);
+            s += ' · Restant: <b style="color:var(--green)">' + fmtE(r.cash_restant_sizing) + '</b>';
+            s += '</td></tr>';
+          }
+        });
+        s += '</tbody></table>';
+        s += '</div>';
       }
       s += '</div>';
       return s;
