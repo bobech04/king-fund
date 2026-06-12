@@ -1319,6 +1319,7 @@ _scheduler.add_job(
     CronTrigger(day_of_week="mon", hour=9, minute=0),
     id="rapport_investisseur",
     replace_existing=True,
+    misfire_grace_time=600,
 )
 
 
@@ -1349,6 +1350,7 @@ _scheduler.add_job(
     CronTrigger(day_of_week="mon", hour=8, minute=0),
     id="rapport_agd_lundi",
     replace_existing=True,
+    misfire_grace_time=600,
 )
 
 
@@ -1374,6 +1376,7 @@ _scheduler.add_job(
     CronTrigger(hour=23, minute=0),
     id="comite_selection_nightly",
     replace_existing=True,
+    misfire_grace_time=600,
 )
 
 
@@ -1457,6 +1460,7 @@ _scheduler.add_job(
     CronTrigger(day=1, hour=7, minute=0),
     id="alpha_lab_mensuel",
     replace_existing=True,
+    misfire_grace_time=600,
 )
 
 
@@ -1494,6 +1498,7 @@ _scheduler.add_job(
     CronTrigger(hour=4, minute=0),
     id="backup_quotidien",
     replace_existing=True,
+    misfire_grace_time=600,
 )
 
 
@@ -1533,6 +1538,7 @@ _scheduler.add_job(
     CronTrigger(day=1, hour=7, minute=30),
     id="rapport_mensuel",
     replace_existing=True,
+    misfire_grace_time=600,
 )
 
 
@@ -1553,6 +1559,7 @@ _scheduler.add_job(
     CronTrigger(month=12, day=31, hour=18, minute=0),
     id="rapport_annuel",
     replace_existing=True,
+    misfire_grace_time=600,
 )
 
 
@@ -1636,6 +1643,16 @@ _scheduler.add_job(
 # ---------------------------------------------------------------------------
 
 def _on_shutdown(msg: str = "arrêt normal") -> None:
+    try:
+        _scheduler.shutdown(wait=False)
+        logger.info("[SHUTDOWN] APScheduler arrêté proprement")
+    except Exception:
+        pass
+    try:
+        engine.stop()
+        logger.info("[SHUTDOWN] TradingEngine arrêté proprement")
+    except Exception:
+        pass
     _send_telegram(
         f"🔴 <b>King Fund — Serveur arrêté</b>\n"
         f"Motif : {msg}\n"
