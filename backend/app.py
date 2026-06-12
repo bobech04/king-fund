@@ -421,10 +421,26 @@ def delete_pru_position(ticker):
     return jsonify({"status": "ok" if ok else "not_found"})
 
 
+@app.route("/api/rapports/investisseur/dernier")
+def get_rapport_investisseur_dernier():
+    from pathlib import Path
+    rep_dir = Path.home() / "rapports" / "investisseur"
+    try:
+        fichiers = sorted(rep_dir.glob("rapport_*.pdf"), key=lambda f: f.stat().st_mtime, reverse=True)
+        if not fichiers:
+            fichiers = sorted(rep_dir.glob("rapport_*.json"), key=lambda f: f.stat().st_mtime, reverse=True)
+        if not fichiers:
+            return jsonify({"erreur": "Aucun rapport investisseur généré"}), 404
+        f = fichiers[0]
+        return jsonify({"chemin_pdf": str(f), "nom": f.name, "taille_ko": round(f.stat().st_size / 1024, 1), "ts": datetime.fromtimestamp(f.stat().st_mtime).isoformat()})
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
 @app.route("/api/rapports/mensuel/dernier")
 def get_rapport_mensuel_dernier():
     from pathlib import Path
-    rep_dir = Path(__file__).parent.parent / "rapports" / "mensuel"
+    rep_dir = Path.home() / "rapports" / "mensuel"
     try:
         fichiers = sorted(rep_dir.glob("rapport_mensuel_*.pdf"), key=lambda f: f.stat().st_mtime, reverse=True)
         if not fichiers:
@@ -451,7 +467,7 @@ def post_rapport_mensuel_generer():
 @app.route("/api/rapports/annuel/dernier")
 def get_rapport_annuel_dernier():
     from pathlib import Path
-    rep_dir = Path(__file__).parent.parent / "rapports" / "annuel"
+    rep_dir = Path.home() / "rapports" / "annuel"
     try:
         fichiers = sorted(rep_dir.glob("rapport_annuel_*.pdf"), key=lambda f: f.stat().st_mtime, reverse=True)
         if not fichiers:
