@@ -65,6 +65,11 @@ def _total_eur(actifs: list[dict]) -> float:
     return round(sum(a["valeur_eur"] for a in actifs), 2)
 
 
+def _total_investissable(actifs: list[dict]) -> float:
+    """Somme uniquement les actifs investissables (investissable != False)."""
+    return round(sum(a["valeur_eur"] for a in actifs if a.get("investissable", True)), 2)
+
+
 def _projection(
     patrimoine: float,
     apport_mensuel: float,
@@ -253,29 +258,35 @@ def get_patrimoine() -> dict:
     actifs = data.get("actifs", _DEFAULTS["actifs"])
     apports = data.get("apports", [])
 
-    total = _total_eur(actifs)
+    total     = _total_eur(actifs)
+    total_inv = _total_investissable(actifs)
+    # Actifs hors fonds (investissable = false)
+    reserves  = [a for a in actifs if not a.get("investissable", True)]
+
     annees_horizon = cfg["age_retraite"] - cfg["age_actuel"]
 
     # Apport mensuel effectif = dernier apport mensuel ou valeur config
     apport_mensuel = cfg.get("apport_mensuel", 500.0)
     if apports:
-        # Moyenne des 3 derniers apports
         recents = sorted(apports, key=lambda x: x.get("date", ""))[-3:]
         apport_mensuel = sum(a.get("montant", 0) for a in recents) / len(recents)
 
-    projection = _projection(total, apport_mensuel, cfg["taux_annuel"], max(0, annees_horizon))
+    # Projection basée uniquement sur la base investissable
+    projection = _projection(total_inv, apport_mensuel, cfg["taux_annuel"], max(0, annees_horizon))
 
     return {
-        "actifs":         actifs,
-        "total_eur":      total,
-        "apports":        list(reversed(sorted(apports, key=lambda x: x.get("date", "")))),
-        "apports_cumules_12m": _apports_12m(apports),
-        "config":         cfg,
-        "projection":     projection,
-        "valeur_retraite": projection[-1]["valeur"] if projection else 0,
-        "apport_mensuel_effectif": round(apport_mensuel, 2),
-        "fiscalite":      _fiscalite(actifs),
-        "timestamp":      datetime.utcnow().isoformat(),
+        "actifs":                   actifs,
+        "total_eur":                total,
+        "total_investissable":      total_inv,
+        "reserves":                 reserves,
+        "apports":                  list(reversed(sorted(apports, key=lambda x: x.get("date", "")))),
+        "apports_cumules_12m":      _apports_12m(apports),
+        "config":                   cfg,
+        "projection":               projection,
+        "valeur_retraite":          projection[-1]["valeur"] if projection else 0,
+        "apport_mensuel_effectif":  round(apport_mensuel, 2),
+        "fiscalite":                _fiscalite(actifs),
+        "timestamp":                datetime.utcnow().isoformat(),
     }
 
 

@@ -132,7 +132,7 @@ def _generer_narrative(donnees: dict) -> str:
 
         cfg_ret = donnees.get("patrimoine", {}).get("config", {})
         val_ret = donnees.get("patrimoine", {}).get("valeur_retraite", 0)
-        total_pat = donnees.get("patrimoine", {}).get("total_eur", 0)
+        total_pat = donnees.get("patrimoine", {}).get("total_investissable", donnees.get("patrimoine", {}).get("total_eur", 0))
         annee_ret = (cfg_ret.get("annee_base", 2026) +
                      (cfg_ret.get("age_retraite", 56) - cfg_ret.get("age_actuel", 35)))
 
@@ -284,7 +284,7 @@ def _generer_pdf(chemin: Path, donnees: dict, narrative: str) -> None:
     pat = donnees.get("patrimoine", {})
     cfg_ret = pat.get("config", {})
     val_ret = pat.get("valeur_retraite", 0)
-    total_pat = pat.get("total_eur", 0)
+    total_pat = pat.get("total_investissable", pat.get("total_eur", 0))
     annee_ret = (cfg_ret.get("annee_base", 2026) +
                  (cfg_ret.get("age_retraite", 56) - cfg_ret.get("age_actuel", 35)))
     pct_ret = min(100, total_pat / max(1, val_ret) * 100)
