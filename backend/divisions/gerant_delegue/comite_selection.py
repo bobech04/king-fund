@@ -61,14 +61,14 @@ Contexte portefeuille Zoubida :
   - Objectif retraite 56 ans (2041), 500 000€ cible
   - DZD épargne 17 000€ — rapatriement partiel prévu
 
-Donne ton vote fiscal en JSON :
+Donne ton vote fiscal en JSON strict (une seule valeur par champ, pas d'objet imbriqué) :
 {{
-  "vote": "OUI" | "NON" | "ABSTENTION",
+  "vote": "OUI",
   "motif": "raison fiscale principale (max 60 mots)",
-  "impact_flat_tax_annuel": euros_estimés,
-  "conditions": ["condition 1 si applicable", ...],
-  "cerfa_3916_requis": true | false,
-  "risque_double_imposition": true | false
+  "impact_flat_tax_annuel": 12.5,
+  "conditions": ["condition 1 si applicable"],
+  "cerfa_3916_requis": false,
+  "risque_double_imposition": false
 }}"""
 
 _SYSTEM_CIO = """\
@@ -134,10 +134,19 @@ class ComiteSelection:
 
     @staticmethod
     def _parse_json_claude(raw: str) -> dict:
-        """Extrait le JSON d'une réponse Claude même si enveloppé en markdown."""
+        """Extrait le JSON d'une réponse Claude même si enveloppé en markdown ou en texte libre."""
+        # 1. Strip balises markdown ```json...```
         cleaned = re.sub(r"^```(?:json)?\s*\n?", "", raw.strip())
         cleaned = re.sub(r"\n?```\s*$", "", cleaned.strip())
-        return json.loads(cleaned.strip())
+        try:
+            return json.loads(cleaned.strip())
+        except json.JSONDecodeError:
+            pass
+        # 2. Extraire le premier bloc {...} complet dans la réponse
+        match = re.search(r"\{[\s\S]*\}", raw)
+        if match:
+            return json.loads(match.group(0))
+        raise json.JSONDecodeError("Aucun JSON trouvé", raw, 0)
 
     def _claude(self, system: str, prompt: str, max_tokens: int = 300) -> dict:
         if self._client is None:
@@ -273,7 +282,7 @@ class ComiteSelection:
             pays           = donnees.get("pays", "N/A"),
         )
 
-        result = self._claude(_SYSTEM_CIO, prompt, max_tokens=300)
+        result = self._claude(_SYSTEM_CIO, prompt, max_tokens=500)
         return {"votant": "CIO", **result}
 
     # ------------------------------------------------------------------
@@ -290,7 +299,7 @@ class ComiteSelection:
             pays        = donnees.get("pays", "France"),
             score       = donnees.get("score_final", "N/A"),
         )
-        result = self._claude(_SYSTEM_FISCALISTE, prompt, max_tokens=300)
+        result = self._claude(_SYSTEM_FISCALISTE, prompt, max_tokens=500)
         return {"votant": "Fiscaliste", **result}
 
     # ------------------------------------------------------------------
