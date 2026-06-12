@@ -8,11 +8,17 @@
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/dashboard_mobile.png" alt="Dashboard mobile" width="220"/>
-  &nbsp;&nbsp;&nbsp;
-  <img src="docs/screenshots/tab_brief.png" alt="Morning Brief" width="220"/>
-  &nbsp;&nbsp;&nbsp;
-  <img src="docs/screenshots/tab_intelligence.png" alt="Intelligence AGD-01" width="220"/>
+  <img src="docs/screenshots/dashboard_desktop.png" alt="Dashboard desktop — onglet Bord" width="580"/>
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/dashboard_mobile.png" alt="Dashboard mobile 375px" width="180"/>
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/tab_brief.png" alt="Morning Brief 06h30" width="260"/>
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/tab_intelligence.png" alt="Intelligence — AGD-01 & Comité" width="260"/>
+  &nbsp;&nbsp;
+  <img src="docs/screenshots/tab_marches.png" alt="Marchés — indices & banques centrales" width="260"/>
 </p>
 
 ---
@@ -171,9 +177,9 @@ Verdict : **3/3 BUY CONFIRMÉ** → alerte Telegram critique | **2/3 BUY CONDITI
 ## Dashboard — 10 onglets
 
 <p align="center">
-  <img src="docs/screenshots/tab_croissance.png" alt="Onglet Croissance" width="380"/>
+  <img src="docs/screenshots/tab_croissance.png" alt="Onglet Croissance — classement 30 traders" width="380"/>
   &nbsp;&nbsp;
-  <img src="docs/screenshots/tab_marches.png" alt="Onglet Marchés" width="380"/>
+  <img src="docs/screenshots/tab_retraite.png" alt="Onglet Retraite — projection 2041 & PRU" width="380"/>
 </p>
 
 | Onglet | Contenu principal |
@@ -189,9 +195,6 @@ Verdict : **3/3 BUY CONFIRMÉ** → alerte Telegram critique | **2/3 BUY CONDITI
 | 💧 **Liquidité** | Score liquidité Howell, 7 agents desk, budget factor [0.50 – 1.50] |
 | 🌅 **Brief** | Morning Brief 06h30 — direction marché, confiance, indices Asie, CB |
 
-<p align="center">
-  <img src="docs/screenshots/tab_retraite.png" alt="Onglet Retraite" width="500"/>
-</p>
 
 ---
 
