@@ -109,6 +109,7 @@ class AgentGerantDelegue:
         self._howell_cache: dict = {}
         self._howell_ts: float  = 0.0
         self._dernier_rapport:  str = ""
+        self._claude_down_alerted_at: float = 0.0  # anti-spam : 1 alerte/heure max
         self._init_claude()
 
     # ------------------------------------------------------------------
@@ -125,9 +126,27 @@ class AgentGerantDelegue:
         except Exception as e:
             logger.warning("[AGD-01] Claude non disponible: %s", e)
 
+    def _claude_unavailable_alert(self, reason: str) -> None:
+        """Envoie une alerte Telegram si Claude est down, au plus 1 fois par heure."""
+        now = time.time()
+        if now - self._claude_down_alerted_at < 3600:
+            return
+        self._claude_down_alerted_at = now
+        try:
+            alerte(
+                "AGD-01 HORS LIGNE",
+                f"⚠️ Claude Opus indisponible — les évaluations VETO sont suspendues.\n"
+                f"Raison : {reason}\n"
+                f"Les décisions ne sont PAS analysées tant que l'API est inaccessible.",
+                niveau="warning",
+            )
+        except Exception:
+            pass
+
     def _claude(self, prompt: str, max_tokens: int = 600) -> str:
         if self._client is None:
             logger.warning("[AGD-01] _client is None — Claude non initialisé")
+            self._claude_unavailable_alert("ANTHROPIC_API_KEY absent ou invalide")
             return "{}"
         try:
             from agents.formation import enrichir_systeme
@@ -144,6 +163,7 @@ class AgentGerantDelegue:
             return msg.content[0].text.strip()
         except Exception as e:
             logger.warning("[AGD-01] Erreur Claude: %s", e)
+            self._claude_unavailable_alert(str(e)[:120])
             return "{}"
 
     # ------------------------------------------------------------------
@@ -295,8 +315,9 @@ class AgentGerantDelegue:
             import json
             result = json.loads(raw)
         except Exception:
-            result = {"decision": "VALIDE", "raison": "Analyse indisponible", "confiance": 0.5,
-                      "recommandation": "", "regles_violees": []}
+            result = {"decision": "VALIDE", "raison": "⚠️ AGD-01 hors ligne — décision non analysée (Claude indisponible)",
+                      "confiance": 0.0, "recommandation": "Vérifier la disponibilité de l'API Anthropic avant d'agir.",
+                      "regles_violees": ["API_INDISPONIBLE"]}
 
         if result.get("decision") == "VETO":
             alerte(
