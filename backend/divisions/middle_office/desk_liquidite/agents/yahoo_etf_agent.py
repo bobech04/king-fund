@@ -10,7 +10,7 @@ class YahooETFAgent:
     name = "Yahoo_ETF"
 
     async def _fetch_etf(self, symbol: str) -> dict[str, Any]:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self._get_etf_data, symbol)
 
     def _get_etf_data(self, symbol: str) -> dict[str, Any]:

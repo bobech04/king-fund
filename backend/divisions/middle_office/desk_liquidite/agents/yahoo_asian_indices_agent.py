@@ -18,7 +18,7 @@ class YahooAsianIndicesAgent:
     name = "Yahoo_Asian"
 
     async def _fetch_index(self, symbol: str) -> dict[str, Any]:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self._get_info, symbol)
 
     def _get_info(self, symbol: str) -> dict[str, Any]:

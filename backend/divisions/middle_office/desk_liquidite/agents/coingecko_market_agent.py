@@ -45,7 +45,7 @@ class CoinGeckoMarketAgent:
         return resp.json().get("data", {})
 
     async def run(self) -> dict[str, Any]:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         try:
             market_raw, global_data = await asyncio.gather(
                 loop.run_in_executor(None, self._fetch_market_data),

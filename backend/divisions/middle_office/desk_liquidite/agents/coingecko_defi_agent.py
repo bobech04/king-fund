@@ -45,7 +45,7 @@ class CoinGeckoDeFiAgent:
         return resp.json().get("data", {})
 
     async def run(self) -> dict[str, Any]:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         try:
             tokens_raw, defi_global = await asyncio.gather(
                 loop.run_in_executor(None, self._fetch_defi_tokens),

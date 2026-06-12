@@ -10,7 +10,7 @@ class YahooEquityAgent:
     name = "Yahoo_Equity"
 
     async def _fetch_ticker(self, symbol: str) -> dict[str, Any]:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self._get_info, symbol)
 
     def _get_info(self, symbol: str) -> dict[str, Any]:

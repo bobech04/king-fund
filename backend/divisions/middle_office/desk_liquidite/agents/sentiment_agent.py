@@ -19,7 +19,7 @@ class SentimentAgent:
         self._gn_key = GLASSNODE_API_KEY
 
     async def run(self) -> dict[str, Any]:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         st_data, gn_data = await asyncio.gather(
             loop.run_in_executor(None, self._fetch_stocktwits),
             loop.run_in_executor(None, self._fetch_glassnode),

@@ -10,7 +10,7 @@ class YahooForexAgent:
     name = "Yahoo_Forex"
 
     async def _fetch_pair(self, symbol: str) -> dict[str, Any]:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         return await loop.run_in_executor(None, self._get_fx_data, symbol)
 
     def _get_fx_data(self, symbol: str) -> dict[str, Any]:

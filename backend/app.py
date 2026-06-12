@@ -312,7 +312,6 @@ def get_patrimoine():
 @app.route("/api/patrimoine/apport", methods=["POST"])
 def add_patrimoine_apport():
     from data.patrimoine import add_apport
-    from flask import request
     body = request.get_json(silent=True) or {}
     try:
         montant = float(body.get("montant", 0))
@@ -329,7 +328,6 @@ def add_patrimoine_apport():
 @app.route("/api/patrimoine/config", methods=["POST"])
 def update_patrimoine_config():
     from data.patrimoine import update_config
-    from flask import request
     body = request.get_json(silent=True) or {}
     try:
         cfg = update_config(
@@ -356,7 +354,6 @@ def get_positions_pru():
 @app.route("/api/patrimoine/positions-pru/transaction", methods=["POST"])
 def add_pru_transaction():
     from data.suivi_pru import ajouter_transaction
-    from flask import request
     body = request.get_json(silent=True) or {}
     try:
         tx = ajouter_transaction(
@@ -379,7 +376,6 @@ def add_pru_transaction():
 @app.route("/api/patrimoine/positions-pru/config", methods=["POST"])
 def config_pru_position():
     from data.suivi_pru import configurer_position
-    from flask import request
     body = request.get_json(silent=True) or {}
     try:
         pos = configurer_position(
@@ -479,7 +475,6 @@ def get_gouvernance_etat():
 
 @app.route("/api/gouvernance/log")
 def get_gouvernance_log():
-    from flask import request
     limit = int(request.args.get("limit", 50))
     try:
         from divisions.gouvernance.gouvernance import get_gouvernance_engine
@@ -500,7 +495,6 @@ def valider_action(vid):
 
 @app.route("/api/gouvernance/validation/<vid>/rejeter", methods=["POST"])
 def rejeter_action(vid):
-    from flask import request
     body = request.get_json(silent=True) or {}
     try:
         from divisions.gouvernance.autonomie import get_autonomie_manager
@@ -521,7 +515,6 @@ def get_autonomie_etat():
 
 @app.route("/api/gouvernance/autonomie/log")
 def get_autonomie_log():
-    from flask import request
     limit = int(request.args.get("limit", 50))
     try:
         from divisions.gouvernance.autonomie import get_autonomie_manager
@@ -541,7 +534,6 @@ def get_mode_trading_etat():
 
 @app.route("/api/gouvernance/mode/basculer-reel", methods=["POST"])
 def demander_mode_reel():
-    from flask import request
     body = request.get_json(silent=True) or {}
     try:
         capital = float(body.get("capital", 0))
@@ -597,7 +589,6 @@ def get_config_user():
 
 @app.route("/api/config-user", methods=["POST"])
 def post_config_user():
-    from flask import request
     body = request.get_json(silent=True) or {}
     try:
         from data.config_user import update_config, update_config_bulk
@@ -1075,8 +1066,7 @@ def get_maintenance_health():
 def get_alpha_lab_rapport():
     """Rapport complet Alpha Lab : signaux backtestés + scores facteurs watchlist."""
     try:
-        from flask import request as _req
-        force = _req.args.get("force", "0") == "1"
+        force = request.args.get("force", "0") == "1"
         from divisions.alpha_lab.valide_signaux import generer_rapport
         from divisions.alpha_lab.agent_facteurs import get_agent_facteurs
         rapport_signaux = generer_rapport(force=force)
@@ -1110,7 +1100,6 @@ def get_agd_howell():
 
 @app.route("/api/gerant-delegue/evaluer-decision", methods=["POST"])
 def post_agd_evaluer():
-    from flask import request
     body = request.get_json(silent=True) or {}
     try:
         from divisions.gerant_delegue import get_gerant_delegue
@@ -1129,7 +1118,6 @@ def post_agd_evaluer():
 
 @app.route("/api/gerant-delegue/rapport-lundi", methods=["POST"])
 def post_agd_rapport():
-    from flask import request
     body = request.get_json(silent=True) or {}
     try:
         from divisions.gerant_delegue import get_gerant_delegue
@@ -1168,9 +1156,8 @@ def get_actualites_critiques():
 @app.route("/api/veille-strategique")
 def get_veille_strategique():
     try:
-        from flask import request as _req
         from divisions.gerant_delegue.agent_veille_strategique import get_agent_veille
-        force = _req.args.get("force", "0") == "1"
+        force = request.args.get("force", "0") == "1"
         agent = get_agent_veille()
         articles = agent.analyser(forcer=force)
         return jsonify({
@@ -1228,7 +1215,6 @@ def get_benchmark():
 
 @app.route("/api/comite-selection/voter", methods=["POST"])
 def post_comite_voter():
-    from flask import request
     body = request.get_json(silent=True) or {}
     ticker = body.get("ticker", "")
     if not ticker:

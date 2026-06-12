@@ -41,7 +41,7 @@ class FREDMacroAgent:
         }
 
     async def run(self) -> dict[str, Any]:
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         results = {}
         for name, series_id in FRED_SERIES.items():
             try:
