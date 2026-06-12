@@ -138,6 +138,10 @@ class AutonomieManager:
     def confirmer(self, validation_id: str) -> bool:
         with self._lock:
             entry = self._pending.get(validation_id)
+            if not entry:
+                # Recharge depuis le disque (peut avoir été écrit par un autre process)
+                self._charger_pending()
+                entry = self._pending.get(validation_id)
             if not entry or entry["statut"] != PENDING:
                 return False
             entry["statut"] = VALIDEE
@@ -160,6 +164,9 @@ class AutonomieManager:
     def rejeter(self, validation_id: str, raison: str = "") -> bool:
         with self._lock:
             entry = self._pending.get(validation_id)
+            if not entry:
+                self._charger_pending()
+                entry = self._pending.get(validation_id)
             if not entry or entry["statut"] != PENDING:
                 return False
             entry["statut"] = REJETEE
@@ -289,6 +296,7 @@ class AutonomieManager:
 
     def get_etat(self) -> dict:
         with self._lock:
+            self._charger_pending()   # sync depuis le disque à chaque lecture
             pending = [e for e in self._pending.values() if e["statut"] == PENDING]
             pouvoirs = self._pouvoirs_etendus
 
