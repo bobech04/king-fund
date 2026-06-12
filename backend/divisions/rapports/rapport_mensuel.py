@@ -60,8 +60,9 @@ def _collecter_donnees(engine) -> dict:
     except Exception as e:
         logger.debug("Benchmark: %s", e)
 
-    alpha_cac = benchmark.get("alpha_vs_cac40")
-    alpha_sp  = benchmark.get("alpha_vs_sp500")
+    _alpha    = benchmark.get("alpha_reel", {})
+    alpha_cac = _alpha.get("CAC40")
+    alpha_sp  = _alpha.get("SP500")
 
     # ── AGD-01 audit — décisions du mois ─────────────────────────────────────
     decisions_agd = []
