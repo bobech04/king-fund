@@ -1694,5 +1694,6 @@ if __name__ == "__main__":
         f"• Backup quotidien 04:00 | Watchdog actif\n"
         f"Objectif retraite Zoubida 2041 — 500 000€"
     )
+    # Dev/Windows uniquement — sur RPi utiliser gunicorn via systemd (voir install_raspberry.sh)
     logger.info("Server starting on http://0.0.0.0:5000")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)

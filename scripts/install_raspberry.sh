@@ -167,7 +167,13 @@ Type=simple
 User=${SERVICE_USER}
 Group=${SERVICE_USER}
 WorkingDirectory=${KINGFUND_DIR}/backend
-ExecStart=${VENV_DIR}/bin/python app.py
+ExecStart=${VENV_DIR}/bin/gunicorn \
+    -k geventwebsocket.gunicorn.workers.GeventWebSocketWorker \
+    -w 1 \
+    --bind 0.0.0.0:5000 \
+    --timeout 120 \
+    --keep-alive 5 \
+    app:app
 EnvironmentFile=${ENV_FILE}
 Restart=always
 RestartSec=10
