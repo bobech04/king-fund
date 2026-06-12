@@ -112,6 +112,7 @@ class TradingEngine:
         self._last_eod_date = None            # détection changement de journée
         self._selection_multipliers: dict = {}  # trader.id → multiplicateur sélection naturelle
         self._eliminated_ids: set = set()       # IDs des traders éliminés au J15
+        self._orphan_symbols: set = set()       # symboles en position mais hors SYMBOLS feed
         from data.expert_signal_client import get_expert_signal_client
         self._expert_signals = get_expert_signal_client()
         self._init_db()
@@ -237,8 +238,86 @@ class TradingEngine:
         self._traders = loaded
         logger.info(f"Loaded {len(self._traders)} traders")
         self._restore_trader_states()
+        self._orphan_symbols = self._collect_orphan_symbols()
         self._update_sitg_budgets()
         self._preload_histories()
+
+    def _collect_orphan_symbols(self) -> set:
+        """Retourne les symboles détenus en position mais absents du feed SYMBOLS."""
+        known = set(SYMBOLS)
+        orphans = set()
+        for trader in self._traders:
+            for sym, qty in trader.portfolio.positions.items():
+                if abs(qty) > 1e-9 and sym not in known:
+                    orphans.add(sym)
+        if orphans:
+            logger.warning(
+                "[ORPHAN] %d symbole(s) hors-feed détecté(s) dans les positions : %s",
+                len(orphans), sorted(orphans),
+            )
+        return orphans
+
+    def _liquidate_orphan_positions(self, prices: dict) -> None:
+        """Force-vend toutes les positions dans des symboles orphelins (hors SYMBOLS).
+
+        Appelé une seule fois au premier tick de run() après que MarketData a
+        été étendu pour inclure ces symboles — les prix sont donc disponibles.
+        """
+        if not self._orphan_symbols:
+            return
+
+        now = datetime.utcnow().isoformat()
+        nav_before = sum(t.portfolio.value(prices) for t in self._traders)
+        liquidated = 0
+        still_missing: set = set()
+
+        def _do_liquidate(conn):
+            nonlocal liquidated
+            for trader in self._traders:
+                for sym in list(trader.portfolio.positions.keys()):
+                    if sym not in self._orphan_symbols:
+                        continue
+                    qty = trader.portfolio.positions[sym]
+                    if abs(qty) < 1e-9:
+                        trader.portfolio.positions.pop(sym, None)
+                        continue
+                    price = prices.get(sym, 0.0)
+                    if price <= 0:
+                        still_missing.add(sym)
+                        logger.warning(
+                            "[ORPHAN] TRD%02d %s qty=%.6f — prix introuvable, liquidation reportée",
+                            trader.id, sym, qty,
+                        )
+                        continue
+                    proceeds = qty * price
+                    trader.portfolio.cash += proceeds
+                    trader.portfolio.positions.pop(sym)
+                    pv = trader.portfolio.value(prices)
+                    trader.portfolio.portfolio_value = pv
+                    conn.execute(
+                        "INSERT INTO trades "
+                        "(trader_id, timestamp, symbol, action, amount, price, portfolio_value) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (trader.id, now, sym, "sell", qty, price, pv),
+                    )
+                    logger.info(
+                        "[ORPHAN] LIQUIDATION TRD%02d SELL %s %.6f @ %.4f "
+                        "→ cash récupéré=%.2f€  PV=%.2f€",
+                        trader.id, sym, qty, price, proceeds, pv,
+                    )
+                    liquidated += 1
+
+        _write_with_retry(_do_liquidate)
+        # Ne garder en orphelins que ce qu'on n'a pas pu liquider
+        self._orphan_symbols = still_missing
+        self._update_sitg_budgets()
+
+        nav_after = sum(t.portfolio.value(prices) for t in self._traders)
+        logger.info(
+            "[ORPHAN] ══ Liquidation orphelins terminée ══ "
+            "%d position(s) soldée(s) | NAV %+.2f€ (%.2f€ → %.2f€)",
+            liquidated, nav_after - nav_before, nav_before, nav_after,
+        )
 
     def _restore_trader_states(self):
         """Reload cash + positions from the latest snapshot for each trader."""
@@ -342,9 +421,28 @@ class TradingEngine:
             self._prev_tick_prices = dict(prices)
             return
 
+        _CIRCUIT_BREAKER_FLOOR = STARTING_CAPITAL * 0.05   # 25 € — freeze total si PV ≤ plancher
+
         def _do_tick(conn):
             for trader in self._traders:
                 try:
+                    # ── Circuit breaker individuel ─────────────────────────
+                    # Si la valeur du portefeuille tombe sous 5 % du capital
+                    # de départ (25 €), on gèle ce trader : plus aucun ordre
+                    # ne passe jusqu'à une éventuelle élimination/remplacement.
+                    pv_now = trader.portfolio.value(prices)
+                    if pv_now <= _CIRCUIT_BREAKER_FLOOR:
+                        trader.portfolio.portfolio_value = pv_now
+                        self._save_snapshot(trader, now, conn)
+                        if not getattr(trader, "_cb_logged", False):
+                            logger.warning(
+                                "CIRCUIT BREAKER TRD%02d  PV=%.2f€ ≤ %.0f€ — frozen",
+                                trader.id, pv_now, _CIRCUIT_BREAKER_FLOOR,
+                            )
+                            trader._cb_logged = True
+                        continue
+                    trader._cb_logged = False   # reset si le trader remonte
+
                     sym = getattr(trader, "_symbol", None)
                     # Skip decide() when price hasn't changed since last tick.
                     # This prevents stale off-market prices from polluting the
@@ -936,13 +1034,21 @@ class TradingEngine:
 
     def run(self):
         from data.market import MarketData
-        market = MarketData(SYMBOLS)
+        # Étendre la liste de symboles pour inclure les positions orphelines
+        # afin qu'elles puissent être valorisées et vendues au premier tick.
+        all_symbols = list(SYMBOLS) + sorted(self._orphan_symbols)
+        market = MarketData(all_symbols)
+        self._market = market          # référence engine pour usage futur
         self._running = True
         logger.info("Trading engine started")
+        _liquidation_done = not bool(self._orphan_symbols)  # skip si aucun orphelin
         while self._running:
             try:
                 prices = market.get_prices()
                 self._last_prices = prices
+                if not _liquidation_done:
+                    self._liquidate_orphan_positions(prices)
+                    _liquidation_done = True
                 self.tick(prices)
                 if self._tick_callback:
                     self._tick_callback(self.get_state())
