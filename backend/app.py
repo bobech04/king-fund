@@ -1282,6 +1282,32 @@ def get_comite_historique():
         return jsonify({"erreur": str(e)}), 500
 
 
+@app.route("/api/comite-selection/decisions-agd")
+def get_decisions_agd():
+    try:
+        import sqlite3 as _sqlite3
+        import json as _json
+        db_path = Path(__file__).resolve().parent.parent / "database" / "king_fund.db"
+        with _sqlite3.connect(str(db_path)) as con:
+            con.row_factory = _sqlite3.Row
+            rows = con.execute(
+                "SELECT * FROM decisions_agd ORDER BY ts DESC LIMIT 50"
+            ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            if d.get("conditions"):
+                try:
+                    d["conditions"] = _json.loads(d["conditions"])
+                except Exception:
+                    pass
+            d.pop("donnees", None)
+            result.append(d)
+        return jsonify(result)
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
 @app.route("/api/trader/<int:trader_id>")
 def get_trader(trader_id: int):
     data = engine.get_trader(trader_id)
