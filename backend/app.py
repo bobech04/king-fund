@@ -655,11 +655,12 @@ def get_bus_state():
 
     # Derive Howell regime from VIX + liq_budget_factor
     liq_f = dl.get("budget_factor", 1.0)
-    if vix_val is not None and float(vix_val) >= 30 or liq_f <= 0.65:
+    vix_f = float(vix_val) if vix_val is not None else None
+    if (vix_f is not None and vix_f >= 30) or liq_f <= 0.65:
         howell = "HOWELL_DANGER"
-    elif vix_val is not None and float(vix_val) >= 25 or liq_f <= 0.80:
+    elif (vix_f is not None and vix_f >= 25) or liq_f <= 0.80:
         howell = "HOWELL_VIGILANCE"
-    elif vix_val is not None and float(vix_val) >= 20 or liq_f <= 0.95:
+    elif (vix_f is not None and vix_f >= 20) or liq_f <= 0.95:
         howell = "HOWELL_ATTENTION"
     else:
         howell = "HOWELL_SEREIN"
