@@ -227,6 +227,7 @@ async function loadDashboard(silent = false) {
     dashboardLoaded = true;
     renderDashboard(state, bus, brief);
     _loadDashPositions();
+    _loadDashWatchlist();
   } catch {
     if (!silent) qs('#dashboard-wrap').innerHTML = '<div class="error-state">Erreur chargement tableau de bord.</div>';
   }
@@ -345,6 +346,15 @@ function renderDashboard(s, bus, brief) {
     <div class="dash-pos-scroll" id="dash-pos-cards">
       <div class="dash-pos-loading">Chargement…</div>
     </div>
+  </div>
+
+  <!-- Watchlist -->
+  <div class="dash-section" id="dash-wl-section">
+    <div class="dash-wl-header">
+      <span class="dash-section-title">🎯 Watchlist</span>
+      <span class="dash-wl-meta" id="dash-wl-meta"></span>
+    </div>
+    <div id="dash-wl-body"><div class="dash-wl-loading">Chargement…</div></div>
   </div>
 
   <!-- Top 5 performers -->
@@ -504,6 +514,120 @@ function _openPositionDetail(ticker) {
     const pruCard = qs('#pru-card') || qs('#pru-section');
     if (pruCard) pruCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }, 450);
+}
+
+// ── Dashboard — Watchlist ─────────────────────────────────────────────────────
+
+const DASH_WL_LIMIT = 15;
+
+async function _loadDashWatchlist() {
+  try {
+    const [wlRes, pruRes] = await Promise.allSettled([
+      fetch(`${API}/investissement/watchlist`).then(r => r.json()),
+      fetch(`${API}/patrimoine/positions-pru`).then(r => r.json()),
+    ]);
+    const wl  = wlRes.status  === 'fulfilled' ? wlRes.value  : null;
+    const pru = pruRes.status === 'fulfilled' ? pruRes.value : null;
+    _renderDashWatchlist(wl, pru);
+  } catch {
+    const el = qs('#dash-wl-body');
+    if (el) el.innerHTML = '<div class="dash-wl-empty">Watchlist indisponible</div>';
+  }
+}
+
+function _renderDashWatchlist(wlData, pruData) {
+  const el = qs('#dash-wl-body');
+  if (!el) return;
+
+  const items  = (wlData?.watchlist || []).filter(x => x.ticker);
+  const inPRU  = new Set(Object.keys(pruData?.positions || {}).filter(
+    k => (pruData.positions[k]?.quantite || 0) > 0
+  ));
+
+  if (!items.length) {
+    el.innerHTML = '<div class="dash-wl-empty">Aucun actif en watchlist</div>';
+    return;
+  }
+
+  // Sort by score desc, cap at DASH_WL_LIMIT
+  const sorted  = [...items].sort((a, b) => (b.score || 0) - (a.score || 0));
+  const visible = sorted.slice(0, DASH_WL_LIMIT);
+  const hasMore = sorted.length > DASH_WL_LIMIT;
+
+  const metaEl = qs('#dash-wl-meta');
+  if (metaEl) metaEl.textContent = `${visible.length}${hasMore ? `/${sorted.length}` : ''} actifs`;
+
+  // Group by priority
+  const high   = visible.filter(x => (x.score || 0) >= 8);
+  const medium = visible.filter(x => (x.score || 0) >= 6 && (x.score || 0) < 8);
+  const low    = visible.filter(x => (x.score || 0) < 6);
+
+  function buildRow(item) {
+    const score  = item.score != null ? Number(item.score).toFixed(1) : '—';
+    const prix   = item.prix_actuel != null ? fmt(item.prix_actuel, 2) : '—';
+    const signal = item.signal || 'HOLD';
+    const sigCls = signal === 'BUY' ? 'buy' : signal === 'SELL' ? 'sell' : 'hold';
+    const already = inPRU.has(item.ticker);
+    const scored  = item.score != null && item.score > 0;
+
+    let btn = '';
+    if (!scored) {
+      btn = `<button class="dash-wl-btn analyse" onclick="_dashWlAnalyse('${escHtml(item.ticker)}')">Analyser</button>`;
+    } else if ((item.score || 0) >= 7 && !already) {
+      btn = `<button class="dash-wl-btn voter" onclick="_dashWlVoter('${escHtml(item.ticker)}')">Voter</button>`;
+    }
+
+    const scoreCls = (item.score || 0) >= 8 ? 'high' : (item.score || 0) >= 6 ? 'med' : 'low';
+
+    return `<div class="dash-wl-row">
+      <div class="dash-wl-left">
+        <span class="dash-wl-ticker">${escHtml(item.ticker)}</span>
+        <span class="dash-wl-nom">${escHtml(item.nom || item.ticker)}</span>
+      </div>
+      <div class="dash-wl-mid">
+        <span class="dash-wl-score dash-wl-score-${scoreCls}">${score}<span class="dash-wl-score-denom">/10</span></span>
+        <span class="dash-wl-prix">${prix}</span>
+        <span class="dash-wl-sig dash-wl-sig-${sigCls}">${signal}</span>
+      </div>
+      <div class="dash-wl-right">${btn}</div>
+    </div>`;
+  }
+
+  function buildGroup(emoji, label, groupItems) {
+    if (!groupItems.length) return '';
+    return `<div class="dash-wl-group">
+      <div class="dash-wl-group-hdr">${emoji} ${label}</div>
+      ${groupItems.map(buildRow).join('')}
+    </div>`;
+  }
+
+  el.innerHTML =
+    buildGroup('🔥', 'Priorité haute', high) +
+    buildGroup('🟡', 'Moyenne', medium) +
+    buildGroup('⚪', 'Basse', low) +
+    (hasMore
+      ? `<button class="dash-wl-voir-tout" onclick="switchTab('investissement')">Voir tout (${sorted.length} actifs) →</button>`
+      : '');
+}
+
+function _dashWlAnalyse(ticker) {
+  switchTab('investissement');
+  setTimeout(() => {
+    const el = qs('#investissement-wrap') || qs('#tab-investissement');
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 400);
+}
+
+function _dashWlVoter(ticker) {
+  if (!confirm(`Lancer le vote Comité pour ${ticker} ?`)) return;
+  fetch(`${API}/comite-selection/voter`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ ticker }),
+  })
+    .then(r => r.json())
+    .then(d => alert(`Vote ${ticker} : ${d.decision || d.verdict || JSON.stringify(d)}`))
+    .catch(() => alert('Erreur lors du vote'));
 }
 
 // ═══════════════════════════════════════════════════════════════════
