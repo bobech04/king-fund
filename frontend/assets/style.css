@@ -3454,3 +3454,48 @@ main { padding-bottom: 60px; }
   cursor: pointer;
 }
 .pdm-btn-secondary:hover { color: var(--accent); border-color: rgba(0,229,160,.3); }
+
+/* ── Watchlist Detail Modal — Étapes Graham ─────────────────────── */
+.wdm-stages { display: flex; flex-direction: column; gap: 4px; }
+.wdm-stage-row {
+  display: grid;
+  grid-template-columns: 14px 1fr 60px 36px;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  border-bottom: 1px solid rgba(255,255,255,.03);
+  font-size: 0.68rem;
+}
+.wdm-stage-row:last-child { border-bottom: none; }
+.wdm-stage-icon { text-align: center; font-size: 0.65rem; }
+.wdm-stage-icon.pos    { color: var(--accent); }
+.wdm-stage-icon.neg    { color: var(--red); }
+.wdm-stage-icon.muted-stage { color: var(--muted); }
+.wdm-stage-name {
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.wdm-stage-bar-wrap {
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+  display: flex;
+}
+.wdm-stage-bar {
+  height: 100%;
+  border-radius: 2px;
+  transition: width .3s ease;
+  min-width: 2px;
+}
+.wdm-stage-score {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.62rem;
+}
+.wdm-stage-score.pos        { color: var(--accent); }
+.wdm-stage-score.neg        { color: var(--red); }
+.wdm-stage-score.muted-stage{ color: var(--muted); }

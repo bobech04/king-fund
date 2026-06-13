@@ -726,14 +726,14 @@ function _renderDashWatchlist(wlData, pruData) {
 
     let btn = '';
     if (!scored) {
-      btn = `<button class="dash-wl-btn analyse" onclick="_dashWlAnalyse('${escHtml(item.ticker)}')">Analyser</button>`;
+      btn = `<button class="dash-wl-btn analyse" onclick="event.stopPropagation();_dashWlAnalyse('${escHtml(item.ticker)}')">Analyser</button>`;
     } else if ((item.score || 0) >= 7 && !already) {
-      btn = `<button class="dash-wl-btn voter" onclick="_dashWlVoter('${escHtml(item.ticker)}')">Voter</button>`;
+      btn = `<button class="dash-wl-btn voter" onclick="event.stopPropagation();_dashWlVoter('${escHtml(item.ticker)}')">Voter</button>`;
     }
 
     const scoreCls = (item.score || 0) >= 8 ? 'high' : (item.score || 0) >= 6 ? 'med' : 'low';
 
-    return `<div class="dash-wl-row">
+    return `<div class="dash-wl-row" style="cursor:pointer" onclick="_openWatchlistDetail('${escHtml(item.ticker)}')">
       <div class="dash-wl-left">
         <span class="dash-wl-ticker">${escHtml(item.ticker)}</span>
         <span class="dash-wl-nom">${escHtml(item.nom || item.ticker)}</span>
@@ -782,6 +782,93 @@ function _dashWlVoter(ticker) {
     .then(r => r.json())
     .then(d => alert(`Vote ${ticker} : ${d.decision || d.verdict || JSON.stringify(d)}`))
     .catch(() => alert('Erreur lors du vote'));
+}
+
+// ── Dashboard — Watchlist detail modal ───────────────────────────────────────
+
+function _openWatchlistDetail(ticker) {
+  const item = (_dashWLCache?.watchlist || []).find(x => x.ticker === ticker);
+  if (!item) return;
+
+  const titleEl = qs('#pos-detail-title');
+  const bodyEl  = qs('#pos-detail-body');
+  if (!titleEl || !bodyEl) return;
+
+  const signal  = item.signal || 'HOLD';
+  const sigCls  = signal === 'BUY' ? 'buy' : signal === 'SELL' ? 'sell' : 'hold';
+  const score   = item.score != null ? Number(item.score).toFixed(1) : '—';
+  const scoreCls= (item.score||0) >= 8 ? 'high' : (item.score||0) >= 6 ? 'med' : 'low';
+
+  // ── KPIs ────────────────────────────────────────────────────────
+  const tp      = item.target_price != null ? fmt(item.target_price, 2) : '—';
+  const ms      = item.marge_securite != null ? `${(item.marge_securite*100).toFixed(1)}%` : '—';
+  const msPos   = item.marge_securite > 0;
+  const pe      = item.per   != null ? Number(item.per).toFixed(1)  : '—';
+  const pb      = item.pbr   != null ? Number(item.pbr).toFixed(2)  : '—';
+  const beta    = item.beta  != null ? Number(item.beta).toFixed(2) : '—';
+  const div_    = item.dividende != null ? `${Number(item.dividende).toFixed(2)}%` : '—';
+
+  // ── Étapes Graham (sans "Score final") ──────────────────────────
+  const stages = (item.stages || []).filter(s => s.name !== 'Score final');
+  const stagesHtml = stages.map(s => {
+    const sc = s.score || 0;
+    const cls = sc >= 0.3 ? 'pos' : sc <= -0.3 ? 'neg' : 'muted-stage';
+    const icon = sc >= 0.3 ? '✓' : sc <= -0.3 ? '✗' : '○';
+    const barW = Math.min(100, Math.abs(sc) * 100).toFixed(0);
+    const barCol = sc >= 0 ? 'var(--accent)' : 'var(--red)';
+    return `<div class="wdm-stage-row">
+      <span class="wdm-stage-icon ${cls}">${icon}</span>
+      <span class="wdm-stage-name">${escHtml(s.name)}</span>
+      <div class="wdm-stage-bar-wrap">
+        <div class="wdm-stage-bar" style="width:${barW}%;background:${barCol};${sc < 0 ? 'margin-left:auto' : ''}"></div>
+      </div>
+      <span class="wdm-stage-score ${cls}">${sc >= 0 ? '+' : ''}${sc.toFixed(2)}</span>
+    </div>`;
+  }).join('');
+
+  // ── Boutons action ───────────────────────────────────────────────
+  const inPRU  = _dashPRUCache?.positions?.[ticker] && (_dashPRUCache.positions[ticker].quantite || 0) > 0;
+  const scored = item.score != null && item.score > 0;
+  let actionBtn = '';
+  if (!scored) {
+    actionBtn = `<button class="pdm-btn-secondary" onclick="_closePositionDetail();_dashWlAnalyse('${escHtml(ticker)}')">Analyser →</button>`;
+  } else if ((item.score || 0) >= 7 && !inPRU) {
+    actionBtn = `<button class="pdm-btn-primary" onclick="_closePositionDetail();_dashWlVoter('${escHtml(ticker)}')">Voter (Comité)</button>`;
+  }
+
+  // ── Titre ────────────────────────────────────────────────────────
+  titleEl.innerHTML = `
+    <div class="pdm-title-row">
+      <span class="dash-wl-score dash-wl-score-${scoreCls}" style="font-size:1.1rem">${score}<span class="dash-wl-score-denom">/10</span></span>
+      <h2 class="modal-name">${escHtml(ticker)}</h2>
+      <span class="dash-wl-sig dash-wl-sig-${sigCls}" style="margin-left:auto">${signal}</span>
+    </div>
+    <div class="modal-strategy">${escHtml(item.nom || ticker)}${item.secteur ? ` · ${escHtml(item.secteur)}` : ''}${item.bourse ? ` · ${escHtml(item.bourse)}` : ''}</div>`;
+
+  // ── Corps ────────────────────────────────────────────────────────
+  bodyEl.innerHTML = `
+    <div class="pdm-kpi-grid" style="grid-template-columns:repeat(3,1fr)">
+      <div class="pdm-kpi"><div class="pdm-kpi-lbl">Prix actuel</div><div class="pdm-kpi-val">${item.prix_actuel != null ? fmt(item.prix_actuel,2) : '—'}</div></div>
+      <div class="pdm-kpi"><div class="pdm-kpi-lbl">Target price</div><div class="pdm-kpi-val" style="color:var(--accent)">${tp}</div></div>
+      <div class="pdm-kpi"><div class="pdm-kpi-lbl">Marge sécu.</div><div class="pdm-kpi-val ${msPos?'pos':'neg'}">${ms}</div></div>
+      <div class="pdm-kpi"><div class="pdm-kpi-lbl">P/E</div><div class="pdm-kpi-val">${pe}</div></div>
+      <div class="pdm-kpi"><div class="pdm-kpi-lbl">P/B</div><div class="pdm-kpi-val">${pb}</div></div>
+      <div class="pdm-kpi"><div class="pdm-kpi-lbl">Dividende</div><div class="pdm-kpi-val" style="color:var(--accent)">${div_}</div></div>
+      <div class="pdm-kpi"><div class="pdm-kpi-lbl">Beta</div><div class="pdm-kpi-val">${beta}</div></div>
+    </div>
+
+    <div class="pdm-section">
+      <div class="pdm-section-title">📋 Analyse Graham — ${stages.length} critères</div>
+      <div class="wdm-stages">${stagesHtml}</div>
+    </div>
+
+    <div class="pdm-actions">
+      <button class="pdm-btn-secondary" onclick="_closePositionDetail();switchTab('investissement')">Voir Investissement →</button>
+      ${actionBtn}
+    </div>`;
+
+  qs('#pos-detail-overlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
 }
 
 // ── Dashboard — Alertes ───────────────────────────────────────────────────────
