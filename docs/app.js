@@ -233,6 +233,8 @@ async function loadDashboard(silent = false) {
     _loadDashPositions();
     _loadDashWatchlist();
     _loadDashAlertes();
+    _loadDashPostMarket();
+    _loadDashComite();
   } catch {
     if (!silent) qs('#dashboard-wrap').innerHTML = '<div class="error-state">Erreur chargement tableau de bord.</div>';
   }
@@ -262,6 +264,196 @@ function buildTop5Html(traders) {
       <span class="div-chip" style="--chip-color:${dc};padding:1px 5px;font-size:.5rem">${divIcon(t.division)}</span>
     </div>`;
   }).join('');
+}
+
+function buildSelectionNaturelleHtml(leaderboard, battleDay) {
+  const hasData = leaderboard.some(t => Math.abs((t.selection_multiplier || 1) - 1) > 0.01);
+
+  const title = `<div class="dash-section-title">🧬 Sélection Naturelle <span class="dash-sel-day">J${battleDay}</span></div>`;
+
+  if (!hasData) {
+    return title + `<div class="dash-sel-empty">Active à partir du 1er EOD — J1 en cours</div>`;
+  }
+
+  const active = leaderboard.filter(t => !t.eliminated);
+  const eliminated = leaderboard.filter(t => t.eliminated);
+  const sorted = [...active].sort((a, b) => (b.selection_multiplier || 1) - (a.selection_multiplier || 1));
+  const top5 = sorted.slice(0, 5);
+  const bot5 = sorted.slice(-5).reverse();
+
+  function selRow(t) {
+    const mult = t.selection_multiplier || 1.0;
+    const pct  = Math.round((mult / 2.5) * 100);
+    const isUp = mult > 1.005;
+    const isDn = mult < 0.995;
+    const color = isUp ? 'var(--accent)' : isDn ? 'var(--red)' : 'var(--muted)';
+    const dc    = divColor(t.division);
+    const name  = escHtml(t.name.split(' ').slice(0, 2).join(' '));
+    return `<div class="dash-sel-row">
+      <span class="div-chip" style="--chip-color:${dc};padding:1px 5px;font-size:.5rem">${divIcon(t.division)}</span>
+      <span class="dash-sel-name">${name}</span>
+      <div class="dash-sel-bar-wrap">
+        <div class="dash-sel-bar-fill" style="width:${pct}%;background:${color}"></div>
+      </div>
+      <span class="dash-sel-mult" style="color:${color}">×${mult.toFixed(2)}</span>
+    </div>`;
+  }
+
+  const elimHtml = eliminated.length > 0
+    ? `<div class="dash-sel-elim-row">
+        <span class="dash-sel-elim-label">🗑 Remplacés :</span>
+        ${eliminated.map(t => `<span class="dash-sel-elim-chip">${escHtml(t.name.split(' ')[0])}</span>`).join('')}
+       </div>`
+    : '';
+
+  return title +
+    `<div class="dash-sel-group">
+      <div class="dash-sel-group-label top">▲ Boostés</div>
+      ${top5.map(selRow).join('')}
+    </div>
+    <div class="dash-sel-group">
+      <div class="dash-sel-group-label bot">▼ Pénalisés</div>
+      ${bot5.map(selRow).join('')}
+    </div>
+    ${elimHtml}`;
+}
+
+function buildPostMarketHtml(pm) {
+  if (!pm) return '<div class="dash-pm-loading">Post-Market indisponible</div>';
+
+  const totalPnl  = pm.total_pnl || 0;
+  const isUp      = totalPnl >= 0;
+  const pmCls     = isUp ? 'up' : 'down';
+  const pmColor   = isUp ? 'var(--accent)' : 'var(--red)';
+  const pmEmoji   = isUp ? '📈' : '📉';
+  const sign      = isUp ? '+' : '';
+  const winners   = pm.winners_count || 0;
+  const day       = pm.battle_day || '—';
+  const bestDiv   = pm.best_division?.name || '—';
+
+  const tsRaw   = pm.timestamp || '';
+  const tsLabel = tsRaw
+    ? new Date(tsRaw + (tsRaw.endsWith('Z') ? '' : 'Z')).toLocaleTimeString('fr-FR', {hour:'2-digit', minute:'2-digit'})
+    : '';
+
+  const top3 = (pm.top5    || []).slice(0, 3);
+  const bot3 = (pm.bottom5 || []).slice(0, 3);
+
+  function pmRow(t) {
+    const s2  = t.pnl >= 0 ? '+' : '';
+    const cl2 = t.pnl >= 0 ? 'green' : 'red';
+    const dc  = divColor(t.division);
+    const nm  = escHtml(t.name.split(' ').slice(0, 2).join(' '));
+    return `<div class="dash-pm-row">
+      <span class="div-chip" style="--chip-color:${dc};padding:1px 5px;font-size:.5rem">${divIcon(t.division)}</span>
+      <span class="dash-pm-name">${nm}</span>
+      <span class="dash-pm-val">€${fmt(t.value, 0)}</span>
+      <span class="dash-pm-pct ${cl2}">${s2}${t.pnl_pct}%</span>
+    </div>`;
+  }
+
+  const bdColor = divColor(pm.best_division?.name  || '');
+  const wdColor = divColor(pm.worst_division?.name || '');
+  const bdIcon  = divIcon(pm.best_division?.name   || '');
+
+  const bdPct = (pm.best_division?.avg_pnl_pct  || 0).toFixed(1);
+  const wdPct = (pm.worst_division?.avg_pnl_pct || 0).toFixed(1);
+  const wdSign = pm.worst_division?.avg_pnl_pct >= 0 ? '+' : '';
+
+  return `<div class="dash-pm-card ${pmCls}">
+    <div class="dash-pm-header">
+      <div class="dash-pm-left">
+        <div class="dash-pm-emoji">${pmEmoji}</div>
+        <div>
+          <div class="dash-pm-label" style="color:${pmColor}">POST-MARKET${tsLabel ? ` · ${tsLabel}` : ''} · J${day}</div>
+          <div class="dash-pm-sub">${winners}/30 gagnants · ${escHtml(bestDiv)} en tête</div>
+        </div>
+      </div>
+      <div class="dash-pm-right">
+        <div class="dash-pm-pnl-total" style="color:${pmColor}">${sign}€${fmt(Math.abs(totalPnl), 0)}</div>
+        <div class="dash-pm-winners">${winners} profit</div>
+      </div>
+    </div>
+    <div class="dash-pm-body">
+      <div class="dash-pm-group">
+        <div class="dash-pm-group-label top">▲ Top 3</div>
+        ${top3.map(pmRow).join('')}
+      </div>
+      <div class="dash-pm-group">
+        <div class="dash-pm-group-label bot">▼ Flop 3</div>
+        ${bot3.map(pmRow).join('')}
+      </div>
+    </div>
+    <div class="dash-pm-divs">
+      <span class="dash-pm-div-chip best" style="border-color:${bdColor}44;color:${bdColor}">
+        ${bdIcon} ${escHtml(pm.best_division?.name || '—')} <span class="dash-pm-div-pct">+${bdPct}%</span>
+      </span>
+      <span class="dash-pm-div-chip worst">
+        💔 ${escHtml(pm.worst_division?.name || '—')} <span class="dash-pm-div-pct">${wdSign}${wdPct}%</span>
+      </span>
+    </div>
+  </div>`;
+}
+
+async function _loadDashPostMarket() {
+  const el = qs('#dash-pm-body');
+  if (!el) return;
+  try {
+    const pm = await fetch(`${API}/post-market`).then(r => r.json());
+    el.innerHTML = buildPostMarketHtml(pm);
+  } catch {
+    el.innerHTML = '<div class="dash-pm-loading">Post-Market indisponible</div>';
+  }
+}
+
+function buildComiteHtml(decisions) {
+  const VERDICT = {
+    'BUY CONFIRMÉ':     { cls: 'confirmed', icon: '✅', label: 'BUY 3/3' },
+    'BUY CONDITIONNEL': { cls: 'cond',      icon: '🟡', label: 'BUY 2/3' },
+    'HOLD AVEC REVUE':  { cls: 'hold',      icon: '🔵', label: 'HOLD'    },
+    'VETO':             { cls: 'veto',      icon: '🛑', label: 'VETO'    },
+  };
+
+  if (!decisions || decisions.length === 0) {
+    return '<div class="dash-co-empty">Aucune séance — comité actif chaque soir 23h00</div>';
+  }
+
+  return decisions.slice(0, 3).map(d => {
+    const vd  = VERDICT[d.decision] || { cls: 'hold', icon: '•', label: d.decision };
+    const ts  = d.timestamp ? new Date(d.timestamp.endsWith('Z') ? d.timestamp : d.timestamp + 'Z') : null;
+    const tsLabel = ts ? ts.toLocaleDateString('fr-FR', { day:'2-digit', month:'2-digit' }) + ' · ' +
+                         ts.toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit' }) : '';
+
+    const voteChips = (d.votes || []).map(v => {
+      const votant = v.votant === 'Research' ? 'R' : v.votant === 'CIO' ? 'CIO' : 'F';
+      const vcls   = v.vote === 'OUI' ? 'oui' : v.vote === 'NON' ? 'non' : 'abs';
+      return `<span class="dash-co-vote ${vcls}">${votant}</span>`;
+    }).join('');
+
+    const motif = (d.votes || []).find(v => v.votant === 'CIO')?.motif || '';
+    const motifShort = motif.length > 70 ? motif.slice(0, 70) + '…' : motif;
+
+    return `<div class="dash-co-row">
+      <div class="dash-co-top">
+        <span class="dash-co-ticker">${escHtml(d.ticker || '—')}</span>
+        <span class="dash-co-badge ${vd.cls}">${vd.icon} ${vd.label}</span>
+        <span class="dash-co-ts">${tsLabel}</span>
+      </div>
+      <div class="dash-co-votes">${voteChips}</div>
+      ${motifShort ? `<div class="dash-co-motif">${escHtml(motifShort)}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+async function _loadDashComite() {
+  const el = qs('#dash-co-body');
+  if (!el) return;
+  try {
+    const data = await fetch(`${API}/comite-selection/historique`).then(r => r.json());
+    el.innerHTML = buildComiteHtml(Array.isArray(data) ? data : data.decisions || []);
+  } catch {
+    el.innerHTML = '<div class="dash-co-empty">Comité indisponible</div>';
+  }
 }
 
 function renderDashboard(s, bus, brief) {
@@ -381,10 +573,27 @@ function renderDashboard(s, bus, brief) {
     </div>
   </div>` : ''}
 
+  <!-- Post-Market (Bloc 15) -->
+  <div class="dash-section">
+    <div class="dash-section-title">📊 Post-Market — Bilan de séance</div>
+    <div id="dash-pm-body"><div class="dash-pm-loading">Chargement…</div></div>
+  </div>
+
   <!-- Top 5 performers -->
   <div class="dash-section">
     <div class="dash-section-title">🏆 Top 5 Performers</div>
     <div id="dash-top5">${buildTop5Html(top5)}</div>
+  </div>
+
+  <!-- Sélection Naturelle -->
+  <div class="dash-section">
+    ${buildSelectionNaturelleHtml(s?.leaderboard || [], s?.battle_day || 0)}
+  </div>
+
+  <!-- Comité Sélection (Bloc 16) -->
+  <div class="dash-section">
+    <div class="dash-section-title">🏛️ Comité Sélection — Dernières décisions</div>
+    <div id="dash-co-body"><div class="dash-co-empty">Chargement…</div></div>
   </div>
 
   <!-- Banques Centrales résumé -->

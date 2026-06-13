@@ -3259,6 +3259,308 @@ main { padding-bottom: 60px; }
 }
 .dash-mb-link:hover { text-decoration: underline; }
 
+/* ── Sélection Naturelle (Bloc 14) ──────────────────────────────── */
+.dash-sel-day {
+  font-size: 0.6rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  padding: 1px 7px;
+  border-radius: 20px;
+  background: rgba(255,255,255,.06);
+  color: var(--muted);
+  border: 1px solid var(--border);
+  margin-left: 6px;
+  vertical-align: middle;
+}
+.dash-sel-empty {
+  font-size: 0.75rem;
+  color: var(--muted);
+  padding: 8px 0 2px;
+  font-style: italic;
+}
+.dash-sel-group {
+  margin-bottom: 10px;
+}
+.dash-sel-group-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 0 5px;
+}
+.dash-sel-group-label.top { color: var(--accent); }
+.dash-sel-group-label.bot { color: var(--red); }
+.dash-sel-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.dash-sel-row:last-child { border-bottom: none; }
+.dash-sel-name {
+  flex: 1;
+  font-size: 0.78rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.dash-sel-bar-wrap {
+  width: 60px;
+  height: 4px;
+  background: rgba(255,255,255,.07);
+  border-radius: 2px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.dash-sel-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+.dash-sel-mult {
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  min-width: 38px;
+  text-align: right;
+  flex-shrink: 0;
+}
+.dash-sel-elim-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 8px 0 2px;
+  border-top: 1px solid rgba(255,255,255,.05);
+  margin-top: 4px;
+}
+.dash-sel-elim-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+.dash-sel-elim-chip {
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 20px;
+  background: rgba(255,68,102,.10);
+  color: var(--red);
+  border: 1px solid rgba(255,68,102,.25);
+}
+
+/* ── Post-Market (Bloc 15) ───────────────────────────────────────── */
+.dash-pm-loading {
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding: 6px 0;
+  font-style: italic;
+}
+.dash-pm-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.dash-pm-card.up   { border-color: rgba(0,229,160,.30); }
+.dash-pm-card.down { border-color: rgba(255,68,102,.30); }
+.dash-pm-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.dash-pm-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.dash-pm-emoji { font-size: 1.4rem; line-height: 1; flex-shrink: 0; }
+.dash-pm-label {
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.dash-pm-sub {
+  font-size: 0.55rem;
+  color: var(--muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-pm-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.dash-pm-pnl-total {
+  font-size: 1.05rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.dash-pm-winners {
+  font-size: 0.55rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.dash-pm-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+@media (max-width: 340px) {
+  .dash-pm-body { grid-template-columns: 1fr; }
+}
+.dash-pm-group {}
+.dash-pm-group-label {
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding-bottom: 4px;
+}
+.dash-pm-group-label.top { color: var(--accent); }
+.dash-pm-group-label.bot { color: var(--red); }
+.dash-pm-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255,255,255,.04);
+}
+.dash-pm-row:last-child { border-bottom: none; }
+.dash-pm-name {
+  flex: 1;
+  font-size: 0.7rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+}
+.dash-pm-val {
+  font-size: 0.65rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+.dash-pm-pct {
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+  min-width: 36px;
+  text-align: right;
+}
+.dash-pm-divs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 2px;
+  border-top: 1px solid rgba(255,255,255,.05);
+}
+.dash-pm-div-chip {
+  font-size: 0.62rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: rgba(255,255,255,.04);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.dash-pm-div-chip.worst {
+  color: var(--red);
+  background: rgba(255,68,102,.08);
+  border-color: rgba(255,68,102,.25);
+}
+.dash-pm-div-pct {
+  font-size: 0.55rem;
+  opacity: 0.75;
+}
+
+/* ── Comité Sélection (Bloc 16) ──────────────────────────────────── */
+.dash-co-empty {
+  font-size: 0.72rem;
+  color: var(--muted);
+  padding: 6px 0;
+  font-style: italic;
+}
+.dash-co-row {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+}
+.dash-co-row:last-child { border-bottom: none; }
+.dash-co-top {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.dash-co-ticker {
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.dash-co-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 20px;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+}
+.dash-co-badge.confirmed { background: rgba(0,229,160,.15);  color: var(--accent); border: 1px solid rgba(0,229,160,.3); }
+.dash-co-badge.cond      { background: rgba(255,215,0,.12);  color: #ffd700;       border: 1px solid rgba(255,215,0,.3); }
+.dash-co-badge.hold      { background: rgba(68,136,255,.12); color: #4488ff;       border: 1px solid rgba(68,136,255,.3); }
+.dash-co-badge.veto      { background: rgba(255,68,102,.14); color: var(--red);    border: 1px solid rgba(255,68,102,.3); }
+.dash-co-ts {
+  font-size: 0.58rem;
+  color: var(--muted);
+  margin-left: auto;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+.dash-co-votes {
+  display: flex;
+  gap: 5px;
+}
+.dash-co-vote {
+  font-size: 0.6rem;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 20px;
+  border: 1px solid transparent;
+}
+.dash-co-vote.oui { background: rgba(0,229,160,.12);  color: var(--accent); border-color: rgba(0,229,160,.25); }
+.dash-co-vote.non { background: rgba(255,68,102,.12); color: var(--red);    border-color: rgba(255,68,102,.25); }
+.dash-co-vote.abs { background: rgba(255,255,255,.06); color: var(--muted); border-color: var(--border); }
+.dash-co-motif {
+  font-size: 0.65rem;
+  color: var(--muted);
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* ── Position Detail Modal ───────────────────────────────────────── */
 .pos-detail-modal {
   max-width: 480px;
