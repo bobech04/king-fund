@@ -29,6 +29,10 @@ let activeTraderId = null;
 let activeTab      = 'dashboard';
 let activeFilter   = null;
 
+// Dashboard position detail cache
+let _dashPRUCache = null;
+let _dashWLCache  = null;
+
 // Loaded flags
 let dashboardLoaded    = false;
 let protectionLoaded   = false;
@@ -440,6 +444,7 @@ function renderDashboard(s, bus, brief) {
 async function _loadDashPositions() {
   try {
     const data = await fetch(API + '/patrimoine/positions-pru').then(r => r.json());
+    _dashPRUCache = data;
     _renderDashPositions(data);
   } catch {
     const el = qs('#dash-pos-cards');
@@ -529,11 +534,138 @@ function _renderDashPositions(data) {
 }
 
 function _openPositionDetail(ticker) {
-  switchTab('protection');
-  setTimeout(() => {
-    const pruCard = qs('#pru-card') || qs('#pru-section');
-    if (pruCard) pruCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, 450);
+  const pos = _dashPRUCache?.positions?.[ticker];
+  if (!pos) {
+    // Fallback : navigate to patrimoine
+    switchTab('protection');
+    return;
+  }
+
+  const titleEl = qs('#pos-detail-title');
+  const bodyEl  = qs('#pos-detail-body');
+  if (!titleEl || !bodyEl) return;
+
+  // ── Data ────────────────────────────────────────────────────────
+  const pru  = pos.pru  || 0;
+  const prix = pos.prix_actuel;
+  const pv   = pos.pv_latente;
+  const pct  = pos.pv_pct;
+  const obj  = pos.objectif;
+  const sl   = pos.stop_loss;
+  const qty  = pos.quantite || 0;
+  const valeur = prix != null ? prix * qty : null;
+
+  let status = 'neutral';
+  if (prix != null) {
+    if (obj  && prix >= obj * 0.90)    status = 'obj';
+    else if (pv != null && pv > 0)     status = 'pos';
+    else if (sl  && prix <= sl * 1.10) status = 'sl';
+    else if (pv != null && pv < 0)     status = 'neg';
+  }
+
+  const statusLabel = { obj:'Proche objectif', pos:'PV positive', neg:'MV latente', sl:'Proche stop-loss', neutral:'Neutre' };
+  const pvCls  = pv == null ? '' : pv >= 0 ? 'pos' : 'neg';
+  const pvStr  = pv  != null ? `${pv  >= 0?'+':''}${fmt(pv,  2)}€` : '—';
+  const pctStr = pct != null ? `${pct >= 0?'+':''}${pct.toFixed(2)}%` : '—';
+
+  // ── Graham score depuis watchlist ────────────────────────────────
+  const wlItem  = (_dashWLCache?.watchlist || []).find(x => x.ticker === ticker);
+  const gScore  = wlItem?.score;
+  const gSignal = wlItem?.signal || '';
+  const gSigCls = gSignal === 'BUY' ? 'buy' : gSignal === 'SELL' ? 'sell' : 'hold';
+
+  // ── Grande jauge SL → OBJ ────────────────────────────────────────
+  let gaugeHtml = '';
+  if (prix != null && obj && sl) {
+    const range = obj - sl;
+    if (range > 0) {
+      const posPct = Math.min(100, Math.max(0, ((prix - sl) / range) * 100));
+      const pruPct = Math.min(100, Math.max(0, ((pru  - sl) / range) * 100));
+      gaugeHtml = `
+        <div class="pdm-section">
+          <div class="pdm-gauge-label">
+            <span>🛑 Stop : <strong>${fmt(sl,2)}</strong></span>
+            <span class="pdm-gauge-pct">${posPct.toFixed(0)}% vers objectif</span>
+            <span>🎯 Obj : <strong>${fmt(obj,2)}</strong></span>
+          </div>
+          <div class="pdm-gauge-track">
+            <div class="pdm-gauge-fill" style="width:${posPct.toFixed(1)}%"></div>
+            <div class="pdm-gauge-marker" style="left:${posPct.toFixed(1)}%" title="Prix actuel"></div>
+            <div class="pdm-gauge-pru"   style="left:${pruPct.toFixed(1)}%"  title="PRU"></div>
+          </div>
+          <div class="pdm-gauge-sub">
+            <span>${fmt(sl,2)}</span>
+            <span style="color:var(--muted);font-size:.55rem">▲ PRU ${fmt(pru,2)}</span>
+            <span>${fmt(obj,2)}</span>
+          </div>
+        </div>`;
+    }
+  }
+
+  // ── Historique transactions ──────────────────────────────────────
+  const txs = (_dashPRUCache?.transactions || []).filter(t => t.ticker === ticker)
+    .sort((a, b) => b.date.localeCompare(a.date));
+
+  const txHtml = txs.length
+    ? txs.map(t => {
+        const isBuy = t.type === 'achat';
+        const pvR   = t.pv_realisee != null ? `<span class="${t.pv_realisee>=0?'pos':'neg'}">${t.pv_realisee>=0?'+':''}${fmt(t.pv_realisee,2)}€</span>` : '';
+        return `<div class="pdm-tx-row">
+          <span class="pdm-tx-type ${isBuy?'buy':'sell'}">${isBuy?'▲ Achat':'▼ Vente'}</span>
+          <span class="pdm-tx-date">${escHtml(t.date)}</span>
+          <span class="pdm-tx-detail">${t.quantite}× ${fmt(t.prix_unitaire,3)}</span>
+          <span class="pdm-tx-pv">${pvR}</span>
+          ${t.note ? `<span class="pdm-tx-note">${escHtml(t.note)}</span>` : ''}
+        </div>`;
+      }).join('')
+    : '<div class="pdm-tx-empty">Aucune transaction enregistrée</div>';
+
+  // ── Titre modal ──────────────────────────────────────────────────
+  titleEl.innerHTML = `
+    <div class="pdm-title-row">
+      <div class="dash-pos-dot dash-pos-dot-${status}" style="width:10px;height:10px"></div>
+      <h2 class="modal-name">${escHtml(ticker)}</h2>
+      <span class="pdm-status-badge pdm-status-${status}">${statusLabel[status]}</span>
+    </div>
+    <div class="modal-strategy">${escHtml(pos.nom || ticker)}</div>`;
+
+  // ── Corps modal ──────────────────────────────────────────────────
+  bodyEl.innerHTML = `
+    <div class="pdm-kpi-grid">
+      <div class="pdm-kpi"><div class="pdm-kpi-lbl">Quantité</div><div class="pdm-kpi-val">${qty % 1 === 0 ? qty : qty.toFixed(4)}</div></div>
+      <div class="pdm-kpi"><div class="pdm-kpi-lbl">PRU</div><div class="pdm-kpi-val">${fmt(pru,3)}</div></div>
+      <div class="pdm-kpi"><div class="pdm-kpi-lbl">Prix actuel</div><div class="pdm-kpi-val">${prix != null ? fmt(prix,3) : '—'}</div></div>
+      <div class="pdm-kpi"><div class="pdm-kpi-lbl">PV/MV (€)</div><div class="pdm-kpi-val ${pvCls}">${pvStr}</div></div>
+      <div class="pdm-kpi"><div class="pdm-kpi-lbl">PV/MV (%)</div><div class="pdm-kpi-val ${pvCls}">${pctStr}</div></div>
+      <div class="pdm-kpi"><div class="pdm-kpi-lbl">Valeur</div><div class="pdm-kpi-val">${valeur != null ? fmt(valeur,2)+'€' : '—'}</div></div>
+    </div>
+
+    ${gaugeHtml}
+
+    ${gScore != null ? `
+    <div class="pdm-section pdm-graham">
+      <span class="pdm-graham-lbl">📊 Score Graham</span>
+      <span class="pdm-graham-score">${Number(gScore).toFixed(1)}<span style="font-size:.6rem;font-weight:400;color:var(--muted)">/10</span></span>
+      <span class="dash-wl-sig dash-wl-sig-${gSigCls}">${gSignal}</span>
+    </div>` : ''}
+
+    <div class="pdm-section">
+      <div class="pdm-section-title">📋 Historique (${txs.length})</div>
+      <div class="pdm-tx-list">${txHtml}</div>
+    </div>
+
+    <div class="pdm-actions">
+      <button class="pdm-btn-secondary" onclick="_closePositionDetail();switchTab('protection');setTimeout(()=>{const e=qs('#pru-section');if(e)e.scrollIntoView({behavior:'smooth',block:'start'})},450)">Voir Patrimoine →</button>
+      <button class="pdm-btn-primary" onclick="_closePositionDetail();setTimeout(()=>{const o=qs('#pru-overlay');if(o){qs('#pru-ticker').value='${escHtml(ticker)}';o.classList.remove('hidden');}},200)">＋ Transaction</button>
+    </div>`;
+
+  qs('#pos-detail-overlay').classList.remove('hidden');
+  document.body.style.overflow = 'hidden';
+}
+
+function _closePositionDetail() {
+  qs('#pos-detail-overlay')?.classList.add('hidden');
+  document.body.style.overflow = '';
 }
 
 // ── Dashboard — Watchlist ─────────────────────────────────────────────────────
@@ -548,6 +680,8 @@ async function _loadDashWatchlist() {
     ]);
     const wl  = wlRes.status  === 'fulfilled' ? wlRes.value  : null;
     const pru = pruRes.status === 'fulfilled' ? pruRes.value : null;
+    _dashWLCache = wl;
+    if (pru) _dashPRUCache = pru;
     _renderDashWatchlist(wl, pru);
   } catch {
     const el = qs('#dash-wl-body');
