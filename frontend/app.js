@@ -249,6 +249,8 @@ function refreshDashboardState(s) {
   }
   const top5El = qs('#dash-top5');
   if (top5El) top5El.innerHTML = buildTop5Html(s.leaderboard.slice(0, 5));
+  const snEl = qs('#dash-sn-body');
+  if (snEl) snEl.innerHTML = buildSelectionNaturelleHtml(s.leaderboard || [], s.battle_day || 0);
 }
 
 function buildTop5Html(traders) {
@@ -587,7 +589,7 @@ function renderDashboard(s, bus, brief) {
 
   <!-- Sélection Naturelle -->
   <div class="dash-section">
-    ${buildSelectionNaturelleHtml(s?.leaderboard || [], s?.battle_day || 0)}
+    <div id="dash-sn-body">${buildSelectionNaturelleHtml(s?.leaderboard || [], s?.battle_day || 0)}</div>
   </div>
 
   <!-- Comité Sélection (Bloc 16) -->
