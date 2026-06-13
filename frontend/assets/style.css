@@ -202,39 +202,11 @@ body {
   padding: 6px 16px;
 }
 
-/* ── Tab Bar ───────────────────────────────────────────────────── */
-.tab-bar {
-  display: flex;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  overflow-x: auto;
-  scrollbar-width: none;
-  position: sticky;
-  top: 90px;
-  z-index: 90;
-}
-.tab-bar::-webkit-scrollbar { display: none; }
-.tab-btn {
-  flex-shrink: 0;
-  padding: 0 14px;
-  height: 42px;
-  background: none;
-  border: none;
-  border-bottom: 2px solid transparent;
-  color: var(--muted);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
-  white-space: nowrap;
-}
-.tab-btn:hover  { color: var(--text); }
-.tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+/* .tab-bar / .tab-btn — supprimés (Étape 2 refonte UX) */
 
 /* ── Tab panes ─────────────────────────────────────────────────── */
 .tab-pane {
-  min-height: calc(100dvh - 90px - 42px - 60px); /* header + tab-bar + bottom-nav */
+  min-height: calc(100dvh - 90px - 60px); /* header + bottom-nav */
   animation: fadeIn 0.2s ease;
 }
 @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
