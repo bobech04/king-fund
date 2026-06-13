@@ -235,6 +235,7 @@ async function loadDashboard(silent = false) {
     _loadDashAlertes();
     _loadDashPostMarket();
     _loadDashComite();
+    _loadDashRetraite();
   } catch {
     if (!silent) qs('#dashboard-wrap').innerHTML = '<div class="error-state">Erreur chargement tableau de bord.</div>';
   }
@@ -458,6 +459,29 @@ async function _loadDashComite() {
   }
 }
 
+async function _loadDashRetraite() {
+  const bar   = qs('#dash-ret-bar');
+  const pctEl = qs('#dash-ret-pct');
+  const sub   = qs('#dash-ret-sub');
+  if (!bar) return;
+  try {
+    const d    = await fetch(`${API}/patrimoine/retraite`).then(r => r.json());
+    const base = d.base_investissable || 0;
+    const obj  = d.objectif || 1;
+    const pct  = Math.min(100, (base / obj) * 100);
+    const apport= Math.round(d.apport_mensuel || 0);
+    const taux  = Math.round((d.taux_annuel || 0.10) * 100);
+    const jours = (d.jours_restants || 0).toLocaleString('fr-FR');
+    const annee = d.annee_retraite || 2047;
+    bar.style.width = `${pct.toFixed(2)}%`;
+    pctEl.textContent = `${fmt(base, 0)}€ / ${fmt(obj, 0)}€ (${pct.toFixed(2)}%)`;
+    sub.innerHTML = `<span>💰 ${apport}€/mois</span><span>📈 ${taux}%/an</span><span>⏳ ${jours} j → ${annee}</span>`;
+  } catch {
+    if (pctEl) pctEl.textContent = '—';
+    if (sub) sub.innerHTML = '<span>Données indisponibles</span>';
+  }
+}
+
 function renderDashboard(s, bus, brief) {
   const wrap = qs('#dashboard-wrap');
 
@@ -520,6 +544,18 @@ function renderDashboard(s, bus, brief) {
       <div class="dash-kpi-label">HOWELL</div>
       <div class="dash-kpi-val ${howellCls[howell] || 'muted'}">${howellMap[howell] || howell}</div>
       <div class="dash-kpi-sub">Liquidité mondiale</div>
+    </div>
+  </div>
+
+  <!-- Jauge Retraite 2047 -->
+  <div class="agd-retraite" id="dash-retraite-card">
+    <div class="agd-retraite-header">
+      <span>🎯 RETRAITE 2047</span>
+      <span id="dash-ret-pct" class="agd-retraite-val">—</span>
+    </div>
+    <div class="agd-retraite-bar"><div class="agd-retraite-fill" id="dash-ret-bar" style="width:0%"></div></div>
+    <div id="dash-ret-sub" style="font-size:0.55rem;color:var(--muted);margin-top:6px;display:flex;gap:10px;flex-wrap:wrap">
+      <span>Chargement…</span>
     </div>
   </div>
 
