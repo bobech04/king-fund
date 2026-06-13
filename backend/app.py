@@ -362,6 +362,28 @@ def delete_patrimoine_actif(actif_id):
     return jsonify({"status": "ok" if ok else "not_found"})
 
 
+@app.route("/api/patrimoine/retraite")
+def get_patrimoine_retraite():
+    from data.patrimoine import get_patrimoine as _get
+    from datetime import date as _date
+    try:
+        d = _get()
+        cfg = d.get("config", {})
+        annee_retraite = cfg.get("annee_base", 2026) + (cfg.get("age_retraite", 56) - cfg.get("age_actuel", 35))
+        jours_restants = max(0, (_date(annee_retraite, 1, 1) - _date.today()).days)
+        return jsonify({
+            "base_investissable": d.get("total_investissable", 0),
+            "objectif":           d.get("valeur_retraite", 0),
+            "apport_mensuel":     d.get("apport_mensuel_effectif", 500),
+            "taux_annuel":        cfg.get("taux_annuel", 0.10),
+            "annee_retraite":     annee_retraite,
+            "jours_restants":     jours_restants,
+        })
+    except Exception as e:
+        logger.error("patrimoine/retraite: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
 @app.route("/api/patrimoine/positions-pru")
 def get_positions_pru():
     from data.suivi_pru import get_suivi_pru

@@ -1,0 +1,14 @@
+{
+  "f186226f-87d": {
+    "id": "f186226f-87d",
+    "action": "BUY",
+    "description": "Achat GTT.PA — signal Comité 3/3, score 8.2/10, marge 35%",
+    "ticker": "GTT.PA",
+    "montant": 150.0,
+    "urgence": "normal",
+    "callback_id": null,
+    "soumis_ts": "2026-06-12T08:17:01.042148",
+    "deadline_ts": "2026-06-14T08:17:01.042148",
+    "statut": "PENDING"
+  }
+}

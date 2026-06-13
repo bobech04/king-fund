@@ -1,0 +1,54 @@
+{
+  "actifs": [
+    {
+      "id": "cash",
+      "nom": "Cash",
+      "valeur_eur": 450.0,
+      "categorie": "liquidites",
+      "couleur": "#00e5a0"
+    },
+    {
+      "id": "or",
+      "nom": "Or physique (Napoléons + Veracash)",
+      "valeur_eur": 570.0,
+      "categorie": "metaux",
+      "couleur": "#ffd700"
+    },
+    {
+      "id": "epargne_dzd",
+      "nom": "Réserve Algérie — Maison (DZD)",
+      "valeur_eur": 17000.0,
+      "categorie": "epargne",
+      "couleur": "#b44cff",
+      "investissable": false,
+      "note": "2 500 000 DZD réservés achat immobilier Algérie — hors fonds, jamais réinjectés"
+    },
+    {
+      "id": "pea",
+      "nom": "PEA",
+      "valeur_eur": 0.0,
+      "categorie": "pea",
+      "couleur": "#ff6b35"
+    },
+    {
+      "id": "immo",
+      "nom": "Immobilier",
+      "valeur_eur": 0.0,
+      "categorie": "immobilier",
+      "couleur": "#ff4488",
+      "meta": {
+        "type": "residence_principale",
+        "annees_detention": 0,
+        "credit_restant": 0.0
+      }
+    }
+  ],
+  "apports": [],
+  "config": {
+    "taux_annuel": 0.10,
+    "age_actuel": 35,
+    "age_retraite": 56,
+    "apport_mensuel": 500.0,
+    "annee_base": 2026
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "mode": "SIMULATION",
+  "capital_reel": 500.0,
+  "transition_ts": "2026-06-12T08:18:51.144049",
+  "pending_bascule": null,
+  "historique": [
+    {
+      "ts": "2026-06-12T08:18:51.144049",
+      "mode_avant": "SIMULATION",
+      "mode_apres": "REEL",
+      "capital": 500.0,
+      "decideur": "Zoubida"
+    },
+    {
+      "ts": "2026-06-12T08:19:00.348405",
+      "mode_avant": "REEL",
+      "mode_apres": "SIMULATION",
+      "capital": 500.0,
+      "decideur": "Zoubida"
+    }
+  ]
+}

@@ -1,0 +1,521 @@
+2026-06-12 15:38:55,165 [INFO] Loaded 30 traders
+2026-06-12 15:38:55,343 [INFO] [RESTORE] Restoring 30 traders from last snapshot...
+2026-06-12 15:38:55,364 [INFO] [RESTORE] TRD01  pv=500.00  cash=500.00  positions=0
+2026-06-12 15:38:55,388 [INFO] [RESTORE] TRD02  pv=80.00  cash=80.00  positions=1
+2026-06-12 15:38:55,414 [INFO] [RESTORE] TRD03  pv=0.24  cash=0.24  positions=1
+2026-06-12 15:38:55,439 [INFO] [RESTORE] TRD04  pv=500.11  cash=496.16  positions=1
+2026-06-12 15:38:55,464 [INFO] [RESTORE] TRD05  pv=0.00  cash=0.00  positions=1
+2026-06-12 15:38:55,489 [INFO] [RESTORE] TRD06  pv=491.98  cash=0.15  positions=1
+2026-06-12 15:38:55,491 [INFO] [RESTORE] TRD07  pv=19.58  cash=19.58  positions=1
+2026-06-12 15:38:55,492 [INFO] [RESTORE] TRD08  pv=0.00  cash=0.00  positions=1
+2026-06-12 15:38:55,493 [INFO] [RESTORE] TRD09  pv=500.00  cash=500.00  positions=0
+2026-06-12 15:38:55,494 [INFO] [RESTORE] TRD10  pv=496.79  cash=0.04  positions=1
+2026-06-12 15:38:55,495 [INFO] [RESTORE] TRD11  pv=45.39  cash=35.43  positions=2
+2026-06-12 15:38:55,496 [INFO] [RESTORE] TRD12  pv=500.82  cash=4.23  positions=1
+2026-06-12 15:38:55,498 [INFO] [RESTORE] TRD13  pv=0.00  cash=0.00  positions=1
+2026-06-12 15:38:55,499 [INFO] [RESTORE] TRD14  pv=501.44  cash=0.30  positions=1
+2026-06-12 15:38:55,500 [INFO] [RESTORE] TRD15  pv=85.52  cash=0.21  positions=2
+2026-06-12 15:38:55,501 [INFO] [RESTORE] TRD16  pv=491.34  cash=0.07  positions=1
+2026-06-12 15:38:55,502 [INFO] [RESTORE] TRD17  pv=514.14  cash=514.14  positions=0
+2026-06-12 15:38:55,504 [INFO] [RESTORE] TRD18  pv=0.01  cash=0.01  positions=3
+2026-06-12 15:38:55,505 [INFO] [RESTORE] TRD19  pv=374.86  cash=374.86  positions=1
+2026-06-12 15:38:55,506 [INFO] [RESTORE] TRD20  pv=503.79  cash=503.79  positions=0
+2026-06-12 15:38:55,507 [INFO] [RESTORE] TRD21  pv=199.77  cash=199.77  positions=1
+2026-06-12 15:38:55,508 [INFO] [RESTORE] TRD22  pv=502.30  cash=209.04  positions=1
+2026-06-12 15:38:55,510 [INFO] [RESTORE] TRD23  pv=502.95  cash=502.95  positions=0
+2026-06-12 15:38:55,511 [INFO] [RESTORE] TRD24  pv=128.96  cash=73.08  positions=2
+2026-06-12 15:38:55,512 [INFO] [RESTORE] TRD25  pv=500.00  cash=500.00  positions=0
+2026-06-12 15:38:55,513 [INFO] [RESTORE] TRD26  pv=510.92  cash=0.75  positions=1
+2026-06-12 15:38:55,515 [INFO] [RESTORE] TRD27  pv=503.89  cash=0.88  positions=1
+2026-06-12 15:38:55,516 [INFO] [RESTORE] TRD28  pv=463.17  cash=0.79  positions=1
+2026-06-12 15:38:55,517 [INFO] [RESTORE] TRD29  pv=506.23  cash=0.30  positions=2
+2026-06-12 15:38:55,518 [INFO] [RESTORE] TRD30  pv=504.01  cash=0.47  positions=1
+2026-06-12 15:38:55,519 [INFO] [RESTORE] Done: 30/30 traders restored from last snapshot
+2026-06-12 15:38:56,226 [INFO] Preloaded 625 price points for VPK.AS
+2026-06-12 15:38:56,542 [INFO] Preloaded 1349 price points for GTT.PA
+2026-06-12 15:38:56,682 [INFO] Preloaded 1341 price points for TEL.OL
+2026-06-12 15:38:56,953 [INFO] Preloaded 1607 price points for DNB.OL
+2026-06-12 15:38:57,146 [INFO] Preloaded 2414 price points for TTE.PA
+2026-06-12 15:38:57,335 [INFO] Preloaded 2419 price points for SU.PA
+2026-06-12 15:38:57,641 [INFO] Preloaded 2418 price points for AIR.PA
+2026-06-12 15:38:57,903 [INFO] Preloaded 2231 price points for DSY.PA
+2026-06-12 15:38:58,487 [INFO] Preloaded 1400 price points for BIPC
+2026-06-12 15:38:58,710 [INFO] Preloaded 1398 price points for ADC
+2026-06-12 15:38:58,913 [INFO] Preloaded 1569 price points for SPY
+2026-06-12 15:38:59,545 [INFO] Preloaded 1569 price points for QQQ
+2026-06-12 15:38:59,762 [INFO] Preloaded 1569 price points for GLD
+2026-06-12 15:39:00,016 [INFO] Preloaded 1567 price points for TLT
+2026-06-12 15:39:00,303 [INFO] Preloaded 1569 price points for XLE
+2026-06-12 15:39:00,590 [INFO] Preloaded 1569 price points for XLU
+2026-06-12 15:39:00,753 [INFO] Preloaded 1569 price points for EEM
+2026-06-12 15:39:01,095 [INFO] Preloaded 1567 price points for FXI
+2026-06-12 15:39:01,326 [INFO] Preloaded 1559 price points for INDA
+2026-06-12 15:39:01,522 [INFO] Preloaded 1569 price points for EWZ
+2026-06-12 15:39:01,523 [INFO] Preloaded histories for 30/30 traders
+2026-06-12 15:39:01,533 [INFO] [MessageBus] Initialisé (async=True)
+2026-06-12 15:39:01,534 [INFO] [Bus] engine souscrit à ['alerte_critique', 'alerte_warning', 'signal_marche', 'macro_update']
+2026-06-12 15:39:01,534 [INFO] [InterAgentHub] Initialisé — 5 flux actifs (+ BertezPublisher)
+2026-06-12 15:39:01,542 [INFO] [Engine] GouvernanceEngine initialisé
+2026-06-12 15:39:01,576 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,577 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,577 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,578 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,579 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,579 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,580 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,581 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,581 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,582 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,583 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,584 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,584 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,585 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,586 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 15:39:01,587 [INFO] Added job "_job_rapport_pdf" to job store "default"
+2026-06-12 15:39:01,588 [INFO] Added job "_job_rapport_agd" to job store "default"
+2026-06-12 15:39:01,589 [INFO] Added job "_job_comite_selection" to job store "default"
+2026-06-12 15:39:01,589 [INFO] Added job "_job_actualites" to job store "default"
+2026-06-12 15:39:01,590 [INFO] Added job "_job_alertes_prix" to job store "default"
+2026-06-12 15:39:01,591 [INFO] Added job "_job_calendrier_evenements" to job store "default"
+2026-06-12 15:39:01,591 [INFO] Added job "_job_alpha_lab" to job store "default"
+2026-06-12 15:39:01,592 [INFO] Added job "_job_veille_strategique" to job store "default"
+2026-06-12 15:39:01,593 [INFO] Added job "_job_backup" to job store "default"
+2026-06-12 15:39:01,593 [INFO] Added job "_job_check_outcomes" to job store "default"
+2026-06-12 15:39:01,594 [INFO] Added job "_job_rapport_mensuel" to job store "default"
+2026-06-12 15:39:01,594 [INFO] Added job "_job_rapport_annuel" to job store "default"
+2026-06-12 15:39:01,595 [INFO] Added job "_job_suivi_pru" to job store "default"
+2026-06-12 15:39:01,595 [INFO] Added job "_job_autonomie_check" to job store "default"
+2026-06-12 15:39:01,596 [INFO] Added job "_job_sync_gouvernance" to job store "default"
+2026-06-12 15:39:01,596 [INFO] Scheduler started
+2026-06-12 15:39:01,598 [INFO] [SCHEDULER] APScheduler démarré — job rapport_investisseur lundi 09:00
+2026-06-12 15:39:01,599 [INFO] Trading engine started
+2026-06-12 15:39:02,196 [INFO] Telegram: alerte envoyée (HTTP 200)
+2026-06-12 15:39:02,199 [INFO] Server starting on http://0.0.0.0:5000
+2026-06-12 15:39:02,219 [INFO] [31m[1mWARNING: This is a development server. Do not use it in a production deployment. Use a production WSGI server instead.[0m
+ * Running on all addresses (0.0.0.0)
+ * Running on http://127.0.0.1:5000
+ * Running on http://192.168.1.17:5000
+2026-06-12 15:39:02,219 [INFO] [33mPress CTRL+C to quit[0m
+2026-06-12 15:39:09,030 [INFO] TRADE TRD04 SELL DNB.OL 0.010946 @ 289.6000 → PV=500.12
+2026-06-12 15:39:14,188 [INFO] TRADE TRD14 BUY TLT 0.001919 @ 85.5721 → PV=501.31
+2026-06-12 15:40:16,609 [INFO] TRADE TRD04 SELL DNB.OL 0.002189 @ 289.7000 → PV=500.12
+2026-06-12 15:40:52,889 [INFO] Pipeline [VPK.AS] → 6.3/10 (hold)
+2026-06-12 15:40:53,368 [INFO] Pipeline [GTT.PA] → 6.7/10 (hold)
+2026-06-12 15:40:53,876 [INFO] Pipeline [O] → 5.5/10 (hold)
+2026-06-12 15:40:54,546 [INFO] Pipeline [JNJ] → 6.1/10 (hold)
+2026-06-12 15:40:55,081 [INFO] Pipeline [VZ] → 6.5/10 (hold)
+2026-06-12 15:40:55,735 [INFO] Pipeline [TEL.OL] → 6.6/10 (hold)
+2026-06-12 15:40:56,185 [INFO] Pipeline [DNB.OL] → 6.0/10 (hold)
+2026-06-12 15:40:56,702 [INFO] Pipeline [BIPC] → 6.2/10 (hold)
+2026-06-12 15:40:57,564 [INFO] Pipeline [ADC] → 5.8/10 (hold)
+2026-06-12 15:40:58,196 [INFO] Pipeline [DSY.PA] → 6.4/10 (hold)
+2026-06-12 15:40:58,605 [INFO] Pipeline [SU.PA] → 5.9/10 (hold)
+2026-06-12 15:40:59,249 [INFO] Pipeline [TTE.PA] → 7.5/10 (buy)
+2026-06-12 15:40:59,666 [INFO] Pipeline [AIR.PA] → 5.7/10 (hold)
+C:\Users\zoubida\Documents\king-fund\backend\app.py:223: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return jsonify({"timestamp": datetime.utcnow().isoformat(), "watchlist": results})
+2026-06-12 15:40:59,782 [INFO] 127.0.0.1 - - [12/Jun/2026 15:40:59] "GET /api/investissement/watchlist?force=1 HTTP/1.1" 200 -
+2026-06-12 15:41:18,603 [INFO] TRADE TRD11 BUY SPY 0.009934 @ 737.1800 → PV=45.37
+2026-06-12 15:41:18,608 [INFO] TRADE TRD23 BUY SPY 0.136999 @ 737.1800 → PV=502.95
+2026-06-12 15:41:20,983 [INFO] [Comite] Enrichissement TTE.PA — cache keys: ['VPK.AS', 'GTT.PA', 'O', 'JNJ', 'VZ'] — cached score: 7.51
+2026-06-12 15:41:21,432 [INFO] [Comite] Claude initialisé
+2026-06-12 15:41:21,433 [INFO] [Comite] Ouverture séance — TTE.PA
+2026-06-12 15:41:21,813 [INFO] [AGD-01] Claude Opus initialisé
+2026-06-12 15:41:23,001 [INFO] [AGD-01] Howell: HOWELL_SEREIN — Environnement favorable
+2026-06-12 15:41:31,785 [INFO] HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-12 15:41:37,735 [INFO] HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-12 15:41:38,422 [INFO] [Comite] TTE.PA → BUY CONFIRMÉ (Research: OUI | CIO: OUI | Fiscaliste: OUI)
+2026-06-12 15:41:38,423 [INFO] 127.0.0.1 - - [12/Jun/2026 15:41:38] "POST /api/comite-selection/voter HTTP/1.1" 200 -
+2026-06-12 15:42:20,656 [INFO] TRADE TRD11 BUY SPY 0.007886 @ 736.6100 → PV=45.35
+2026-06-12 15:42:20,657 [INFO] TRADE TRD12 BUY QQQ 0.003555 @ 713.3236 → PV=499.11
+2026-06-12 15:42:20,660 [INFO] TRADE TRD23 BUY SPY 0.109574 @ 736.6100 → PV=502.87
+2026-06-12 15:42:20,661 [INFO] TRADE TRD24 BUY QQQ 0.009077 @ 713.3236 → PV=128.77
+2026-06-12 15:43:22,353 [INFO] TRADE TRD11 BUY SPY 0.006262 @ 735.9450 → PV=45.33
+2026-06-12 15:43:22,355 [INFO] TRADE TRD12 BUY QQQ 0.001422 @ 712.4400 → PV=498.49
+2026-06-12 15:43:22,358 [INFO] TRADE TRD23 BUY SPY 0.087651 @ 735.9450 → PV=502.71
+2026-06-12 15:43:22,359 [INFO] TRADE TRD24 BUY QQQ 0.008283 @ 712.4400 → PV=128.69
+2026-06-12 15:44:26,357 [INFO] TRADE TRD15 SELL XLE 1.341555 @ 57.3200 → PV=85.65
+2026-06-12 15:44:26,361 [INFO] TRADE TRD17 BUY EEM 4.292508 @ 67.2600 → PV=514.14
+2026-06-12 15:45:28,688 [INFO] TRADE TRD17 BUY EEM 1.882890 @ 67.2300 → PV=514.01
+2026-06-12 15:46:30,395 [INFO] TRADE TRD11 BUY SPY 0.004971 @ 735.3800 → PV=45.31
+2026-06-12 15:46:30,397 [INFO] TRADE TRD17 BUY EEM 0.826167 @ 67.1800 → PV=513.70
+2026-06-12 15:46:30,399 [INFO] TRADE TRD23 BUY SPY 0.070104 @ 735.3800 → PV=502.52
+2026-06-12 15:48:33,983 [INFO] TRADE TRD07 BUY AIR.PA 0.017093 @ 179.3200 → PV=19.58
+2026-06-12 15:49:35,810 [INFO] TRADE TRD07 BUY AIR.PA 0.014451 @ 178.9000 → PV=19.57
+2026-06-12 15:49:35,813 [INFO] TRADE TRD15 SELL XLE 0.134156 @ 57.4500 → PV=85.67
+2026-06-12 15:51:39,439 [INFO] TRADE TRD07 BUY AIR.PA 0.012187 @ 178.9200 → PV=19.57
+2026-06-12 15:52:40,990 [INFO] TRADE TRD07 BUY AIR.PA 0.010284 @ 178.8200 → PV=19.57
+2026-06-12 15:52:40,994 [INFO] TRADE TRD20 BUY EWZ 7.254670 @ 34.9300 → PV=503.79
+2026-06-12 15:53:49,218 [INFO] LiquidityDesk refreshed — score=5.24 regime=neutre
+2026-06-12 15:54:44,481 [INFO] TRADE TRD15 SELL XLE 0.013416 @ 57.8150 → PV=85.68
+2026-06-12 15:55:45,961 [INFO] TRADE TRD07 BUY AIR.PA 0.008706 @ 178.1600 → PV=19.53
+2026-06-12 15:55:45,964 [INFO] TRADE TRD15 SELL XLE 0.001342 @ 57.8700 → PV=85.68
+2026-06-12 15:56:47,491 [INFO] TRADE TRD07 BUY AIR.PA 0.007341 @ 178.2000 → PV=19.53
+2026-06-12 15:56:47,494 [INFO] TRADE TRD17 SELL EEM 7.001565 @ 67.4200 → PV=515.38
+2026-06-12 15:56:47,497 [INFO] TRADE TRD24 SELL QQQ 0.095429 @ 714.3950 → PV=128.88
+2026-06-12 15:57:49,503 [INFO] TRADE TRD23 SELL SPY 0.404328 @ 737.3899 → PV=503.33
+2026-06-12 16:00:00,013 [INFO] Running job "_job_actualites (trigger: cron[minute='*/30'], next run at: 2026-06-12 16:00:00 CEST)" (scheduled at 2026-06-12 16:00:00+02:00)
+2026-06-12 16:00:00,031 [INFO] Running job "_job_alertes_prix (trigger: cron[hour='8-20', minute='*/30'], next run at: 2026-06-12 16:00:00 CEST)" (scheduled at 2026-06-12 16:00:00+02:00)
+2026-06-12 16:00:00,045 [INFO] Running job "_job_suivi_pru (trigger: cron[hour='9-18', minute='*/30'], next run at: 2026-06-12 16:00:00 CEST)" (scheduled at 2026-06-12 16:00:00+02:00)
+2026-06-12 16:00:00,050 [INFO] Job "_job_suivi_pru (trigger: cron[hour='9-18', minute='*/30'], next run at: 2026-06-12 16:30:00 CEST)" executed successfully
+2026-06-12 16:00:02,575 [INFO] [Actualites] 15 articles — CRITIQUE:0 IMPORTANT:0 INFO:15
+2026-06-12 16:00:02,576 [INFO] Job "_job_actualites (trigger: cron[minute='*/30'], next run at: 2026-06-12 16:30:00 CEST)" executed successfully
+2026-06-12 16:00:02,684 [INFO] Job "_job_alertes_prix (trigger: cron[hour='8-20', minute='*/30'], next run at: 2026-06-12 16:30:00 CEST)" executed successfully
+2026-06-12 16:00:55,099 [INFO] TRADE TRD12 SELL QQQ 0.698744 @ 715.9453 → PV=500.94
+2026-06-12 16:01:56,686 [INFO] TRADE TRD11 SELL SPY 0.042535 @ 738.3300 → PV=45.44
+2026-06-12 16:02:37,354 [INFO] 127.0.0.1 - - [12/Jun/2026 16:02:37] "[36mGET / HTTP/1.1[0m" 304 -
+2026-06-12 16:02:37,436 [INFO] 127.0.0.1 - - [12/Jun/2026 16:02:37] "[36mGET /assets/style.css HTTP/1.1[0m" 304 -
+2026-06-12 16:02:37,800 [INFO] 127.0.0.1 - - [12/Jun/2026 16:02:37] "[36mGET /manifest.json HTTP/1.1[0m" 304 -
+2026-06-12 16:02:38,322 [INFO] 127.0.0.1 - - [12/Jun/2026 16:02:38] "[36mGET /app.js HTTP/1.1[0m" 304 -
+2026-06-12 16:02:38,683 [INFO] 127.0.0.1 - - [12/Jun/2026 16:02:38] "GET /api/state HTTP/1.1" 200 -
+2026-06-12 16:02:38,684 [INFO] 127.0.0.1 - - [12/Jun/2026 16:02:38] "GET /api/bus/state HTTP/1.1" 200 -
+2026-06-12 16:02:38,730 [INFO] 127.0.0.1 - - [12/Jun/2026 16:02:38] "[36mGET /assets/icon-192.png HTTP/1.1[0m" 304 -
+2026-06-12 16:02:40,851 [INFO] HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-12 16:02:40,853 [INFO] Morning Brief: neutral (conf=0.58) — Mixed signals with moderately tight liquidity (5.24/10), weak energy sentiment (1.3/10), and tepid overall market sentiment (4.0/10) offset by resilient macro (6.0/10) and strong Asian equity flows (7.75/10).
+2026-06-12 16:02:40,861 [INFO] 127.0.0.1 - - [12/Jun/2026 16:02:40] "GET /api/brief HTTP/1.1" 200 -
+2026-06-12 16:02:51,865 [INFO] 127.0.0.1 - - [12/Jun/2026 16:02:51] "GET /api/patrimoine HTTP/1.1" 200 -
+2026-06-12 16:02:52,156 [INFO] 127.0.0.1 - - [12/Jun/2026 16:02:52] "GET /api/bus/state HTTP/1.1" 200 -
+2026-06-12 16:02:56,454 [INFO] 127.0.0.1 - - [12/Jun/2026 16:02:56] "GET /api/divisions HTTP/1.1" 200 -
+2026-06-12 16:02:58,327 [INFO] TRADE TRD10 SELL ADC 5.629443 @ 75.6250 → PV=500.90
+2026-06-12 16:02:58,473 [INFO] 127.0.0.1 - - [12/Jun/2026 16:02:58] "GET /api/divisions HTTP/1.1" 200 -
+2026-06-12 16:03:03,454 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:03] "GET /api/patrimoine HTTP/1.1" 200 -
+2026-06-12 16:03:08,355 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:08] "GET /api/actualites HTTP/1.1" 200 -
+C:\Users\zoubida\Documents\king-fund\backend\app.py:223: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return jsonify({"timestamp": datetime.utcnow().isoformat(), "watchlist": results})
+2026-06-12 16:03:08,680 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:08] "GET /api/comite-selection/historique HTTP/1.1" 200 -
+2026-06-12 16:03:08,683 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:08] "GET /api/investissement/watchlist HTTP/1.1" 200 -
+2026-06-12 16:03:08,725 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:08] "GET /api/investissement/screener HTTP/1.1" 200 -
+C:\Users\zoubida\Documents\king-fund\backend\app.py:1045: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "timestamp":          datetime.utcnow().isoformat(),
+2026-06-12 16:03:09,099 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:09] "GET /api/correlations/actoblig HTTP/1.1" 200 -
+2026-06-12 16:03:09,120 [INFO] Alpha Lab [ValidSignaux] génération rapport complet…
+2026-06-12 16:03:09,322 [INFO] Alpha Lab [Bertez] → OVERFITTE | Sharpe OOS=0.19 | t=3.56
+2026-06-12 16:03:09,346 [INFO] Alpha Lab [Momentum] → BRUIT | Sharpe OOS=0.16 | t=1.41
+2026-06-12 16:03:09,364 [INFO] Alpha Lab [MeanRev] → BRUIT | Sharpe OOS=0.28 | t=0.75
+2026-06-12 16:03:09,383 [INFO] Alpha Lab [Macro] → BRUIT | Sharpe OOS=0.08 | t=0.59
+2026-06-12 16:03:09,407 [INFO] Alpha Lab [TrendFollow] → VALIDE | Sharpe OOS=0.72 | t=5.70
+2026-06-12 16:03:09,431 [INFO] Alpha Lab [Fundamental] → BRUIT | Sharpe OOS=0.03 | t=1.04
+2026-06-12 16:03:09,432 [INFO] Alpha Lab [ValidSignaux] rapport généré en 0.3s — 6 signaux (✅1 VALIDES | 🔇4 BRUITS | ⚠️1 OVERFITS)
+2026-06-12 16:03:09,433 [INFO] Alpha Lab [Facteurs] calcul scores watchlist…
+2026-06-12 16:03:09,456 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:09] "GET /api/agd/audit?limit=20 HTTP/1.1" 200 -
+2026-06-12 16:03:09,697 [ERROR] HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}
+2026-06-12 16:03:09,743 [ERROR] HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}
+2026-06-12 16:03:09,843 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:09] "GET /api/signaux/predictivite HTTP/1.1" 200 -
+C:\Users\zoubida\Documents\king-fund\backend\app.py:948: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "timestamp":      datetime.utcnow().isoformat(),
+2026-06-12 16:03:10,353 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:10] "GET /api/dspx/etat HTTP/1.1" 200 -
+2026-06-12 16:03:10,884 [INFO] [VeilleStrat] 34 articles — CRITIQUE:0 IMPORTANT:11 INFO:23
+2026-06-12 16:03:10,887 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:10] "GET /api/veille-strategique HTTP/1.1" 200 -
+C:\Users\zoubida\Documents\king-fund\backend\app.py:282: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return jsonify({"timestamp": datetime.utcnow().isoformat(), "seuils": resultats})
+2026-06-12 16:03:11,692 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:11] "GET /api/alertes/seuils HTTP/1.1" 200 -
+C:\Users\zoubida\Documents\king-fund\backend\app.py:294: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return jsonify({"timestamp": datetime.utcnow().isoformat(), "evenements": evenements})
+2026-06-12 16:03:11,851 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:11] "GET /api/alertes/calendrier HTTP/1.1" 200 -
+2026-06-12 16:03:19,300 [INFO] Alpha Lab [Facteurs] terminé en 9.9s — 13 actifs scorés
+2026-06-12 16:03:19,302 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:19] "GET /api/alpha-lab/rapport HTTP/1.1" 200 -
+2026-06-12 16:03:37,003 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:37] "GET /api/patrimoine HTTP/1.1" 200 -
+2026-06-12 16:03:38,159 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:38] "GET /api/bus/state HTTP/1.1" 200 -
+C:\Users\zoubida\Documents\king-fund\backend\app.py:774: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "updated_at":         datetime.utcnow().isoformat(),
+2026-06-12 16:03:38,466 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:38] "GET /api/cio/allocation HTTP/1.1" 200 -
+2026-06-12 16:03:41,577 [ERROR] HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: ENGIE.PA"}}}
+2026-06-12 16:03:43,070 [INFO] [Dividendes] Revenu annuel: 154€ | Mensuel: 13€ | Coupes: 0 | Fiables: 0
+2026-06-12 16:03:43,071 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:43] "GET /api/dividendes HTTP/1.1" 200 -
+2026-06-12 16:03:43,438 [INFO] 127.0.0.1 - - [12/Jun/2026 16:03:43] "GET /api/patrimoine/positions-pru HTTP/1.1" 200 -
+2026-06-12 16:04:00,027 [INFO] TRADE TRD19 BUY INDA 1.729984 @ 48.3850 → PV=374.86
+2026-06-12 16:04:00,144 [INFO] 127.0.0.1 - - [12/Jun/2026 16:04:00] "GET /api/divisions HTTP/1.1" 200 -
+C:\Users\zoubida\Documents\king-fund\backend\app.py:774: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "updated_at":         datetime.utcnow().isoformat(),
+2026-06-12 16:04:31,199 [INFO] 127.0.0.1 - - [12/Jun/2026 16:04:31] "GET /api/cio/allocation HTTP/1.1" 200 -
+C:\Users\zoubida\Documents\king-fund\backend\app.py:854: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  "timestamp": datetime.utcnow().isoformat(),
+2026-06-12 16:04:31,201 [INFO] 127.0.0.1 - - [12/Jun/2026 16:04:31] "GET /api/bertez/analyse HTTP/1.1" 200 -
+2026-06-12 16:04:35,471 [INFO] 127.0.0.1 - - [12/Jun/2026 16:04:35] "GET /api/liquidite HTTP/1.1" 200 -
+2026-06-12 16:04:35,776 [INFO] 127.0.0.1 - - [12/Jun/2026 16:04:35] "GET /api/dspx/etat HTTP/1.1" 200 -
+2026-06-12 16:04:35,777 [INFO] 127.0.0.1 - - [12/Jun/2026 16:04:35] "GET /api/correlations/actoblig HTTP/1.1" 200 -
+2026-06-12 16:04:35,782 [INFO] 127.0.0.1 - - [12/Jun/2026 16:04:35] "GET /api/bus/state HTTP/1.1" 200 -
+2026-06-12 16:04:47,326 [INFO] 127.0.0.1 - - [12/Jun/2026 16:04:47] "GET /api/brief HTTP/1.1" 200 -
+2026-06-12 16:04:47,328 [INFO] 127.0.0.1 - - [12/Jun/2026 16:04:47] "GET /api/actualites HTTP/1.1" 200 -
+2026-06-12 16:04:47,333 [INFO] 127.0.0.1 - - [12/Jun/2026 16:04:47] "GET /api/post-market HTTP/1.1" 200 -
+2026-06-12 16:04:48,046 [INFO] [RiskParity] Vol port: 16.2% | Déséquilibres: 3
+2026-06-12 16:04:48,047 [INFO] 127.0.0.1 - - [12/Jun/2026 16:04:48] "GET /api/risk-parity HTTP/1.1" 200 -
+2026-06-12 16:04:48,472 [INFO] [Benchmark] Alpha vs SP500: N/A | Sharpe: None
+2026-06-12 16:04:48,472 [INFO] 127.0.0.1 - - [12/Jun/2026 16:04:48] "GET /api/benchmark HTTP/1.1" 200 -
+2026-06-12 16:05:00,005 [INFO] Running job "_job_veille_strategique (trigger: cron[minute='5'], next run at: 2026-06-12 17:05:00 CEST)" (scheduled at 2026-06-12 16:05:00+02:00)
+2026-06-12 16:05:02,425 [INFO] [VeilleStrat] 34 articles — CRITIQUE:0 IMPORTANT:11 INFO:23
+2026-06-12 16:05:02,426 [INFO] Job "_job_veille_strategique (trigger: cron[minute='5'], next run at: 2026-06-12 17:05:00 CEST)" executed successfully
+2026-06-12 16:05:04,200 [INFO] TRADE TRD10 SELL ADC 0.844416 @ 75.6900 → PV=500.96
+2026-06-12 16:05:04,343 [INFO] 127.0.0.1 - - [12/Jun/2026 16:05:04] "GET /api/divisions HTTP/1.1" 200 -
+2026-06-12 16:06:06,014 [INFO] TRADE TRD10 SELL ADC 0.126662 @ 75.6950 → PV=500.96
+2026-06-12 16:06:06,018 [INFO] TRADE TRD19 SELL INDA 1.729984 @ 48.3250 → PV=374.75
+2026-06-12 16:06:06,487 [INFO] 127.0.0.1 - - [12/Jun/2026 16:06:06] "GET /api/divisions HTTP/1.1" 200 -
+2026-06-12 16:07:07,678 [INFO] TRADE TRD10 SELL ADC 0.018999 @ 75.7050 → PV=500.96
+2026-06-12 16:07:08,079 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:08] "GET /api/divisions HTTP/1.1" 200 -
+2026-06-12 16:07:32,456 [INFO] [Comite] Enrichissement SANOFI — cache keys: ['VPK.AS', 'GTT.PA', 'O', 'JNJ', 'VZ'] — cached score: ABSENT
+2026-06-12 16:07:32,457 [INFO] [Comite] Ouverture séance — SANOFI
+2026-06-12 16:07:39,479 [INFO] HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-12 16:07:45,542 [INFO] HTTP Request: POST https://api.anthropic.com/v1/messages "HTTP/1.1 200 OK"
+2026-06-12 16:07:53,613 [INFO] [ScreenerMondial] Démarrage scan — 136 titres dans l'univers
+2026-06-12 16:07:53,614 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:53] "POST /api/investissement/screener/run HTTP/1.1" 200 -
+2026-06-12 16:07:54,332 [INFO] [Comite] SANOFI → HOLD AVEC REVUE (Research: NON | CIO: ABSTENTION | Fiscaliste: OUI)
+2026-06-12 16:07:54,333 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:54] "POST /api/comite-selection/voter HTTP/1.1" 200 -
+2026-06-12 16:07:56,183 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:56] "GET /api/actualites HTTP/1.1" 200 -
+C:\Users\zoubida\Documents\king-fund\backend\app.py:223: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return jsonify({"timestamp": datetime.utcnow().isoformat(), "watchlist": results})
+2026-06-12 16:07:56,185 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:56] "GET /api/dspx/etat HTTP/1.1" 200 -
+2026-06-12 16:07:56,187 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:56] "GET /api/correlations/actoblig HTTP/1.1" 200 -
+2026-06-12 16:07:56,194 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:56] "GET /api/investissement/watchlist HTTP/1.1" 200 -
+2026-06-12 16:07:56,201 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:56] "GET /api/comite-selection/historique HTTP/1.1" 200 -
+2026-06-12 16:07:56,217 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:56] "GET /api/investissement/screener HTTP/1.1" 200 -
+2026-06-12 16:07:56,524 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:56] "GET /api/alpha-lab/rapport HTTP/1.1" 200 -
+2026-06-12 16:07:56,535 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:56] "GET /api/veille-strategique HTTP/1.1" 200 -
+2026-06-12 16:07:56,542 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:56] "GET /api/agd/audit?limit=20 HTTP/1.1" 200 -
+2026-06-12 16:07:56,578 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:56] "GET /api/signaux/predictivite HTTP/1.1" 200 -
+C:\Users\zoubida\Documents\king-fund\backend\app.py:282: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return jsonify({"timestamp": datetime.utcnow().isoformat(), "seuils": resultats})
+2026-06-12 16:07:57,993 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:57] "GET /api/alertes/seuils HTTP/1.1" 200 -
+C:\Users\zoubida\Documents\king-fund\backend\app.py:294: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+  return jsonify({"timestamp": datetime.utcnow().isoformat(), "evenements": evenements})
+2026-06-12 16:07:58,316 [INFO] 127.0.0.1 - - [12/Jun/2026 16:07:58] "GET /api/alertes/calendrier HTTP/1.1" 200 -
+2026-06-12 16:08:08,477 [INFO] [ScreenerMondial] Démarrage scan — 136 titres dans l'univers
+2026-06-12 16:08:08,478 [INFO] 127.0.0.1 - - [12/Jun/2026 16:08:08] "POST /api/investissement/screener/run HTTP/1.1" 200 -
+2026-06-12 16:08:09,322 [INFO] TRADE TRD10 SELL ADC 0.002850 @ 75.7150 → PV=500.96
+2026-06-12 16:08:09,325 [INFO] TRADE TRD19 BUY INDA 1.729683 @ 48.3800 → PV=374.75
+2026-06-12 16:08:09,514 [INFO] 127.0.0.1 - - [12/Jun/2026 16:08:09] "GET /api/divisions HTTP/1.1" 200 -
+2026-06-12 16:08:13,754 [ERROR] HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: WBA"}}}
+2026-06-12 16:08:20,835 [ERROR] HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: WBA"}}}
+2026-06-12 16:08:39,061 [ERROR] HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: EON.DE"}}}
+2026-06-12 16:08:39,080 [ERROR] HTTP Error 404: {"quoteSummary":{"result":null,"error":{"code":"Not Found","description":"Quote not found for symbol: EON.DE"}}}
+2026-06-12 16:08:58,169 [INFO] [ScreenerMondial] Scan terminé : 9 filtrés → 9 candidats | top: ['YAR.OL', 'BNP.PA', '0941.HK', 'DBK.DE', 'LLOY.L', 'BARC.L', 'SHEL.L', 'ABN.AS', 'BAC']
+2026-06-12 16:09:11,494 [INFO] TRADE TRD20 SELL EWZ 7.254670 @ 35.1400 → PV=505.31
+2026-06-12 16:09:11,683 [INFO] [Bus] [SIGNAL_MARCHE][info] desk_liquidite → Budget ajustement liquidité — factor=1.02 (score=5.2/10)
+2026-06-12 16:09:11,688 [INFO] [Hub] Liq budget factor → 1.02
+2026-06-12 16:09:11,688 [INFO] [DeskLiqBudget] score=5.2/10 → budget_factor=1.02
+2026-06-12 16:09:12,045 [INFO] 127.0.0.1 - - [12/Jun/2026 16:09:12] "GET /api/divisions HTTP/1.1" 200 -
+2026-06-12 16:09:17,753 [ERROR] HTTP Error 401: {"finance":{"result":null,"error":{"code":"Unauthorized","description":"Invalid Crumb"}}}
+2026-06-12 16:09:17,816 [INFO] LiquidityDesk refreshed — score=5.39 regime=neutre
+2026-06-12 16:09:20,679 [INFO] [ScreenerMondial] Scan terminé : 9 filtrés → 9 candidats | top: ['YAR.OL', 'BNP.PA', '0941.HK', 'DBK.DE', 'LLOY.L', 'BARC.L', 'SHEL.L', 'ABN.AS', 'BAC']
+2026-06-12 16:10:13,702 [INFO] 127.0.0.1 - - [12/Jun/2026 16:10:13] "GET /api/divisions HTTP/1.1" 200 -
+2026-06-12 16:11:15,730 [INFO] 127.0.0.1 - - [12/Jun/2026 16:11:15] "GET /ws HTTP/1.1" 200 -
+2026-06-12 16:12:15,760 [ERROR] $SU.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,760 [ERROR] $DNB.OL: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,760 [ERROR] $QQQ: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,769 [ERROR] $GLD: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,784 [ERROR] $ADC: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,785 [ERROR] $GTT.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,797 [ERROR] $EEM: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,801 [ERROR] $XLE: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,804 [ERROR] $EWZ: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,815 [ERROR] $DSY.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,819 [ERROR] $VPK.AS: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,830 [ERROR] $TLT: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,831 [ERROR] $INDA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,830 [ERROR] $SPY: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,832 [ERROR] $XLU: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,846 [ERROR] $AIR.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,847 [ERROR] $TEL.OL: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,846 [ERROR] $TTE.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,849 [ERROR] $FXI: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,853 [ERROR] $BIPC: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:12:15,860 [ERROR] 
+20 Failed downloads:
+2026-06-12 16:12:15,861 [ERROR] ['SU.PA', 'DNB.OL', 'QQQ', 'GLD', 'ADC', 'GTT.PA', 'EEM', 'XLE', 'EWZ', 'DSY.PA', 'VPK.AS', 'TLT', 'INDA', 'SPY', 'XLU', 'AIR.PA', 'TEL.OL', 'TTE.PA', 'FXI', 'BIPC']: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:13:17,728 [INFO] TRADE TRD19 SELL INDA 1.729683 @ 48.3700 → PV=374.73
+2026-06-12 16:14:17,860 [ERROR] $SU.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,863 [ERROR] $DNB.OL: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,866 [ERROR] $QQQ: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,870 [ERROR] $GLD: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,873 [ERROR] $ADC: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,875 [ERROR] $GTT.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,879 [ERROR] $EEM: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,882 [ERROR] $XLE: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,885 [ERROR] $EWZ: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,887 [ERROR] $DSY.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,892 [ERROR] $TLT: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,894 [ERROR] $VPK.AS: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,899 [ERROR] $TEL.OL: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,900 [ERROR] $INDA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,904 [ERROR] $AIR.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,906 [ERROR] $TTE.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,908 [ERROR] $SPY: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,912 [ERROR] $FXI: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,914 [ERROR] $XLU: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,916 [ERROR] $BIPC: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:14:17,924 [ERROR] 
+20 Failed downloads:
+2026-06-12 16:14:17,924 [ERROR] ['SU.PA', 'DNB.OL', 'QQQ', 'GLD', 'ADC', 'GTT.PA', 'EEM', 'XLE', 'EWZ', 'DSY.PA', 'TLT', 'VPK.AS', 'TEL.OL', 'INDA', 'AIR.PA', 'TTE.PA', 'SPY', 'FXI', 'XLU', 'BIPC']: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:00,017 [INFO] Running job "_job_autonomie_check (trigger: cron[minute='15'], next run at: 2026-06-12 17:15:00 CEST)" (scheduled at 2026-06-12 16:15:00+02:00)
+2026-06-12 16:15:00,025 [INFO] Job "_job_autonomie_check (trigger: cron[minute='15'], next run at: 2026-06-12 17:15:00 CEST)" executed successfully
+2026-06-12 16:15:28,035 [ERROR] $SU.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,035 [ERROR] $DNB.OL: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,041 [ERROR] $ADC: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,043 [ERROR] $GTT.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,052 [ERROR] $QQQ: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,052 [ERROR] $GLD: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,054 [ERROR] $EEM: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,061 [ERROR] $EWZ: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,064 [ERROR] $DSY.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,070 [ERROR] $TLT: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,073 [ERROR] $VPK.AS: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,077 [ERROR] $XLU: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,083 [ERROR] $TEL.OL: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,088 [ERROR] $INDA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,095 [ERROR] $TTE.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,096 [ERROR] $AIR.PA: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,103 [ERROR] $SPY: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,110 [ERROR] $FXI: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,111 [ERROR] $BIPC: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,118 [ERROR] $XLE: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:15:28,122 [ERROR] 
+20 Failed downloads:
+2026-06-12 16:15:28,123 [ERROR] ['SU.PA', 'DNB.OL', 'ADC', 'GTT.PA', 'QQQ', 'GLD', 'EEM', 'EWZ', 'DSY.PA', 'TLT', 'VPK.AS', 'XLU', 'TEL.OL', 'INDA', 'TTE.PA', 'AIR.PA', 'SPY', 'FXI', 'BIPC', 'XLE']: possibly delisted; no price data found  (period=1d)
+2026-06-12 16:16:29,848 [INFO] TRADE TRD04 BUY DNB.OL 1.351650 @ 289.5000 → PV=500.12
+2026-06-12 16:17:31,584 [INFO] TRADE TRD04 BUY DNB.OL 0.293655 @ 289.6000 → PV=500.25
+2026-06-12 16:18:33,021 [INFO] TRADE TRD04 BUY DNB.OL 0.063909 @ 289.2000 → PV=499.60
+2026-06-12 16:18:33,024 [INFO] TRADE TRD19 BUY INDA 1.769651 @ 48.4200 → PV=374.73
+2026-06-12 16:19:36,344 [INFO] TRADE TRD19 SELL INDA 1.769651 @ 48.3950 → PV=374.69
+2026-06-12 16:24:44,591 [INFO] [Bus] [SIGNAL_MARCHE][info] desk_liquidite → Budget ajustement liquidité — factor=1.04 (score=5.4/10)
+2026-06-12 16:24:44,594 [INFO] [DeskLiqBudget] score=5.4/10 → budget_factor=1.04
+2026-06-12 16:24:44,594 [INFO] [Hub] Liq budget factor → 1.04
+2026-06-12 16:24:51,561 [INFO] LiquidityDesk refreshed — score=5.39 regime=neutre
+2026-06-12 16:25:46,076 [INFO] TRADE TRD04 BUY DNB.OL 0.014098 @ 289.1000 → PV=499.42
+2026-06-12 16:30:00,015 [INFO] Running job "_job_actualites (trigger: cron[minute='*/30'], next run at: 2026-06-12 17:00:00 CEST)" (scheduled at 2026-06-12 16:30:00+02:00)
+2026-06-12 16:30:00,016 [INFO] Running job "_job_alertes_prix (trigger: cron[hour='8-20', minute='*/30'], next run at: 2026-06-12 17:00:00 CEST)" (scheduled at 2026-06-12 16:30:00+02:00)
+2026-06-12 16:30:00,016 [INFO] Running job "_job_suivi_pru (trigger: cron[hour='9-18', minute='*/30'], next run at: 2026-06-12 17:00:00 CEST)" (scheduled at 2026-06-12 16:30:00+02:00)
+2026-06-12 16:30:00,032 [INFO] Job "_job_suivi_pru (trigger: cron[hour='9-18', minute='*/30'], next run at: 2026-06-12 17:00:00 CEST)" executed successfully
+2026-06-12 16:30:00,034 [INFO] Running job "_job_sync_gouvernance (trigger: cron[minute='30'], next run at: 2026-06-12 16:30:00 CEST)" (scheduled at 2026-06-12 16:30:00+02:00)
+2026-06-12 16:30:00,104 [INFO] Loaded 30 traders
+2026-06-12 16:30:00,258 [INFO] [RESTORE] Restoring 30 traders from last snapshot...
+2026-06-12 16:30:00,259 [INFO] [RESTORE] TRD01  pv=500.00  cash=500.00  positions=0
+2026-06-12 16:30:00,260 [INFO] [RESTORE] TRD02  pv=80.00  cash=80.00  positions=1
+2026-06-12 16:30:00,260 [INFO] [RESTORE] TRD03  pv=0.24  cash=0.24  positions=1
+2026-06-12 16:30:00,261 [INFO] [RESTORE] TRD04  pv=499.42  cash=1.06  positions=1
+2026-06-12 16:30:00,261 [INFO] [RESTORE] TRD05  pv=0.00  cash=0.00  positions=1
+2026-06-12 16:30:00,261 [INFO] [RESTORE] TRD06  pv=493.00  cash=0.15  positions=1
+2026-06-12 16:30:00,262 [INFO] [RESTORE] TRD07  pv=19.61  cash=7.05  positions=2
+2026-06-12 16:30:00,262 [INFO] [RESTORE] TRD08  pv=0.00  cash=0.00  positions=1
+2026-06-12 16:30:00,262 [INFO] [RESTORE] TRD09  pv=500.00  cash=500.00  positions=0
+2026-06-12 16:30:00,263 [INFO] [RESTORE] TRD10  pv=500.96  cash=500.93  positions=1
+2026-06-12 16:30:00,263 [INFO] [RESTORE] TRD11  pv=45.44  cash=45.44  positions=1
+2026-06-12 16:30:00,263 [INFO] [RESTORE] TRD12  pv=500.94  cash=500.94  positions=0
+2026-06-12 16:30:00,264 [INFO] [RESTORE] TRD13  pv=0.00  cash=0.00  positions=1
+2026-06-12 16:30:00,264 [INFO] [RESTORE] TRD14  pv=500.80  cash=0.13  positions=1
+2026-06-12 16:30:00,264 [INFO] [RESTORE] TRD15  pv=85.68  cash=85.67  positions=2
+2026-06-12 16:30:00,265 [INFO] [RESTORE] TRD16  pv=493.00  cash=0.07  positions=1
+2026-06-12 16:30:00,265 [INFO] [RESTORE] TRD17  pv=515.38  cash=515.38  positions=0
+2026-06-12 16:30:00,266 [INFO] [RESTORE] TRD18  pv=0.01  cash=0.01  positions=3
+2026-06-12 16:30:00,266 [INFO] [RESTORE] TRD19  pv=374.69  cash=374.69  positions=1
+2026-06-12 16:30:00,266 [INFO] [RESTORE] TRD20  pv=505.31  cash=505.31  positions=0
+2026-06-12 16:30:00,267 [INFO] [RESTORE] TRD21  pv=199.77  cash=199.77  positions=1
+2026-06-12 16:30:00,267 [INFO] [RESTORE] TRD22  pv=503.36  cash=209.04  positions=1
+2026-06-12 16:30:00,267 [INFO] [RESTORE] TRD23  pv=503.33  cash=503.33  positions=0
+2026-06-12 16:30:00,268 [INFO] [RESTORE] TRD24  pv=128.88  cash=128.88  positions=1
+2026-06-12 16:30:00,268 [INFO] [RESTORE] TRD25  pv=500.00  cash=500.00  positions=0
+2026-06-12 16:30:00,269 [INFO] [RESTORE] TRD26  pv=509.50  cash=0.75  positions=1
+2026-06-12 16:30:00,269 [INFO] [RESTORE] TRD27  pv=502.49  cash=0.88  positions=1
+2026-06-12 16:30:00,269 [INFO] [RESTORE] TRD28  pv=461.88  cash=0.79  positions=1
+2026-06-12 16:30:00,270 [INFO] [RESTORE] TRD29  pv=504.83  cash=0.30  positions=2
+2026-06-12 16:30:00,270 [INFO] [RESTORE] TRD30  pv=502.61  cash=0.47  positions=1
+2026-06-12 16:30:00,271 [INFO] [RESTORE] Done: 30/30 traders restored from last snapshot
+2026-06-12 16:30:00,936 [INFO] Preloaded 643 price points for VPK.AS
+2026-06-12 16:30:01,211 [INFO] Preloaded 1386 price points for GTT.PA
+2026-06-12 16:30:01,401 [INFO] Preloaded 1380 price points for TEL.OL
+2026-06-12 16:30:01,508 [INFO] [Actualites] 0 articles — CRITIQUE:0 IMPORTANT:0 INFO:0
+2026-06-12 16:30:01,509 [INFO] Job "_job_actualites (trigger: cron[minute='*/30'], next run at: 2026-06-12 17:00:00 CEST)" executed successfully
+2026-06-12 16:30:01,565 [INFO] Preloaded 1645 price points for DNB.OL
+2026-06-12 16:30:01,751 [INFO] Preloaded 2465 price points for TTE.PA
+2026-06-12 16:30:01,950 [INFO] Preloaded 2470 price points for SU.PA
+2026-06-12 16:30:02,311 [INFO] Preloaded 2469 price points for AIR.PA
+2026-06-12 16:30:02,519 [INFO] Preloaded 2282 price points for DSY.PA
+2026-06-12 16:30:02,757 [INFO] Preloaded 1434 price points for BIPC
+2026-06-12 16:30:02,792 [INFO] Job "_job_alertes_prix (trigger: cron[hour='8-20', minute='*/30'], next run at: 2026-06-12 17:00:00 CEST)" executed successfully
+2026-06-12 16:30:03,217 [INFO] Preloaded 1431 price points for ADC
+2026-06-12 16:30:03,532 [INFO] Preloaded 1621 price points for SPY
+2026-06-12 16:30:03,788 [INFO] Preloaded 1621 price points for QQQ
+2026-06-12 16:30:04,108 [INFO] Preloaded 1620 price points for GLD
+2026-06-12 16:30:04,300 [INFO] Preloaded 1619 price points for TLT
+2026-06-12 16:30:04,505 [INFO] Preloaded 1621 price points for XLE
+2026-06-12 16:30:04,792 [INFO] Preloaded 1620 price points for XLU
+2026-06-12 16:30:04,981 [INFO] Preloaded 1620 price points for EEM
+2026-06-12 16:30:05,186 [INFO] Preloaded 1619 price points for FXI
+2026-06-12 16:30:05,366 [INFO] Preloaded 1610 price points for INDA
+2026-06-12 16:30:05,581 [INFO] Preloaded 1621 price points for EWZ
+2026-06-12 16:30:05,582 [INFO] Preloaded histories for 30/30 traders
+2026-06-12 16:30:05,582 [INFO] [Engine] GouvernanceEngine initialisé
+2026-06-12 16:30:05,619 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,619 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,620 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,621 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,621 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,622 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,622 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,622 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,623 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,623 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,624 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,624 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,625 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,625 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,626 [INFO] Adding job tentatively -- it will be properly scheduled when the scheduler starts
+2026-06-12 16:30:05,626 [INFO] Job "_job_sync_gouvernance (trigger: cron[minute='30'], next run at: 2026-06-12 17:30:00 CEST)" executed successfully
+2026-06-12 16:30:14,322 [INFO] 127.0.0.1 - - [12/Jun/2026 16:30:14] "[36mGET / HTTP/1.1[0m" 304 -
+2026-06-12 16:30:14,364 [INFO] 127.0.0.1 - - [12/Jun/2026 16:30:14] "[36mGET /assets/style.css HTTP/1.1[0m" 304 -
+2026-06-12 16:30:14,668 [INFO] 127.0.0.1 - - [12/Jun/2026 16:30:14] "GET /app.js HTTP/1.1" 200 -
+2026-06-12 16:30:14,947 [INFO] 127.0.0.1 - - [12/Jun/2026 16:30:14] "[36mGET /manifest.json HTTP/1.1[0m" 304 -
+2026-06-12 16:30:15,378 [INFO] 127.0.0.1 - - [12/Jun/2026 16:30:15] "GET /api/state HTTP/1.1" 200 -
+2026-06-12 16:30:15,435 [INFO] 127.0.0.1 - - [12/Jun/2026 16:30:15] "GET /api/bus/state HTTP/1.1" 200 -
+2026-06-12 16:30:15,484 [INFO] 127.0.0.1 - - [12/Jun/2026 16:30:15] "GET /api/brief HTTP/1.1" 200 -
+2026-06-12 16:30:15,573 [INFO] 127.0.0.1 - - [12/Jun/2026 16:30:15] "[36mGET /assets/icon-192.png HTTP/1.1[0m" 304 -
+2026-06-12 16:30:34,420 [INFO] 127.0.0.1 - - [12/Jun/2026 16:30:34] "GET /api/patrimoine HTTP/1.1" 200 -
+2026-06-12 16:30:34,735 [INFO] 127.0.0.1 - - [12/Jun/2026 16:30:34] "GET /api/dividendes HTTP/1.1" 200 -
+2026-06-12 16:30:35,173 [INFO] 127.0.0.1 - - [12/Jun/2026 16:30:35] "GET /api/patrimoine/positions-pru HTTP/1.1" 200 -
+2026-06-12 16:30:53,860 [INFO] TRADE TRD04 BUY DNB.OL 0.002897 @ 289.3000 → PV=499.77
+2026-06-12 16:32:55,484 [INFO] 127.0.0.1 - - [12/Jun/2026 16:32:55] "GET /ws HTTP/1.1" 200 -
+2026-06-12 16:37:25,831 [INFO] 127.0.0.1 - - [12/Jun/2026 16:37:25] "[33mGET /api/rapports/investisseur/dernier HTTP/1.1[0m" 404 -
+2026-06-12 16:37:26,039 [INFO] 127.0.0.1 - - [12/Jun/2026 16:37:26] "[33mGET /api/rapports/mensuel/dernier HTTP/1.1[0m" 404 -
+2026-06-12 16:37:26,043 [INFO] 127.0.0.1 - - [12/Jun/2026 16:37:26] "[33mGET /api/rapports/annuel/dernier HTTP/1.1[0m" 404 -
+2026-06-12 16:38:05,071 [INFO] TRADE TRD20 BUY EWZ 7.549491 @ 35.0500 → PV=505.31
+2026-06-12 16:40:12,965 [INFO] [Bus] [SIGNAL_MARCHE][info] desk_liquidite → Budget ajustement liquidité — factor=1.04 (score=5.4/10)
+2026-06-12 16:40:12,965 [INFO] [DeskLiqBudget] score=5.4/10 → budget_factor=1.04
+2026-06-12 16:40:12,967 [INFO] [Hub] Liq budget factor → 1.04
+2026-06-12 16:40:15,505 [WARNING] FRED [IRSTCB01GBM156N]: 400 Client Error: Bad Request for url: https://api.stlouisfed.org/fred/series/observations?series_id=IRSTCB01GBM156N&api_key=634b66e75f80327222c29cf6a4734d40&file_type=json&limit=5&sort_order=desc
+2026-06-12 16:40:15,507 [CRITICAL] [Bus] [MACRO_UPDATE][critique] banques_centrales → BOE — signal dovish (haussier) (+1.00)
+Exception in thread hub-cb:
+Traceback (most recent call last):
+  File "C:\Users\zoubida\AppData\Local\Python\pythoncore-3.14-64\Lib\threading.py", line 1082, in _bootstrap_inner
+    self._context.run(self.run)
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^
+  File "C:\Users\zoubida\AppData\Local\Python\pythoncore-3.14-64\Lib\threading.py", line 1024, in run
+    self._target(*self._args, **self._kwargs)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\zoubida\Documents\king-fund\backend\divisions\interagents.py", line 136, in publish
+    published, _TRADERS_BANQUE_CENTRALE)
+               ^^^^^^^^^^^^^^^^^^^^^^^^
+NameError: name '_TRADERS_BANQUE_CENTRALE' is not defined
+2026-06-12 16:40:25,066 [INFO] LiquidityDesk refreshed — score=5.39 regime=neutre
+2026-06-12 16:40:31,338 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:31] "[36mGET / HTTP/1.1[0m" 304 -
+2026-06-12 16:40:31,390 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:31] "[36mGET /assets/style.css HTTP/1.1[0m" 304 -
+2026-06-12 16:40:31,659 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:31] "[36mGET /app.js HTTP/1.1[0m" 304 -
+2026-06-12 16:40:31,869 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:31] "[36mGET /manifest.json HTTP/1.1[0m" 304 -
+2026-06-12 16:40:32,057 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:32] "GET /api/state HTTP/1.1" 200 -
+2026-06-12 16:40:32,058 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:32] "GET /api/bus/state HTTP/1.1" 200 -
+2026-06-12 16:40:32,060 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:32] "GET /api/brief HTTP/1.1" 200 -
+2026-06-12 16:40:32,179 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:32] "[36mGET /assets/icon-192.png HTTP/1.1[0m" 304 -
+2026-06-12 16:40:35,917 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:35] "GET /api/patrimoine HTTP/1.1" 200 -
+2026-06-12 16:40:36,229 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:36] "GET /api/dividendes HTTP/1.1" 200 -
+2026-06-12 16:40:36,663 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:36] "GET /api/patrimoine/positions-pru HTTP/1.1" 200 -
+2026-06-12 16:40:55,565 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:55] "[36mGET / HTTP/1.1[0m" 304 -
+2026-06-12 16:40:55,620 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:55] "[36mGET /manifest.json HTTP/1.1[0m" 304 -
+2026-06-12 16:40:55,882 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:55] "[36mGET /assets/style.css HTTP/1.1[0m" 304 -
+2026-06-12 16:40:55,915 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:55] "[36mGET /app.js HTTP/1.1[0m" 304 -
+2026-06-12 16:40:56,253 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:56] "GET /api/state HTTP/1.1" 200 -
+2026-06-12 16:40:56,255 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:56] "GET /api/bus/state HTTP/1.1" 200 -
+2026-06-12 16:40:56,264 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:56] "GET /api/brief HTTP/1.1" 200 -
+2026-06-12 16:40:56,299 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:56] "[36mGET /assets/icon-192.png HTTP/1.1[0m" 304 -
+2026-06-12 16:40:56,504 [INFO] 127.0.0.1 - - [12/Jun/2026 16:40:56] "[36mGET /assets/icon-192.png HTTP/1.1[0m" 304 -
+2026-06-12 16:41:01,299 [INFO] 127.0.0.1 - - [12/Jun/2026 16:41:01] "GET /api/patrimoine HTTP/1.1" 200 -
+2026-06-12 16:41:01,605 [INFO] 127.0.0.1 - - [12/Jun/2026 16:41:01] "GET /api/dividendes HTTP/1.1" 200 -
+2026-06-12 16:41:01,965 [INFO] 127.0.0.1 - - [12/Jun/2026 16:41:01] "GET /api/patrimoine/positions-pru HTTP/1.1" 200 -
+2026-06-12 16:41:02,042 [INFO] 127.0.0.1 - - [12/Jun/2026 16:41:02] "GET /ws HTTP/1.1" 200 -
+2026-06-12 16:41:15,317 [INFO] TRADE TRD24 BUY QQQ 0.016529 @ 717.7600 → PV=128.88
