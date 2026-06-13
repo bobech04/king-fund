@@ -15,6 +15,11 @@ database/
 
 # Logs
 logs/
+backend_launch.log
+backend_launch_err.log
+
+# Debug
+debug_frozen.py
 
 # IDE
 .vscode/
@@ -28,5 +33,7 @@ data/
 !data/
 !data/patrimoine/
 !data/patrimoine/suivi_pru.json
+data/patrimoine/patrimoine.json
+data/gouvernance/
 rapports/bus/
 backend/config_user.json
