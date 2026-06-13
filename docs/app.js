@@ -364,6 +364,19 @@ function renderDashboard(s, bus, brief) {
     <div id="dash-al-body"><div class="dash-al-loading">Chargement…</div></div>
   </div>
 
+  <!-- Morning Brief résumé -->
+  ${brief?.summary ? `
+  <div class="dash-section">
+    <div class="dash-mb-header">
+      <span class="dash-section-title">🌅 Morning Brief</span>
+      <span class="dash-mb-dir dash-mb-dir-${dir}">${dirEmoji[dir] || '➡️'} ${dirLabel[dir] || dir.toUpperCase()} · ${conf}%</span>
+    </div>
+    <div class="dash-mb-body">
+      <p class="dash-mb-text">${escHtml(brief.summary)}</p>
+      <button class="dash-mb-link" onclick="switchTab('morning-brief')">Voir rapport complet →</button>
+    </div>
+  </div>` : ''}
+
   <!-- Top 5 performers -->
   <div class="dash-section">
     <div class="dash-section-title">🏆 Top 5 Performers</div>
