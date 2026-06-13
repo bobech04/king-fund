@@ -228,6 +228,7 @@ async function loadDashboard(silent = false) {
     renderDashboard(state, bus, brief);
     _loadDashPositions();
     _loadDashWatchlist();
+    _loadDashAlertes();
   } catch {
     if (!silent) qs('#dashboard-wrap').innerHTML = '<div class="error-state">Erreur chargement tableau de bord.</div>';
   }
@@ -355,6 +356,12 @@ function renderDashboard(s, bus, brief) {
       <span class="dash-wl-meta" id="dash-wl-meta"></span>
     </div>
     <div id="dash-wl-body"><div class="dash-wl-loading">Chargement…</div></div>
+  </div>
+
+  <!-- Alertes -->
+  <div class="dash-section">
+    <div class="dash-section-title">🚨 Alertes</div>
+    <div id="dash-al-body"><div class="dash-al-loading">Chargement…</div></div>
   </div>
 
   <!-- Top 5 performers -->
@@ -628,6 +635,90 @@ function _dashWlVoter(ticker) {
     .then(r => r.json())
     .then(d => alert(`Vote ${ticker} : ${d.decision || d.verdict || JSON.stringify(d)}`))
     .catch(() => alert('Erreur lors du vote'));
+}
+
+// ── Dashboard — Alertes ───────────────────────────────────────────────────────
+
+async function _loadDashAlertes() {
+  try {
+    const [seuilsRes, calRes] = await Promise.allSettled([
+      fetch(`${API}/alertes/seuils`).then(r => r.json()),
+      fetch(`${API}/alertes/calendrier`).then(r => r.json()),
+    ]);
+    const seuils = seuilsRes.status === 'fulfilled' ? seuilsRes.value : null;
+    const cal    = calRes.status    === 'fulfilled' ? calRes.value    : null;
+    _renderDashAlertes(seuils, cal);
+  } catch {
+    const el = qs('#dash-al-body');
+    if (el) el.innerHTML = '<div class="dash-al-empty">Alertes indisponibles</div>';
+  }
+}
+
+function _renderDashAlertes(seuilsData, calData) {
+  const el = qs('#dash-al-body');
+  if (!el) return;
+
+  const seuils = seuilsData?.seuils || [];
+  const events = calData?.evenements || [];
+
+  if (!seuils.length && !events.length) {
+    el.innerHTML = '<div class="dash-al-empty">Aucune alerte configurée</div>';
+    return;
+  }
+
+  // Seuils: ALERTE first, then OK
+  const alertes = seuils.filter(s => s.statut === 'ALERTE');
+  const ok      = seuils.filter(s => s.statut !== 'ALERTE');
+  const sortedSeuils = [...alertes, ...ok];
+
+  function seuil_label(s) {
+    if (s.type === 'BAISSE_JOUR') {
+      const v = s.variation_jour_pct != null ? `${s.variation_jour_pct >= 0 ? '+' : ''}${Number(s.variation_jour_pct).toFixed(2)}%` : '—';
+      return `Var. jour ${v} / seuil ${s.seuil}%`;
+    }
+    return `Prix ${fmt(s.prix_actuel, 2)} ${s.devise} / seuil < ${fmt(s.seuil, 2)}`;
+  }
+
+  const seuilsHtml = sortedSeuils.length ? `
+    <div class="dash-al-sub">📊 Seuils de prix</div>
+    ${sortedSeuils.map(s => {
+      const isAlerte = s.statut === 'ALERTE';
+      return `<div class="dash-al-row ${isAlerte ? 'alerte' : ''}">
+        <div class="dash-al-left">
+          <span class="dash-al-ticker">${escHtml(s.ticker)}</span>
+          <span class="dash-al-nom">${escHtml(s.nom || s.ticker)}</span>
+        </div>
+        <div class="dash-al-right">
+          <span class="dash-al-detail">${seuil_label(s)}</span>
+          <span class="dash-al-badge ${isAlerte ? 'alerte' : 'ok'}">${isAlerte ? '🚨 ALERTE' : '✓ OK'}</span>
+        </div>
+      </div>`;
+    }).join('')}` : '';
+
+  function urgencyCls(jours) {
+    if (jours <= 3)  return 'urgent';
+    if (jours <= 14) return 'proche';
+    return 'normal';
+  }
+
+  const calHtml = events.length ? `
+    <div class="dash-al-sub">📅 Calendrier corporate</div>
+    ${events.map(e => {
+      const typeEmoji = e.type === 'dividende' ? '💰' : '📢';
+      const cls = urgencyCls(e.jours_restants || 99);
+      return `<div class="dash-al-row">
+        <div class="dash-al-left">
+          <span class="dash-al-ticker">${typeEmoji} ${escHtml(e.ticker)}</span>
+          <span class="dash-al-nom">${escHtml(e.nom || e.ticker)} — ${escHtml(e.type)}</span>
+        </div>
+        <div class="dash-al-right">
+          <span class="dash-al-detail">${escHtml(e.date)}</span>
+          <span class="dash-al-jours dash-al-jours-${cls}">J−${e.jours_restants}</span>
+        </div>
+      </div>`;
+    }).join('')}` : '';
+
+  el.innerHTML = seuilsHtml + calHtml;
 }
 
 // ═══════════════════════════════════════════════════════════════════
