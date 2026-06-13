@@ -2877,3 +2877,137 @@ main { padding-bottom: 60px; }
   color: var(--muted);
   white-space: nowrap;
 }
+
+/* ── Dashboard — Mes Positions (scroll horizontal) ──────────────── */
+.dash-pos-count {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-left: 4px;
+}
+.dash-pos-scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+}
+.dash-pos-scroll::-webkit-scrollbar { height: 3px; }
+.dash-pos-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.dash-pos-loading,
+.dash-pos-empty {
+  color: var(--muted);
+  font-size: 0.72rem;
+  padding: 12px 4px;
+}
+
+.dash-pos-card {
+  flex-shrink: 0;
+  width: 280px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  scroll-snap-align: start;
+  transition: border-color .2s, background .2s;
+}
+.dash-pos-card:active { opacity: .85; }
+
+/* Border accent selon statut */
+.dash-pos-status-pos  { border-left: 3px solid var(--accent); }
+.dash-pos-status-obj  { border-left: 3px solid #ffd700; }
+.dash-pos-status-sl   { border-left: 3px solid var(--red); }
+.dash-pos-status-neg  { border-left: 3px solid #ff6b35; }
+.dash-pos-status-neutral { border-left: 3px solid #f0c040; }
+
+.dash-pos-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 10px;
+}
+.dash-pos-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.dash-pos-dot-pos     { background: var(--accent); box-shadow: 0 0 5px var(--accent); }
+.dash-pos-dot-obj     { background: #ffd700;        box-shadow: 0 0 5px #ffd700; }
+.dash-pos-dot-sl      { background: var(--red);     box-shadow: 0 0 5px var(--red); }
+.dash-pos-dot-neg     { background: #ff6b35;        box-shadow: 0 0 5px #ff6b35; }
+.dash-pos-dot-neutral { background: #f0c040;        box-shadow: 0 0 5px #f0c040; }
+
+.dash-pos-ticker {
+  font-size: 0.80rem;
+  font-weight: 800;
+  color: var(--gold);
+  letter-spacing: 0.04em;
+}
+.dash-pos-name {
+  font-size: 0.65rem;
+  color: var(--muted);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash-pos-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.dash-pos-cell { display: flex; flex-direction: column; gap: 2px; }
+.dash-pos-lbl  { font-size: 0.55rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.dash-pos-val  { font-size: 0.72rem; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+.dash-pos-val.pos { color: var(--accent); }
+.dash-pos-val.neg { color: var(--red); }
+
+/* Jauge SL → Objectif */
+.dash-pos-gauge { margin-top: 2px; }
+.dash-pos-gauge-track {
+  position: relative;
+  height: 5px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: visible;
+}
+.dash-pos-gauge-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--red) 0%, #f0c040 50%, var(--accent) 100%);
+  border-radius: 3px;
+  transition: width .4s ease;
+  clip-path: inset(0 round 3px);
+}
+.dash-pos-gauge-marker {
+  position: absolute;
+  top: -3px;
+  width: 4px;
+  height: 11px;
+  background: #fff;
+  border-radius: 2px;
+  transform: translateX(-50%);
+  box-shadow: 0 0 4px rgba(0,0,0,.5);
+}
+.dash-pos-gauge-pru {
+  position: absolute;
+  top: -1px;
+  width: 2px;
+  height: 7px;
+  background: var(--muted);
+  border-radius: 1px;
+  transform: translateX(-50%);
+}
+.dash-pos-gauge-labels {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  font-size: 0.55rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}

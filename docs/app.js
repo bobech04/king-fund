@@ -226,6 +226,7 @@ async function loadDashboard(silent = false) {
     const brief = briefRes.status === 'fulfilled' ? briefRes.value : null;
     dashboardLoaded = true;
     renderDashboard(state, bus, brief);
+    _loadDashPositions();
   } catch {
     if (!silent) qs('#dashboard-wrap').innerHTML = '<div class="error-state">Erreur chargement tableau de bord.</div>';
   }
@@ -338,6 +339,14 @@ function renderDashboard(s, bus, brief) {
   </div>
   ${brief?.summary ? `<div class="dash-brief-summary">${escHtml(brief.summary.slice(0, 180))}${brief.summary.length > 180 ? '…' : ''}</div>` : ''}
 
+  <!-- Mes Positions -->
+  <div class="dash-section">
+    <div class="dash-section-title">📊 Mes Positions <span class="dash-pos-count" id="dash-pos-count"></span></div>
+    <div class="dash-pos-scroll" id="dash-pos-cards">
+      <div class="dash-pos-loading">Chargement…</div>
+    </div>
+  </div>
+
   <!-- Top 5 performers -->
   <div class="dash-section">
     <div class="dash-section-title">🏆 Top 5 Performers</div>
@@ -394,6 +403,107 @@ function renderDashboard(s, bus, brief) {
   // Update black swan from bus state live
   const bsEl2 = qs('#black-swan-val');
   if (bsEl2) { bsEl2.textContent = bsLabel; bsEl2.className = `stat-value ${bsCls}`; }
+}
+
+// ── Dashboard — Cartes Portfolio scrollables ──────────────────────────────────
+
+async function _loadDashPositions() {
+  try {
+    const data = await fetch(API + '/patrimoine/positions-pru').then(r => r.json());
+    _renderDashPositions(data);
+  } catch {
+    const el = qs('#dash-pos-cards');
+    if (el) el.innerHTML = '<div class="dash-pos-empty">Positions indisponibles</div>';
+  }
+}
+
+function _renderDashPositions(data) {
+  const el = qs('#dash-pos-cards');
+  if (!el) return;
+  const entries = Object.values(data?.positions || {}).filter(p => (p.quantite || 0) > 0);
+
+  const countEl = qs('#dash-pos-count');
+  if (countEl) countEl.textContent = entries.length ? `(${entries.length})` : '';
+
+  if (!entries.length) {
+    el.innerHTML = '<div class="dash-pos-empty">Aucune position — ajouter via Patrimoine</div>';
+    return;
+  }
+
+  el.innerHTML = entries.map(p => {
+    const pru  = p.pru  || 0;
+    const prix = p.prix_actuel;
+    const pv   = p.pv_latente;
+    const pct  = p.pv_pct;
+    const obj  = p.objectif;
+    const sl   = p.stop_loss;
+
+    // Couleur pastille
+    let status = 'neutral';
+    if (prix != null) {
+      if (obj && prix >= obj * 0.90)          status = 'obj';
+      else if (pv != null && pv > 0)          status = 'pos';
+      else if (sl && prix <= sl * 1.10)       status = 'sl';
+      else if (pv != null && pv < 0)          status = 'neg';
+    }
+
+    // Jauge SL → Objectif avec marqueur prix actuel
+    let gaugeHtml = '';
+    if (prix != null && obj && sl) {
+      const range = obj - sl;
+      if (range > 0) {
+        const posPct = Math.min(100, Math.max(0, ((prix - sl) / range) * 100));
+        const pruPct = pru ? Math.min(100, Math.max(0, ((pru  - sl) / range) * 100)) : null;
+        gaugeHtml = `
+          <div class="dash-pos-gauge">
+            <div class="dash-pos-gauge-track">
+              <div class="dash-pos-gauge-fill" style="width:${posPct.toFixed(1)}%"></div>
+              <div class="dash-pos-gauge-marker" style="left:${posPct.toFixed(1)}%"></div>
+              ${pruPct !== null ? `<div class="dash-pos-gauge-pru" style="left:${pruPct.toFixed(1)}%"></div>` : ''}
+            </div>
+            <div class="dash-pos-gauge-labels">
+              <span>🛑 ${fmt(sl,2)}</span>
+              <span>🎯 ${fmt(obj,2)}</span>
+            </div>
+          </div>`;
+      }
+    }
+
+    const pvStr  = pv  != null ? `${pv  >= 0 ? '+' : ''}${fmt(pv, 2)}€` : '—';
+    const pctStr = pct != null ? ` (${pct >= 0 ? '+' : ''}${pct.toFixed(1)}%)` : '';
+    const pvCls  = pv  == null ? '' : pv >= 0 ? 'pos' : 'neg';
+
+    return `<div class="dash-pos-card dash-pos-status-${status}" onclick="_openPositionDetail('${escHtml(p.ticker)}')">
+      <div class="dash-pos-header">
+        <div class="dash-pos-dot dash-pos-dot-${status}"></div>
+        <span class="dash-pos-ticker">${escHtml(p.ticker)}</span>
+        <span class="dash-pos-name">${escHtml(p.nom || p.ticker)}</span>
+      </div>
+      <div class="dash-pos-row">
+        <div class="dash-pos-cell">
+          <div class="dash-pos-lbl">PRU</div>
+          <div class="dash-pos-val">${fmt(pru, 3)}</div>
+        </div>
+        <div class="dash-pos-cell">
+          <div class="dash-pos-lbl">Prix actuel</div>
+          <div class="dash-pos-val">${prix != null ? fmt(prix, 3) : '—'}</div>
+        </div>
+        <div class="dash-pos-cell">
+          <div class="dash-pos-lbl">PV/MV</div>
+          <div class="dash-pos-val ${pvCls}">${pvStr}${pctStr}</div>
+        </div>
+      </div>
+      ${gaugeHtml}
+    </div>`;
+  }).join('');
+}
+
+function _openPositionDetail(ticker) {
+  switchTab('protection');
+  setTimeout(() => {
+    const pruCard = qs('#pru-card') || qs('#pru-section');
+    if (pruCard) pruCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, 450);
 }
 
 // ═══════════════════════════════════════════════════════════════════
