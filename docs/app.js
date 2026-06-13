@@ -1880,15 +1880,18 @@ function renderGouvernance(etat, log, logAuton, cfgData) {
     </div>
 
     <!-- Modal bascule RÉEL -->
-    <div id="gov-mode-overlay" class="apport-overlay hidden">
-      <div class="apport-modal" style="max-width:400px">
-        <div class="apport-modal-title" style="color:var(--red)">⚠️ Bascule MODE RÉEL</div>
-        <div style="font-size:.75rem;color:var(--muted);margin-bottom:12px">Cette action est irréversible sans nouvelle confirmation. L'historique simulation est préservé.</div>
-        <label class="apport-label">Capital réel à injecter (€)</label>
-        <input id="gov-capital-input" class="apport-input" type="number" min="1" step="1" placeholder="500">
-        <div class="apport-actions">
-          <button class="apport-btn-cancel" id="gov-mode-cancel">Annuler</button>
-          <button class="apport-btn-save" style="background:var(--red)" id="gov-mode-confirm">Confirmer</button>
+    <div id="gov-mode-overlay" class="overlay hidden">
+      <div class="modal" style="max-width:400px;padding:20px;display:flex;flex-direction:column;gap:12px">
+        <div style="color:var(--red);font-size:.85rem;font-weight:700">⚠️ Bascule MODE RÉEL</div>
+        <div style="font-size:.75rem;color:var(--muted)">Cette action est irréversible sans nouvelle confirmation. L'historique simulation est préservé.</div>
+        <label style="font-size:.72rem;color:var(--muted)">Capital réel à injecter (€)
+          <input id="gov-capital-input" type="number" min="1" step="1" placeholder="500"
+            style="margin-top:6px;width:100%;background:var(--surface2);border:1px solid var(--border);
+                   color:var(--text);border-radius:8px;padding:10px 12px;font-size:1rem;outline:none">
+        </label>
+        <div style="display:flex;gap:8px;margin-top:2px">
+          <button class="gov-btn-mode gov-btn-mode-sim" id="gov-mode-cancel" style="flex:1">Annuler</button>
+          <button class="gov-btn-mode" id="gov-mode-confirm" style="flex:1;background:rgba(255,68,68,.25);color:var(--red)">Confirmer</button>
         </div>
       </div>
     </div>
