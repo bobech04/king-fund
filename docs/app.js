@@ -2801,9 +2801,6 @@ function _fmtTs(ts) {
 qs('#btn-close').addEventListener('click', closeModal);
 qs('#overlay').addEventListener('click', e => { if (e.target===qs('#overlay')) closeModal(); });
 
-document.querySelectorAll('.tab-btn').forEach(btn => {
-  btn.addEventListener('click', () => switchTab(btn.dataset.tab));
-});
 
 qs('#filter-clear').addEventListener('click', () => { activeFilter=null; applyFilter(); });
 
