@@ -195,6 +195,7 @@ function updateTicker(traders) {
 function switchTab(tab) {
   qsa('.tab-btn').forEach(b  => b.classList.toggle('active', b.dataset.tab === tab));
   qsa('.tab-pane').forEach(p => p.classList.toggle('hidden', p.id !== `tab-${tab}`));
+  qsa('.bnav-btn[data-tab]').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
   activeTab = tab;
 
   if (tab === 'dashboard')      loadDashboard();
@@ -2720,6 +2721,11 @@ function updateBellBadge() {
   const badge=qs('#bell-badge'); if (!badge) return;
   if (unread>0){badge.textContent=unread>99?'99+':String(unread);badge.classList.remove('hidden');}
   else badge.classList.add('hidden');
+  const bnavBadge=qs('#bnav-bell-badge');
+  if (bnavBadge) {
+    if (unread>0){bnavBadge.textContent=unread>99?'99+':String(unread);bnavBadge.classList.remove('hidden');}
+    else bnavBadge.classList.add('hidden');
+  }
 }
 function showToast(n) {
   const container=qs('#toast-container'),el=document.createElement('div');
@@ -2811,9 +2817,40 @@ document.addEventListener('click', e => {
 
 qs('#notif-clear-btn').addEventListener('click', () => { NOTIFS.length=0; renderNotifList(); });
 
+// ── Header funds ─────────────────────────────────────────────────
+async function updateHeaderFunds() {
+  try {
+    const [patRes, busRes] = await Promise.allSettled([
+      fetch(API + '/patrimoine').then(r => r.json()),
+      fetch(API + '/bus/state').then(r => r.json()),
+    ]);
+    const pat = patRes.status === 'fulfilled' ? patRes.value : null;
+    const bus = busRes.status === 'fulfilled' ? busRes.value : null;
+
+    if (pat) {
+      const navEl = qs('#hdr-nav');
+      if (navEl) navEl.textContent = fmt(pat.total_eur, 0) + ' €';
+      const baseEl = qs('#hdr-base-inv');
+      if (baseEl) baseEl.textContent = fmt(pat.total_investissable, 0) + ' €';
+      const cashAct = (pat.actifs || []).find(a => a.id === 'cash');
+      const cashEl = qs('#hdr-cash');
+      if (cashEl && cashAct) cashEl.textContent = fmt(cashAct.valeur_eur, 0) + ' €';
+    }
+    if (bus) {
+      const howell = bus.howell_regime || 'HOWELL_SEREIN';
+      const labelMap = { HOWELL_SEREIN:'SEREIN', HOWELL_ATTENTION:'ATTENTION', HOWELL_VIGILANCE:'VIGILANCE', HOWELL_DANGER:'DANGER' };
+      const clsMap   = { HOWELL_SEREIN:'serein', HOWELL_ATTENTION:'attention', HOWELL_VIGILANCE:'vigilance', HOWELL_DANGER:'danger' };
+      const regEl = qs('#hdr-regime');
+      if (regEl) { regEl.textContent = labelMap[howell] || howell; regEl.className = 'hdr-regime ' + (clsMap[howell] || 'serein'); }
+    }
+  } catch {}
+}
+
 // ── Boot ──────────────────────────────────────────────────────────
 startClock();
 initWS();
 startPolling();
 _initApportModal();
 loadDashboard();
+updateHeaderFunds();
+setInterval(updateHeaderFunds, 5 * 60 * 1000);
