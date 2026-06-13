@@ -2610,3 +2610,270 @@ main { padding-bottom: 60px; }
   .toast-title { font-size: 0.65rem; }
   .toast-msg   { font-size: 0.60rem; }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+   DASHBOARD — composants renderDashboard()
+   ═══════════════════════════════════════════════════════════════════ */
+
+.dash-panel {
+  padding: 12px 14px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* ── En-tête ─────────────────────────────────────────────────────── */
+.dash-pillar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+.dash-fo-label {
+  font-size: 0.60rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.dash-battle-badge {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--accent);
+  background: var(--accent-bg);
+  border: 1px solid rgba(0,229,160,.25);
+  padding: 2px 8px;
+  border-radius: 20px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── KPI row (4 cellules) ────────────────────────────────────────── */
+.dash-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+@media (max-width: 420px) {
+  .dash-kpi-row { grid-template-columns: repeat(2, 1fr); }
+}
+.dash-kpi {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 10px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dash-kpi-label {
+  font-size: 0.52rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.dash-kpi-val {
+  font-size: 1.0rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+.dash-kpi-sub {
+  font-size: 0.52rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Morning Brief card ──────────────────────────────────────────── */
+.dash-brief-card {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.dash-brief-card.bullish { border-color: rgba(0,229,160,.35); }
+.dash-brief-card.bearish { border-color: rgba(255,68,102,.35); }
+.dash-brief-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+}
+.dash-brief-emoji { font-size: 1.6rem; line-height: 1; flex-shrink: 0; }
+.dash-brief-label {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+}
+.dash-brief-sub {
+  font-size: 0.55rem;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.dash-brief-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.dash-conf-num {
+  font-size: 1.1rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.dash-conf-bar-bg {
+  width: 60px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+.dash-conf-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--muted);
+  transition: width 0.4s ease;
+}
+.dash-conf-bar-fill.bullish { background: var(--accent); }
+.dash-conf-bar-fill.bearish { background: var(--red); }
+.dash-conf-bar-fill.neutral { background: var(--muted); }
+
+.dash-brief-summary {
+  font-size: 0.68rem;
+  color: var(--muted);
+  line-height: 1.5;
+  padding: 6px 10px;
+  background: var(--surface);
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-top: -4px;
+}
+
+/* ── Sections ────────────────────────────────────────────────────── */
+.dash-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dash-section-title {
+  font-size: 0.60rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+/* ── Top 5 traders ───────────────────────────────────────────────── */
+.dash-trader-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.72rem;
+}
+.dash-rank { font-size: 0.85rem; flex-shrink: 0; }
+.dash-tname {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+.dash-tval {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.dash-tpnl {
+  font-size: 0.65rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
+}
+
+/* ── Banques Centrales résumé ────────────────────────────────────── */
+.dash-cb-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.dash-cb-chip {
+  font-size: 0.60rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 20px;
+  border: 1px solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+}
+.dash-cb-chip.hawkish { color: #ff9944; border-color: rgba(255,153,68,.3); background: rgba(255,153,68,.08); }
+.dash-cb-chip.dovish  { color: #4488ff; border-color: rgba(68,136,255,.3); background: rgba(68,136,255,.08); }
+.dash-cb-chip.neutral { color: var(--muted); }
+.dash-cb-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dash-cb-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 8px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 0.65rem;
+}
+.dash-cb-name {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* ── Navigation rapide (grille 2×5) ─────────────────────────────── */
+.dash-nav-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.dash-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.dash-nav-btn:hover,
+.dash-nav-btn:active {
+  background: var(--surface3);
+  border-color: var(--accent);
+}
+.dash-nav-icon { font-size: 1.2rem; line-height: 1; }
+.dash-nav-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text);
+  white-space: nowrap;
+}
+.dash-nav-sub {
+  font-size: 0.55rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
