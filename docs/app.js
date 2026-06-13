@@ -3405,11 +3405,90 @@ async function updateHeaderFunds() {
   } catch {}
 }
 
+// ── Bloc 13 — Pull-to-refresh ─────────────────────────────────────
+
+let _ptrTouchY     = 0;
+let _ptrTracking   = false;
+let _ptrRefreshing = false;
+const _PTR_THRESHOLD = 72;
+
+function _ptrEl() { return qs('#ptr-indicator'); }
+
+function _ptrMove(pullPx) {
+  const el = _ptrEl();
+  if (!el) return;
+  const dy = Math.min(pullPx, _PTR_THRESHOLD * 1.1);
+  el.style.transform = `translateX(-50%) translateY(calc(-44px + ${(dy * 0.72).toFixed(1)}px))`;
+  el.textContent = pullPx >= _PTR_THRESHOLD ? '↑' : '↓';
+}
+
+function _ptrReset() {
+  const el = _ptrEl();
+  if (!el) return;
+  el.classList.remove('ptr-dragging', 'ptr-loading');
+  el.style.transform = '';
+  el.classList.add('ptr-hide');
+  el.textContent = '↓';
+  setTimeout(() => el.classList.remove('ptr-hide'), 350);
+}
+
+async function _ptrDoRefresh() {
+  if (_ptrRefreshing) return;
+  _ptrRefreshing = true;
+  const el  = _ptrEl();
+  const btn = qs('#hdr-refresh-btn');
+  if (el)  { el.classList.remove('ptr-dragging'); el.classList.add('ptr-loading'); el.style.transform = ''; el.textContent = '⟳'; }
+  if (btn) btn.classList.add('ptr-spinning');
+  dashboardLoaded = false;
+  try { await loadDashboard(); } catch {}
+  _ptrRefreshing = false;
+  _ptrReset();
+  if (btn) btn.classList.remove('ptr-spinning');
+}
+
+function _ptrInit() {
+  document.addEventListener('touchstart', e => {
+    _ptrTracking = false;
+    if (activeTab !== 'dashboard') return;
+    if (window.scrollY > 4) return;
+    if (document.querySelector('.overlay:not(.hidden)')) return;
+    _ptrTouchY   = e.touches[0].clientY;
+    _ptrTracking = true;
+    const el = _ptrEl();
+    if (el) el.classList.add('ptr-dragging');
+  }, { passive: true });
+
+  document.addEventListener('touchmove', e => {
+    if (!_ptrTracking || _ptrRefreshing) return;
+    if (window.scrollY > 4) { _ptrTracking = false; _ptrReset(); return; }
+    const dy = e.touches[0].clientY - _ptrTouchY;
+    if (dy <= 0) { _ptrTracking = false; _ptrReset(); return; }
+    _ptrMove(dy);
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    if (!_ptrTracking) return;
+    _ptrTracking = false;
+    const dy = e.changedTouches[0].clientY - _ptrTouchY;
+    if (dy >= _PTR_THRESHOLD) {
+      _ptrDoRefresh();
+    } else {
+      _ptrReset();
+    }
+  }, { passive: true });
+
+  qs('#hdr-refresh-btn')?.addEventListener('click', () => {
+    if (activeTab !== 'dashboard') switchTab('dashboard');
+    _ptrDoRefresh();
+  });
+}
+
 // ── Boot ──────────────────────────────────────────────────────────
 startClock();
 initWS();
 startPolling();
 _initApportModal();
+_ptrInit();
 loadDashboard();
 updateHeaderFunds();
 setInterval(updateHeaderFunds, 5 * 60 * 1000);
