@@ -22,20 +22,40 @@
 
 <!-- ── HEADER ────────────────────────────────────────────────── -->
 <header class="header">
-  <div class="header-left">
-    <div class="logo">👑 KING FUND</div>
-    <div class="battle-day" id="battle-day">J— / 30</div>
-    <div class="live-pill" id="live-pill">
-      <span class="live-dot"></span>LIVE
+  <!-- Ligne 1 : NAV totale + perf mois + badge régime -->
+  <div class="hdr-line hdr-line-1">
+    <span class="hdr-logo">👑 KING FUND</span>
+    <div class="hdr-right-1">
+      <span class="hdr-nav-val" id="hdr-nav">— €</span>
+      <span class="hdr-perf" id="hdr-perf-mois"></span>
+      <span class="hdr-regime serein" id="hdr-regime">SEREIN</span>
     </div>
   </div>
-  <div class="header-right">
-    <div class="header-clock" id="header-clock"></div>
-    <button class="bell-btn" id="bell-btn" title="Alertes">
-      🔔<span class="bell-badge hidden" id="bell-badge">0</span>
-    </button>
-    <div class="ws-dot" id="ws-dot"></div>
-    <div class="update-time" id="update-time">—</div>
+  <!-- Ligne 2 : Base investissable + cash disponible -->
+  <div class="hdr-line hdr-line-2">
+    <div class="hdr-kv">
+      <span class="hdr-label">Base invest.</span>
+      <span class="hdr-val" id="hdr-base-inv">— €</span>
+    </div>
+    <div class="hdr-kv">
+      <span class="hdr-label">Cash dispo.</span>
+      <span class="hdr-val" id="hdr-cash">— €</span>
+    </div>
+  </div>
+  <!-- Ligne 3 : horloge + statut -->
+  <div class="hdr-line hdr-line-3">
+    <div class="hdr-left-3">
+      <span class="header-clock" id="header-clock"></span>
+      <span class="battle-day" id="battle-day">J— / 30</span>
+      <div class="live-pill" id="live-pill"><span class="live-dot"></span>LIVE</div>
+    </div>
+    <div class="hdr-right-3">
+      <span class="update-time" id="update-time">—</span>
+      <div class="ws-dot" id="ws-dot"></div>
+      <button class="bell-btn" id="bell-btn" title="Alertes">
+        🔔<span class="bell-badge hidden" id="bell-badge">0</span>
+      </button>
+    </div>
   </div>
 </header>
 
@@ -261,6 +281,27 @@
 
 <!-- ── TOAST NOTIFICATIONS ────────────────────────────────────── -->
 <div id="toast-container" aria-live="polite" aria-atomic="false"></div>
+
+<!-- ── BOTTOM NAV ─────────────────────────────────────────────── -->
+<nav class="bottom-nav" id="bottom-nav">
+  <button class="bnav-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">
+    <span class="bnav-icon">📊</span>
+    <span class="bnav-label">Portfolio</span>
+  </button>
+  <button class="bnav-btn" data-tab="marches" onclick="switchTab('marches')">
+    <span class="bnav-icon">🌍</span>
+    <span class="bnav-label">Marché</span>
+  </button>
+  <button class="bnav-btn" data-tab="intelligence" onclick="switchTab('intelligence')">
+    <span class="bnav-icon">🗳️</span>
+    <span class="bnav-label">Vote</span>
+  </button>
+  <button class="bnav-btn" id="bnav-alertes" onclick="document.getElementById('bell-btn').click()">
+    <span class="bnav-icon">🔔</span>
+    <span class="bnav-badge hidden" id="bnav-bell-badge">0</span>
+    <span class="bnav-label">Alertes</span>
+  </button>
+</nav>
 
 <script src="app.js"></script>
 </body>
