@@ -594,6 +594,68 @@
       </div>
     </div>
 
+    <!-- ══ ALPHA LAB — Backtests Signaux & Facteurs Académiques ══ -->
+    <div class="section-header" style="margin-top:24px">
+      <span class="section-title">🔬 Alpha Lab — Backtests Signaux &amp; Facteurs Académiques</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="al-time">—</span>
+        <button class="btn btn-sm btn-ghost" onclick="App.refreshAlphaLab()">↻</button>
+      </div>
+    </div>
+
+    <!-- KPIs Alpha Lab -->
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Signaux testés</div>
+        <div class="kpi-val neu" id="al-n-signaux">—</div>
+        <div class="kpi-sub">French 1926+</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">VALIDES</div>
+        <div class="kpi-val pos" id="al-n-valides">—</div>
+        <div class="kpi-sub">t≥2 &amp; Sharpe OOS≥0.5</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">TrendFollow</div>
+        <div class="kpi-val" id="al-trendf-verdict">—</div>
+        <div class="kpi-sub" id="al-trendf-sub">Sharpe OOS</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Bertez (proxy)</div>
+        <div class="kpi-val" id="al-bertez-verdict">—</div>
+        <div class="kpi-sub" id="al-bertez-sub">HML+CAPE</div>
+      </div>
+    </div>
+
+    <!-- Badge régime cohérent -->
+    <div id="al-regime-badge" style="display:none;margin-bottom:12px;padding:10px 14px;background:rgba(192,57,43,0.15);border:1px solid #c0392b;border-radius:8px;font-size:12px;color:#ff4455">
+      ⚡ Signal TrendFollow VALIDE + régime CRISE_LIQUIDITE détecté par Flux Macro — cohérence cross-agent confirmée
+    </div>
+
+    <!-- Table backtests -->
+    <div class="card">
+      <div class="card-title">📊 Backtests Signaux — Walk-Forward 5 splits (French 1926+)</div>
+      <div id="al-signaux-table">
+        <div style="text-align:center;padding:20px;color:var(--muted)"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Table facteurs watchlist -->
+    <div class="card">
+      <div class="card-title">🏅 Scores Factoriels — Watchlist 13 actifs (Value · Momentum · Quality · LowVol)</div>
+      <div id="al-facteurs-table">
+        <div style="text-align:center;padding:20px;color:var(--muted)"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Performance par crise (signal TrendFollow) -->
+    <div class="card">
+      <div class="card-title">📉 Performance par Crise — Signal TrendFollow (6 crises historiques)</div>
+      <div id="al-crises-table">
+        <div style="color:var(--muted);font-size:12px;padding:16px">Chargement…</div>
+      </div>
+    </div>
+
   </section>
 
   <!-- ══════════════════════ 7. INVESTISSEMENT ══════════════════════ -->
