@@ -59,10 +59,13 @@ def _scoring_dividende(info: dict) -> dict:
     score = 0.0
     notes = []
 
-    div_yield = info.get("dividendYield") or 0.0
-    payout    = info.get("payoutRatio")   or 0.0
-    fcf       = info.get("freeCashflow")  or 0
-    market_cap= info.get("marketCap")     or 1
+    div_yield  = info.get("dividendYield") or 0.0
+    payout     = info.get("payoutRatio")  or 0.0
+    fcf        = info.get("freeCashflow") or 0
+    market_cap = info.get("marketCap")    or 1
+    industry   = (info.get("industry") or "").upper()
+    sector     = (info.get("sector")   or "").lower()
+    is_reit    = "REIT" in industry or sector == "real estate"
 
     # Rendement raisonnable (2%-8%) — dividendYield yfinance est en %
     if 2.0 <= div_yield <= 8.0:
@@ -74,8 +77,12 @@ def _scoring_dividende(info: dict) -> dict:
     else:
         notes.append("Rendement faible ou absent")
 
-    # Payout ratio sain (< 75%)
-    if 0 < payout < 0.75:
+    # Payout ratio — les REITs ont un payout GAAP structurellement > 100% (amortissements)
+    # La métrique pertinente est le FFO payout (~75-85%), non disponible via yfinance
+    if is_reit:
+        score += 1.5
+        notes.append("REIT — payout GAAP non pertinent (amortissements immobiliers)")
+    elif 0 < payout < 0.75:
         score += 2.5
         notes.append(f"Payout sain {payout:.0%}")
     elif 0.75 <= payout < 1.0:
@@ -103,6 +110,7 @@ def _scoring_dividende(info: dict) -> dict:
         "score":    min(round(score, 1), 10.0),
         "notes":    notes,
         "fiable":   score >= 6.0,
+        "is_reit":  is_reit,
     }
 
 
@@ -133,6 +141,9 @@ class AgentDividendes:
             div_yield= inf.get("dividendYield") or 0.0
             payout   = inf.get("payoutRatio")
             freq     = inf.get("dividendFrequency")            # None ou entier
+            industry = (inf.get("industry") or "").upper()
+            sector   = (inf.get("sector")   or "").lower()
+            is_reit  = "REIT" in industry or sector == "real estate"
 
             nb_titres = (montant_investi / prix) if prix > 0 else 0.0
             rev_annuel= nb_titres * div_ann
@@ -168,6 +179,7 @@ class AgentDividendes:
                 "rev_annuel":    round(rev_annuel, 2),
                 "rev_mensuel":   round(rev_mensuel, 2),
                 "payout_ratio":  round(payout * 100, 1) if payout else None,
+                "is_reit":       is_reit,
                 "scoring":       scoring,
                 "coupe_detectee": coupe_detectee,
             }
