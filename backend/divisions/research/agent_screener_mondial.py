@@ -186,11 +186,18 @@ def _safe(val, default=None):
         return default
 
 
+def _norm_div(val) -> float:
+    """yfinance retourne dividendYield en décimal (0.05) ou déjà en % (5.0) selon le ticker.
+    Normalise toujours vers décimal avant filtrage et affichage."""
+    v = _safe(val, 0.0)
+    return v / 100.0 if v > 1.0 else v
+
+
 def _graham_score(info: dict) -> float:
     """Score composite Graham 0-100 (filtrage + classement)."""
     per     = _safe(info.get("trailingPE"))
     pbr     = _safe(info.get("priceToBook"))
-    div     = _safe(info.get("dividendYield"), 0.0)
+    div     = _norm_div(info.get("dividendYield"))
     de      = _safe(info.get("debtToEquity"),  999.0)
     growth  = _safe(info.get("revenueGrowth"), -1.0)
     cr      = _safe(info.get("currentRatio"),  0.0)
@@ -255,7 +262,7 @@ class AgentScreenerMondial:
             score  = _graham_score(info)
             per    = _safe(info.get("trailingPE"))
             pbr    = _safe(info.get("priceToBook"))
-            div    = _safe(info.get("dividendYield"), 0.0)
+            div    = _norm_div(info.get("dividendYield"))
             de     = _safe(info.get("debtToEquity"))
             growth = _safe(info.get("revenueGrowth"))
             prix   = _safe(info.get("currentPrice"))
@@ -309,7 +316,7 @@ class AgentScreenerMondial:
     def _passe_filtres(self, info: dict) -> bool:
         per    = _safe(info.get("trailingPE"))
         pbr    = _safe(info.get("priceToBook"))
-        div    = _safe(info.get("dividendYield"), 0.0)
+        div    = _norm_div(info.get("dividendYield"))
         de     = _safe(info.get("debtToEquity"))
         growth = _safe(info.get("revenueGrowth"))
 

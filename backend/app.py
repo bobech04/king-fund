@@ -1629,6 +1629,26 @@ _scheduler.add_job(
 )
 
 
+def _job_screener_mondial():
+    """Scan Graham mondial — nuit à 02:30 UTC (~2 min sur 136 titres)."""
+    logger.info("[SCHEDULER] Screener mondial démarrage")
+    try:
+        from divisions.research.agent_screener_mondial import get_screener_mondial
+        candidats = get_screener_mondial().scanner()
+        logger.info("[SCHEDULER] ✓ Screener mondial — %d candidats", len(candidats))
+    except Exception as exc:
+        logger.error("[SCHEDULER] ✗ Screener mondial ÉCHEC: %s", exc)
+
+
+_scheduler.add_job(
+    _job_screener_mondial,
+    CronTrigger(hour=2, minute=30),
+    id="screener_mondial",
+    replace_existing=True,
+    misfire_grace_time=600,
+)
+
+
 def _job_check_outcomes():
     """Évalue quotidiennement les prédictions Bertez/Morning Brief vs SPY (18:30 Paris)."""
     try:
