@@ -2102,7 +2102,7 @@ _scheduler.add_job(
 )
 
 
-# ── Agent Flux Macro — 2×/jour (08h00 + 16h00 UTC = 10h00 + 18h00 Paris CEST)
+# ── Agent Flux Macro — 2×/jour : 10h00 et 18h00 Europe/Paris
 
 def _job_flux_macro():
     logger.info("[SCHEDULER] Agent Flux Macro — analyse flux de capitaux")
@@ -2123,14 +2123,14 @@ def _job_flux_macro():
 
 _scheduler.add_job(
     _job_flux_macro,
-    CronTrigger(hour=10, minute=0),   # 10h00 Paris ≈ 08h00 UTC (CEST)
+    CronTrigger(hour=10, minute=0),   # 10h00 Europe/Paris
     id="flux_macro_matin",
     replace_existing=True,
 )
 
 _scheduler.add_job(
     _job_flux_macro,
-    CronTrigger(hour=18, minute=0),   # 18h00 Paris ≈ 16h00 UTC (CEST)
+    CronTrigger(hour=18, minute=0),   # 18h00 Europe/Paris
     id="flux_macro_aprem",
     replace_existing=True,
 )
