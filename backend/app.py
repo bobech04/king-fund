@@ -1165,6 +1165,34 @@ def get_correlations_actoblig():
         })
 
 
+@app.route("/api/scheduler/etat")
+def get_scheduler_etat():
+    try:
+        jobs = []
+        for job in _scheduler.get_jobs():
+            jobs.append({
+                "id":              job.id,
+                "prochaine_exec":  job.next_run_time.isoformat() if job.next_run_time else None,
+                "trigger":         str(job.trigger),
+                "dernier_resultat": _job_results.get(job.id, {}).get("statut", "pending"),
+            })
+        jobs.sort(key=lambda j: j["prochaine_exec"] or "9999")
+        return jsonify({
+            "running":  _scheduler.running,
+            "nb_jobs":  len(jobs),
+            "timezone": "Europe/Paris",
+            "jobs":     jobs,
+        })
+    except Exception as e:
+        logger.error("scheduler/etat: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+@app.route("/api/scheduler/resultats")
+def get_scheduler_resultats():
+    return jsonify(_job_results)
+
+
 @app.route("/api/maintenance/health")
 def get_maintenance_health():
     from maintenance import get_health as _health
@@ -1426,7 +1454,8 @@ def websocket(ws):
 # Scheduler APScheduler — jobs périodiques
 # ---------------------------------------------------------------------------
 
-_scheduler = BackgroundScheduler(timezone=pytz.timezone("Europe/Paris"))
+_scheduler   = BackgroundScheduler(timezone=pytz.timezone("Europe/Paris"))
+_job_results: dict = {}   # {job_id: {statut, timestamp, detail}}
 
 
 def _job_rapport_pdf():
