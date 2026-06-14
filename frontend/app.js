@@ -1539,7 +1539,7 @@
     const sigColor = signal === 'buy'  ? '#4ade80' : signal === 'hold' ? '#facc15' : '#f87171';
     const statutColor = statut === 'OK' ? 'var(--green)' : '#facc15';
 
-    const stageRows = stages.map((s, i) => {
+    const stageRows = stages.filter(s => s.name !== 'Score final').map((s, i) => {
       const sc  = s.score ?? 0;
       const cls = sc >= 0.3 ? 'pos' : sc <= -0.3 ? 'neg' : 'neu';
       const pct = Math.round(((sc + 1) / 2) * 100);
