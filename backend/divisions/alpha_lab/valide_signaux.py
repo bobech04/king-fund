@@ -251,7 +251,7 @@ def generer_rapport(force: bool = False) -> dict:
         "crises_testees": list(CRISES.keys()),
         "signaux":        {k: v.to_dict() for k, v in signaux.items()},
         "traders_map":    TRADER_ARCHETYPES,
-        "signal_regime_coherent": False,  # mis à jour en Bloc 4
+        "signal_regime_coherent": _check_regime_coherence(valides),
     }
 
     with _LOCK:
@@ -269,6 +269,25 @@ def generer_rapport(force: bool = False) -> dict:
         _notifier_agd01_bertez_valide(signaux.get("Bertez_Energy"))
 
     return rapport
+
+
+def _check_regime_coherence(valides: list) -> bool:
+    """
+    Retourne True si TrendFollow est VALIDE ET que le Flux Macro détecte CRISE_LIQUIDITE.
+    Utilisé pour le badge cross-agent dans le frontend (Bloc 4).
+    Silencieux en cas d'erreur (Flux Macro peut ne pas avoir encore tourné).
+    """
+    if "TrendFollow" not in valides:
+        return False
+    try:
+        from divisions.research.agent_flux_macro import get_agent_flux_macro
+        cache = get_agent_flux_macro()._cache
+        if cache is None:
+            return False
+        regime = (cache.get("regime") or {}).get("regime", "")
+        return regime == "CRISE_LIQUIDITE"
+    except Exception:
+        return False
 
 
 def _notifier_agd01_bertez_valide(res) -> None:
