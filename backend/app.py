@@ -1609,6 +1609,47 @@ def get_flux_macro_journal():
         return jsonify({"erreur": str(exc)}), 500
 
 
+@app.route("/api/flux-macro/etat")
+def get_flux_macro_etat():
+    """Retourne l'état courant de l'agent (depuis cache, sans refetch)."""
+    try:
+        from divisions.research.agent_flux_macro import get_agent_flux_macro
+        return jsonify(get_agent_flux_macro().etat())
+    except Exception as exc:
+        logger.error("flux-macro/etat: %s", exc)
+        return jsonify({"erreur": str(exc)}), 500
+
+
+@app.route("/api/flux-macro/scan-contexte", methods=["POST"])
+def post_flux_macro_scan_contexte():
+    """
+    Scan contexte avec événement absorbeur injecté (Règle Monétaire Éternelle).
+    Body JSON : {titre, valorisation, date_prevue, source, type, note}
+    """
+    body = request.get_json(silent=True) or {}
+    if not body.get("titre"):
+        return jsonify({"erreur": "champ 'titre' requis"}), 400
+    try:
+        from divisions.research.agent_flux_macro import get_agent_flux_macro
+        return jsonify(get_agent_flux_macro().scan_contexte(body))
+    except Exception as exc:
+        logger.error("flux-macro/scan-contexte: %s", exc)
+        return jsonify({"erreur": str(exc)}), 500
+
+
+@app.route("/api/flux-macro/rapport-flash", methods=["POST"])
+def post_flux_macro_rapport_flash():
+    """Génère un rapport flash immédiat (sans attendre le scheduler)."""
+    try:
+        from divisions.research.agent_flux_macro import get_agent_flux_macro
+        agent = get_agent_flux_macro()
+        result = agent.generer_rapport_flash()
+        return jsonify(result)
+    except Exception as exc:
+        logger.error("flux-macro/rapport-flash: %s", exc)
+        return jsonify({"erreur": str(exc)}), 500
+
+
 # ── Agent Dividendes ──────────────────────────────────────────────────────────
 
 @app.route("/api/dividendes")
@@ -2132,6 +2173,28 @@ _scheduler.add_job(
     _job_flux_macro,
     CronTrigger(hour=18, minute=0),   # 18h00 Europe/Paris
     id="flux_macro_aprem",
+    replace_existing=True,
+)
+
+
+def _job_flux_macro_hebdo():
+    """Rapport hebdomadaire Flux Macro — lundi 07:00 UTC."""
+    logger.info("[SCHEDULER] Flux Macro hebdo — génération rapport lundi 07:00 UTC")
+    try:
+        from divisions.research.agent_flux_macro import get_agent_flux_macro
+        result = get_agent_flux_macro().generer_rapport_hebdo()
+        logger.info(
+            "[SCHEDULER] Flux Macro hebdo ✓ — sauvegardé : %s",
+            result.get("chemin", "?"),
+        )
+    except Exception as exc:
+        logger.error("[SCHEDULER] Flux Macro hebdo ÉCHEC: %s", exc)
+
+
+_scheduler.add_job(
+    _job_flux_macro_hebdo,
+    CronTrigger(day_of_week="mon", hour=7, minute=0),   # lundi 07:00 UTC
+    id="flux_macro_hebdo",
     replace_existing=True,
 )
 

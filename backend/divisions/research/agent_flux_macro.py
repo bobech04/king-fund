@@ -219,9 +219,25 @@ TICKERS_YF: dict[str, str] = {
     "SPY":    "SPY",         # SPDR S&P 500 ETF — ratio TLT/SPY → CRISE_LIQUIDITE
     "COPX":   "COPX",        # Global X Copper Miners ETF — cuivre = signal croissance réelle vs financière
     "UNG":    "UNG",         # United States Natural Gas Fund — signal énergie/inflation
+    "QQQ":   "QQQ",          # Invesco QQQ Trust (Nasdaq 100 ETF) — tech vs large cap
 }
 
 FRED_SERIES = ["DGS3MO", "DGS10", "T10YIE"]
+
+# Indicateurs de liquidité macro (nécessitent historique pour calcul variation)
+FRED_SERIES_LIQUIDITE = ["M2SL", "WALCL", "IORB", "BAMLC0A0CM", "BAMLH0A0HYM2"]
+
+# Seuils d'alerte liquidité (spec)
+# Note FRED units : BAMLC0A0CM et BAMLH0A0HYM2 sont en % (pas bps)
+# → 150 bps = 1.50% | 500 bps = 5.00%
+# WALCL est en millions de dollars (pas milliards)
+LIQUIDITE_SEUILS = {
+    "M2SL_yoy_orange":    2.0,    # croissance M2 < 2% → alerte orange
+    "M2SL_yoy_rouge":     0.0,    # croissance M2 < 0  → alerte rouge
+    "WALCL_baisse_3m":   -5.0,   # baisse Fed BS > 5% sur 3 mois (en %)
+    "IG_spread_max_pct":  1.50,  # spreads IG > 1.50% (= 150 bps dans unité FRED)
+    "HY_spread_max_pct":  5.00,  # spreads HY > 5.00% (= 500 bps dans unité FRED)
+}
 
 # Ratio thresholds (from spec)
 RATIO_SEUILS = {
@@ -569,6 +585,83 @@ class AgentFluxMacro:
         except Exception as exc:
             logger.debug("[FluxMacro] _fetch_cftc: %s", exc)
             return {"ok": False, "reason": "DONNÉES INDISPONIBLES", "data": {}}
+
+    def _fetch_fred_liquidite(self) -> dict[str, Any]:
+        """
+        Fetch indicateurs liquidité macro : M2SL, WALCL, IORB, spreads IG/HY.
+        Retourne historique 13 périodes pour calculer variations.
+        """
+        result: dict[str, Any] = {}
+        try:
+            from config import FRED_API_KEY
+            if not FRED_API_KEY:
+                return {"ok": False, "reason": "FRED_API_KEY absent", "data": {}}
+            from fredapi import Fred
+            fred = Fred(api_key=FRED_API_KEY)
+            for series_id in FRED_SERIES_LIQUIDITE:
+                try:
+                    s = fred.get_series_latest_release(series_id)
+                    s_clean = s.dropna()
+                    if s_clean.empty:
+                        result[series_id] = {"value": None, "freshness": "UNAVAILABLE", "hist": []}
+                        continue
+                    val  = float(s_clean.iloc[-1])
+                    hist = [float(x) for x in s_clean.tail(14).tolist()]
+                    result[series_id] = {"value": val, "freshness": "OK", "hist": hist}
+                except Exception as exc:
+                    logger.debug("[FluxMacro] FRED liq %s: %s", series_id, exc)
+                    result[series_id] = {"value": None, "freshness": "UNAVAILABLE", "hist": []}
+            return {"ok": True, "data": result}
+        except Exception as exc:
+            logger.warning("[FluxMacro] _fetch_fred_liquidite: %s", exc)
+            return {"ok": False, "reason": str(exc), "data": {}}
+
+    def _check_liquidite_seuils(self, fred_liq_data: dict) -> list[dict]:
+        """Vérifie les seuils d'alerte sur les indicateurs de liquidité macro."""
+        alertes: list[dict] = []
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+        m2 = fred_liq_data.get("M2SL", {})
+        if m2.get("value") is not None and m2.get("hist") and len(m2["hist"]) >= 13:
+            m2_now = m2["value"]
+            m2_1y  = m2["hist"][-13]
+            if m2_1y and m2_1y > 0:
+                m2_yoy = (m2_now - m2_1y) / m2_1y * 100
+                if m2_yoy < LIQUIDITE_SEUILS["M2SL_yoy_rouge"]:
+                    alertes.append({"id": "m2_negatif", "label": "M2 croissance NÉGATIVE (🔴)",
+                                    "valeur": round(m2_yoy, 2), "niveau": "CRITIQUE",
+                                    "seuil": "< 0%", "timestamp": now_str})
+                elif m2_yoy < LIQUIDITE_SEUILS["M2SL_yoy_orange"]:
+                    alertes.append({"id": "m2_faible", "label": "M2 croissance faible (🟡)",
+                                    "valeur": round(m2_yoy, 2), "niveau": "IMPORTANT",
+                                    "seuil": "< 2%", "timestamp": now_str})
+
+        walcl = fred_liq_data.get("WALCL", {})
+        if walcl.get("value") is not None and walcl.get("hist") and len(walcl["hist"]) >= 4:
+            w_now = walcl["value"]
+            w_3m  = walcl["hist"][-4]
+            if w_3m and w_3m > 0:
+                w_var = (w_now - w_3m) / w_3m * 100
+                if w_var < LIQUIDITE_SEUILS["WALCL_baisse_3m"]:
+                    alertes.append({"id": "walcl_baisse", "label": "Fed balance sheet baisse > 5% (3 mois)",
+                                    "valeur": round(w_var, 2), "niveau": "IMPORTANT",
+                                    "seuil": "< -5% sur 3 mois", "timestamp": now_str})
+
+        ig = fred_liq_data.get("BAMLC0A0CM", {})
+        if ig.get("value") is not None and ig["value"] > LIQUIDITE_SEUILS["IG_spread_max_pct"]:
+            ig_bps = round(ig["value"] * 100, 0)
+            alertes.append({"id": "spread_ig", "label": "Spreads IG > 150 bps",
+                            "valeur": f"{ig_bps:.0f} bps ({ig['value']:.2f}%)", "niveau": "IMPORTANT",
+                            "seuil": "> 1.50% (150 bps)", "timestamp": now_str})
+
+        hy = fred_liq_data.get("BAMLH0A0HYM2", {})
+        if hy.get("value") is not None and hy["value"] > LIQUIDITE_SEUILS["HY_spread_max_pct"]:
+            hy_bps = round(hy["value"] * 100, 0)
+            alertes.append({"id": "spread_hy", "label": "Spreads HY > 500 bps",
+                            "valeur": f"{hy_bps:.0f} bps ({hy['value']:.2f}%)", "niveau": "CRITIQUE" if hy["value"] > 8.0 else "IMPORTANT",
+                            "seuil": "> 5.00% (500 bps)", "timestamp": now_str})
+
+        return alertes
 
     def _fetch_ipo_calendar(self) -> list[dict]:
         """
@@ -1178,7 +1271,7 @@ class AgentFluxMacro:
             # ── Étape 1/2 : Fetch données + détection ──────────────────────
             prix_result = self._fetch_prix()
             if prix_result.get("ok"):
-                sources_actives.append("yfinance (XAUUSD/GC=F, HSI, AAXJ, URTH, IRX, USDJPY, GLD, USO, TLT, SPY, COPX, UNG)")
+                sources_actives.append("yfinance (XAUUSD/GC=F, HSI, AAXJ, URTH, IRX, USDJPY, GLD, USO, TLT, SPY, QQQ, COPX, UNG)")
             else:
                 erreurs.append(f"yfinance: {prix_result.get('erreur','erreur inconnue')}")
 
@@ -1204,6 +1297,14 @@ class AgentFluxMacro:
                 sources_actives.append(
                     f"Reuters commodités ({len(commodites['alertes'])} alerte(s) matières premières)"
                 )
+
+            # FRED liquidité macro (M2SL, WALCL, IORB, spreads IG/HY)
+            fred_liq_result = self._fetch_fred_liquidite()
+            fred_liq_ok     = fred_liq_result.get("ok", False)
+            fred_liq_data   = fred_liq_result.get("data", {})
+            if fred_liq_ok:
+                sources_actives.append("FRED API liquidité (M2SL, WALCL, IORB, BAMLC0A0CM, BAMLH0A0HYM2)")
+            alertes_liquidite = self._check_liquidite_seuils(fred_liq_data) if fred_liq_ok else []
 
             # ── Étape 1 : DÉTECTER anomalies ───────────────────────────────
             prix_data   = prix_result.get("data", {})
@@ -1314,16 +1415,30 @@ class AgentFluxMacro:
 
             # ── Construction résultat ───────────────────────────────────────
             fred_data = fred_result.get("data", {})
+
+            def _liq_val(series_id: str) -> Any:
+                return fred_liq_data.get(series_id, {}).get("value", "DONNÉES INDISPONIBLES")
+
             self._cache = {
                 "timestamp":         ts_debut,
                 "sources_actives":   sources_actives,
                 "nb_sources":        len(sources_actives),
                 "anomalies":         anomalies,
+                "alertes_liquidite": alertes_liquidite,
                 "ratios":            ratios_etat,
                 "fred": {
                     "DGS3MO":  fred_data.get("DGS3MO",  {}).get("value", "DONNÉES INDISPONIBLES"),
                     "DGS10":   fred_data.get("DGS10",   {}).get("value", "DONNÉES INDISPONIBLES"),
                     "T10YIE":  fred_data.get("T10YIE",  {}).get("value", "DONNÉES INDISPONIBLES"),
+                },
+                "fred_liquidite": {
+                    "M2SL":         _liq_val("M2SL"),
+                    "WALCL":        _liq_val("WALCL"),
+                    "IORB":         _liq_val("IORB"),
+                    "BAMLC0A0CM":   _liq_val("BAMLC0A0CM"),
+                    "BAMLH0A0HYM2": _liq_val("BAMLH0A0HYM2"),
+                    "ok":           fred_liq_ok,
+                    "note":         "M2SL: masse monétaire US (Mds$) | WALCL: Fed balance sheet (Mds$) | IORB: taux repo (%) | BAMLC0A0CM: spreads IG (bps) | BAMLH0A0HYM2: spreads HY (bps)",
                 },
                 "cftc": cftc_result if cftc_ok else {"ok": False, "reason": "DONNÉES INDISPONIBLES"},
                 "ipos":              ipos,
@@ -1561,10 +1676,170 @@ class AgentFluxMacro:
         """Retourne l'état courant (depuis cache si disponible)."""
         if self._cache:
             return {
-                "timestamp":       self._cache.get("timestamp"),
-                "nb_anomalies":    len(self._cache.get("anomalies", [])),
-                "confiance":       self._cache.get("confiance"),
-                "nb_sources":      self._cache.get("nb_sources", 0),
+                "timestamp":        self._cache.get("timestamp"),
+                "nb_anomalies":     len(self._cache.get("anomalies", [])),
+                "nb_alertes_liq":   len(self._cache.get("alertes_liquidite", [])),
+                "confiance":        self._cache.get("confiance"),
+                "nb_sources":       self._cache.get("nb_sources", 0),
                 "alertes_envoyees": self._cache.get("alertes_envoyees", []),
+                "regime":           self._cache.get("regime", {}).get("regime"),
             }
-        return {"timestamp": None, "nb_anomalies": 0, "confiance": None, "nb_sources": 0}
+        return {"timestamp": None, "nb_anomalies": 0, "confiance": None, "nb_sources": 0, "regime": None}
+
+    # ── Rapports Flash / Hebdo ───────────────────────────────────────────────
+
+    def generer_rapport_flash(self, anomalie: dict | None = None) -> dict:
+        """
+        Génère un rapport flash texte (signal CRITIQUE ou à la demande).
+        Sauvegarde dans rapports/flux_macro/flash/flash_YYYY-MM-DD_HHMM.txt
+        Retourne {"ok": bool, "chemin": str, "texte": str}.
+        """
+        donnees = self._cache or {}
+        now     = datetime.now(timezone.utc)
+        nom     = f"flash_{now.strftime('%Y-%m-%d_%H%M')}.txt"
+        chemin  = _RAPPORTS_DIR / "flash" / nom
+
+        anomalies  = donnees.get("anomalies", [])
+        top_anom   = anomalie or (max(anomalies, key=lambda x: abs(x.get("z_score", 0))) if anomalies else {})
+        regime     = donnees.get("regime", {}).get("regime", "NORMAL")
+        confiance  = donnees.get("confiance", "—")
+        conclusion = donnees.get("conclusion", "—")
+        action     = donnees.get("action_suggeree", "—")
+        tort       = donnees.get("pourquoi_tort", "—")
+        sources    = donnees.get("sources_actives", [])
+        liq        = donnees.get("fred_liquidite", {})
+        biais      = donnees.get("biais_checklist", {})
+
+        biais_lines = ""
+        for biais_id, v in BIAIS_CHECKLIST.items():
+            ok  = biais.get(biais_id, False)
+            ico = "✅" if ok else "❌"
+            tag = "[BLOQUANT]" if v["blocage"] else "[avert.]"
+            biais_lines += f"  {ico} {tag} {biais_id} : {v['question']}\n"
+
+        texte = (
+            f"═══════════════════════════════════════════════════\n"
+            f"RAPPORT FLASH — AGENT FLUX MACRO\n"
+            f"Le Détective de Capitaux — Division Research — King Fund\n"
+            f"═══════════════════════════════════════════════════\n"
+            f"Date : {now.strftime('%Y-%m-%d %H:%M UTC')}\n"
+            f"Régime marché : {regime}\n"
+            f"Confiance : {confiance}\n\n"
+            f"── ANOMALIE PRINCIPALE ──────────────────────────\n"
+            f"{top_anom.get('label', 'Aucune') if top_anom else 'Aucune anomalie CRITIQUE'}\n"
+            f"Valeur : {top_anom.get('valeur', '—')} | Z-score : {top_anom.get('z_score', '—')}\n"
+            f"Niveau : {top_anom.get('niveau', '—')}\n\n"
+            f"── CONCLUSION ───────────────────────────────────\n"
+            f"{conclusion}\n\n"
+            f"── ACTION SUGGÉRÉE ──────────────────────────────\n"
+            f"{action}\n\n"
+            f"── INDICATEURS LIQUIDITÉ (FRED) ─────────────────\n"
+            f"  M2SL     : {liq.get('M2SL', 'DONNÉES INDISPONIBLES')} Mds$\n"
+            f"  WALCL    : {liq.get('WALCL', 'DONNÉES INDISPONIBLES')} Mds$\n"
+            f"  IORB     : {liq.get('IORB', 'DONNÉES INDISPONIBLES')} %\n"
+            f"  IG spread: {liq.get('BAMLC0A0CM', 'DONNÉES INDISPONIBLES')} bps\n"
+            f"  HY spread: {liq.get('BAMLH0A0HYM2', 'DONNÉES INDISPONIBLES')} bps\n\n"
+            f"── SOURCES ACTIVES ({len(sources)}) ─────────────────────────\n"
+            + "\n".join(f"  • {s}" for s in sources) + "\n\n"
+            f"── AUDIT ANTI-BIAIS ─────────────────────────────\n"
+            f"{biais_lines}\n"
+            f"── POURQUOI J'AI TORT (biais narratif) ──────────\n"
+            f"{tort}\n\n"
+            f"── LIMITES FONDAMENTALES ────────────────────────\n"
+            + "\n".join(f"  • {l}" for l in LIMITES_FONDAMENTALES) + "\n\n"
+            f"⚠️ Soumis à AGD-01 pour validation avant diffusion\n"
+            f"⚠️ DISCLAIMER : {DISCLAIMER}\n"
+            f"═══════════════════════════════════════════════════\n"
+        )
+
+        try:
+            chemin.write_text(texte, encoding="utf-8")
+            logger.info("[FluxMacro] Rapport flash sauvegardé : %s", chemin)
+            return {"ok": True, "chemin": str(chemin), "texte": texte}
+        except Exception as exc:
+            logger.warning("[FluxMacro] Rapport flash sauvegarde: %s", exc)
+            return {"ok": False, "chemin": "", "texte": texte, "erreur": str(exc)}
+
+    def generer_rapport_hebdo(self) -> dict:
+        """
+        Génère le rapport hebdomadaire (lundi 07:00 UTC).
+        Lance d'abord un scan complet puis génère le rapport.
+        Sauvegarde dans rapports/flux_macro/hebdo/hebdo_YYYY-WNN.txt
+        """
+        donnees = self.analyser(forcer=True)
+        now     = datetime.now(timezone.utc)
+        semaine = now.strftime("W%W")
+        nom     = f"hebdo_{now.strftime('%Y')}-{semaine}.txt"
+        chemin  = _RAPPORTS_DIR / "hebdo" / nom
+
+        anomalies      = donnees.get("anomalies", [])
+        alertes_liq    = donnees.get("alertes_liquidite", [])
+        ipos           = donnees.get("ipos", [])
+        regime         = donnees.get("regime", {}).get("regime", "NORMAL")
+        confiance      = donnees.get("confiance", "—")
+        conclusion     = donnees.get("conclusion", "—")
+        sources        = donnees.get("sources_actives", [])
+        liq            = donnees.get("fred_liquidite", {})
+        journal_recent = self.journal(limite=7)
+
+        faux_positifs = [j for j in journal_recent if j.get("faux_positif") == 1]
+
+        texte = (
+            f"═══════════════════════════════════════════════════\n"
+            f"RAPPORT HEBDOMADAIRE — AGENT FLUX MACRO\n"
+            f"Le Détective de Capitaux — {now.strftime('%Y %B')}\n"
+            f"═══════════════════════════════════════════════════\n"
+            f"Période : {semaine} | Généré le {now.strftime('%Y-%m-%d %H:%M UTC')}\n"
+            f"Régime marché : {regime} | Confiance : {confiance}\n\n"
+            f"── ANOMALIES DE LA SEMAINE ({len(anomalies)}) ─────────────────\n"
+            + (("\n".join(
+                f"  [{a.get('niveau','?')}] {a.get('label','?')} — z={a.get('z_score','?')} | {a.get('variation_pct','?')}%"
+                for a in anomalies
+            ) if anomalies else "  Aucune anomalie détectée") + "\n\n")
+            + f"── ALERTES LIQUIDITÉ ({len(alertes_liq)}) ──────────────────────\n"
+            + (("\n".join(
+                f"  [{a.get('niveau','?')}] {a.get('label','?')} — {a.get('valeur','?')} (seuil: {a.get('seuil','?')})"
+                for a in alertes_liq
+            ) if alertes_liq else "  Aucune alerte liquidité") + "\n\n")
+            + f"── INDICATEURS LIQUIDITÉ MACRO ────────────────────\n"
+            f"  M2SL (masse monétaire US) : {liq.get('M2SL', 'DONNÉES INDISPONIBLES')} Mds$\n"
+            f"  WALCL (Fed balance sheet) : {liq.get('WALCL', 'DONNÉES INDISPONIBLES')} Mds$\n"
+            f"  IORB (taux repo Fed)      : {liq.get('IORB', 'DONNÉES INDISPONIBLES')} %\n"
+            f"  Spreads IG (BAMLC0A0CM)  : {liq.get('BAMLC0A0CM', 'DONNÉES INDISPONIBLES')} bps\n"
+            f"  Spreads HY (BAMLH0A0HYM2): {liq.get('BAMLH0A0HYM2', 'DONNÉES INDISPONIBLES')} bps\n\n"
+            f"── CALENDRIER IPO (SEC EDGAR S-1) ─────────────────\n"
+            + (("\n".join(
+                f"  {i.get('date','?')} — {i.get('titre','?')[:80]}"
+                for i in ipos[:5]
+            ) if ipos else "  Aucun filing S-1 récent") + "\n\n")
+            + f"── FAUX POSITIFS SEMAINE ({len(faux_positifs)}) ─────────────────\n"
+            + (("\n".join(
+                f"  {j.get('date','?')[:10]} — {j.get('anomalie','?')[:60]}"
+                for j in faux_positifs[:5]
+            ) if faux_positifs else "  Aucun faux positif enregistré") + "\n\n")
+            + f"── CONCLUSION ───────────────────────────────────\n"
+            f"{conclusion}\n\n"
+            f"── SOURCES ACTIVES ({len(sources)}) ─────────────────────────\n"
+            + "\n".join(f"  • {s}" for s in sources) + "\n\n"
+            f"⚠️ DISCLAIMER : {DISCLAIMER}\n"
+            f"═══════════════════════════════════════════════════\n"
+        )
+
+        try:
+            chemin.write_text(texte, encoding="utf-8")
+            logger.info("[FluxMacro] Rapport hebdo sauvegardé : %s", chemin)
+            try:
+                from divisions.gerant_delegue.notifier import send
+                send(
+                    f"📊 Rapport Hebdo Flux Macro — {semaine}\n"
+                    f"Anomalies: {len(anomalies)} | Alertes liq: {len(alertes_liq)} | Régime: {regime}\n"
+                    f"Confiance: {confiance}\n"
+                    f"⚠️ {DISCLAIMER}",
+                    "info",
+                )
+            except Exception:
+                pass
+            return {"ok": True, "chemin": str(chemin), "texte": texte, "semaine": semaine}
+        except Exception as exc:
+            logger.warning("[FluxMacro] Rapport hebdo sauvegarde: %s", exc)
+            return {"ok": False, "chemin": "", "texte": texte, "erreur": str(exc)}

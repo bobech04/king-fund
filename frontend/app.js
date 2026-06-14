@@ -2052,6 +2052,116 @@
     if (data.disclaimer) {
       $('fm-disclaimer').textContent = data.disclaimer;
     }
+
+    // ── Régime de marché ─────────────────────────────────────────────────────
+    const regime = data.regime || {};
+    const regimeNom = regime.regime || 'NORMAL';
+    const regimeBadge = $('fm-regime-badge');
+    if (regimeBadge) {
+      const REGIME_COLORS = {
+        NORMAL:          { bg: 'rgba(0,229,160,0.15)',  color: '#00e5a0', border: '#00e5a0' },
+        ROTATION:        { bg: 'rgba(255,213,0,0.15)',  color: '#ffd700', border: '#ffd700' },
+        CRISE_LIQUIDITE: { bg: 'rgba(255,68,85,0.15)',  color: '#ff4455', border: '#ff4455' },
+        EFFONDREMENT:    { bg: 'rgba(180,76,255,0.15)', color: '#b44cff', border: '#b44cff' },
+      };
+      const rc = REGIME_COLORS[regimeNom] || REGIME_COLORS.NORMAL;
+      regimeBadge.textContent = regimeNom;
+      regimeBadge.style.background   = rc.bg;
+      regimeBadge.style.color        = rc.color;
+      regimeBadge.style.border       = `1px solid ${rc.border}`;
+    }
+    const regimeDesc = $('fm-regime-desc');
+    if (regimeDesc) regimeDesc.textContent = regime.description || '—';
+    const regimeProt = $('fm-regime-protection');
+    if (regimeProt) {
+      regimeProt.textContent = '🛡️ ' + (regime.protection || '—');
+    }
+    const corrEl  = $('fm-corr-tlt-spy');
+    const ratioEl = $('fm-ratio-tlt-spy');
+    if (corrEl) {
+      const corr = regime.corr_tlt_spy_5j;
+      corrEl.textContent = corr !== null && corr !== undefined ? (corr >= 0 ? '+' : '') + corr.toFixed(3) : '—';
+      corrEl.style.color = (corr !== null && corr > 0) ? '#ff4455' : 'var(--green)';
+    }
+    if (ratioEl) {
+      ratioEl.textContent = regime.ratio_tlt_spy !== null && regime.ratio_tlt_spy !== undefined
+        ? regime.ratio_tlt_spy.toFixed(4) : '—';
+    }
+    const signauxEl = $('fm-regime-signaux');
+    if (signauxEl && regime.signaux && regime.signaux.length) {
+      signauxEl.innerHTML = regime.signaux.map(s =>
+        `<div style="padding:4px 0">⚡ ${s}</div>`
+      ).join('');
+    } else if (signauxEl) {
+      signauxEl.innerHTML = '';
+    }
+
+    // ── Indicateurs liquidité macro ───────────────────────────────────────────
+    const liq = data.fred_liquidite || {};
+    const liqEl = $('fm-liquidite');
+    if (liqEl) {
+      // Formatters — FRED units: WALCL en M$ (pas Mds), spreads en % (×100 = bps)
+      const LIQ_ITEMS = [
+        {
+          id: 'M2SL', label: 'M2 (masse monét. US)',
+          fmt: (v) => v.toLocaleString('fr-FR', {maximumFractionDigits: 0}) + ' Mds$',
+          warn: () => false,
+        },
+        {
+          id: 'WALCL', label: 'Fed balance sheet',
+          fmt: (v) => (v / 1000).toLocaleString('fr-FR', {maximumFractionDigits: 0}) + ' Mds$',
+          warn: () => false,
+        },
+        {
+          id: 'IORB', label: 'Taux repo Fed (IORB)',
+          fmt: (v) => v.toFixed(2) + ' %',
+          warn: () => false,
+        },
+        {
+          id: 'BAMLC0A0CM', label: 'Spreads IG (150 bps seuil)',
+          fmt: (v) => (v * 100).toFixed(0) + ' bps (' + v.toFixed(2) + '%)',
+          warn: (v) => typeof v === 'number' && v > 1.50,
+        },
+        {
+          id: 'BAMLH0A0HYM2', label: 'Spreads HY (500 bps seuil)',
+          fmt: (v) => (v * 100).toFixed(0) + ' bps (' + v.toFixed(2) + '%)',
+          warn: (v) => typeof v === 'number' && v > 5.00,
+        },
+      ];
+      if (!liq.ok) {
+        liqEl.innerHTML = '<span style="color:var(--muted);font-size:12px">DONNÉES INDISPONIBLES — FRED_API_KEY requis</span>';
+      } else {
+        liqEl.innerHTML = LIQ_ITEMS.map(item => {
+          const val = liq[item.id];
+          const display = (val === 'DONNÉES INDISPONIBLES' || val === null || val === undefined)
+            ? '<span style="color:var(--muted)">DONNÉES INDISPONIBLES</span>'
+            : (typeof val === 'number' ? item.fmt(val) : String(val));
+          const alerte = typeof val === 'number' ? item.warn(val) : false;
+          return `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--bg3);border-radius:6px;border-left:3px solid ${alerte ? '#ff4455' : 'var(--border)'}">
+            <span style="font-size:13px">${alerte ? '🔴' : '🔵'}</span>
+            <div style="flex:1;font-size:12px;color:var(--muted)">${item.label}</div>
+            <div style="font-size:13px;font-weight:700;color:${alerte ? '#ff4455' : 'var(--fg)'}">${display}</div>
+          </div>`;
+        }).join('');
+      }
+    }
+
+    // Alertes liquidité (seuils M2/WALCL/spreads dépassés)
+    const alertesLiqEl = $('fm-alertes-liquidite');
+    if (alertesLiqEl) {
+      const alertesLiq = data.alertes_liquidite || [];
+      if (alertesLiq.length) {
+        alertesLiqEl.innerHTML = alertesLiq.map(a => {
+          const col = a.niveau === 'CRITIQUE' ? '#c0392b' : '#e67e22';
+          return `<div style="border-left:3px solid ${col};padding:8px 12px;margin-bottom:6px;background:var(--bg2);border-radius:0 6px 6px 0;font-size:12px">
+            <span style="background:${col};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-right:8px">${a.niveau}</span>
+            <b>${a.label}</b> — ${a.valeur} (seuil: ${a.seuil})
+          </div>`;
+        }).join('');
+      } else {
+        alertesLiqEl.innerHTML = '';
+      }
+    }
   }
 
   async function loadRetraite() {
