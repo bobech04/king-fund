@@ -196,7 +196,7 @@ class AgentVeilleStrategique:
     # ------------------------------------------------------------------
 
     def analyser(self, forcer: bool = False) -> list[dict]:
-        now = time.monotonic()
+        now = time.time()
         if not forcer and self._cache and (now - self._cache_ts) < _CACHE_TTL:
             return list(self._cache)
 
