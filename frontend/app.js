@@ -1865,10 +1865,13 @@
     } catch (e) {
       $('intel-articles').innerHTML = '<span style="color:var(--muted);padding:16px;display:block">Erreur chargement veille stratégique.</span>';
       $('intel-sources').innerHTML  = '';
-      return;
     }
-    state.intelligence = data;
-    renderIntelligence(data);
+    if (data) {
+      state.intelligence = data;
+      renderIntelligence(data);
+    }
+    // Charger Flux Macro en parallèle (non bloquant)
+    loadFluxMacro().catch(() => {});
   }
 
   function renderIntelligence(data) {
@@ -1939,6 +1942,115 @@
       </div>`;
     }
     $('intel-sources').innerHTML = html2;
+  }
+
+  // ── Flux Macro — Le Détective de Capitaux ─────────────────────────────────
+
+  async function loadFluxMacro() {
+    $('fm-ratios').innerHTML    = '<div style="text-align:center;padding:20px;color:var(--muted)"><div class="spinner"></div></div>';
+    $('fm-anomalies').innerHTML = '<div style="color:var(--muted);font-size:12px;padding:16px">Chargement…</div>';
+    $('fm-ipos').innerHTML      = '<div style="color:var(--muted);font-size:12px;padding:16px">Chargement…</div>';
+    let data;
+    try {
+      data = await apiFetch('/flux-macro', 60_000);
+    } catch (e) {
+      $('fm-ratios').innerHTML = '<span style="color:var(--muted);padding:16px;display:block">Erreur chargement Flux Macro.</span>';
+      return;
+    }
+    state.fluxMacro = data;
+    renderFluxMacro(data);
+  }
+
+  function renderFluxMacro(data) {
+    const anomalies = data.anomalies || [];
+    const ratios    = data.ratios    || [];
+    const ipos      = data.ipos      || [];
+    const ts        = data.timestamp ? 'Mis à jour ' + timeAgo(data.timestamp) : '—';
+
+    $('fm-time').textContent = ts;
+    $('fm-nb-anomalies').textContent = anomalies.length;
+    $('fm-nb-sources').textContent   = data.nb_sources ?? '—';
+    $('fm-nb-ipos').textContent      = ipos.length;
+
+    // Confiance coloring
+    const conf = data.confiance || '—';
+    const confEl = $('fm-confiance');
+    confEl.textContent = conf;
+    confEl.style.color = conf === 'FORTE' ? 'var(--green)' :
+                         conf === 'MOYEN'  ? 'var(--yellow)' :
+                         conf === 'FAIBLE' ? '#ff6b35' : 'var(--muted)';
+
+    // ── Ratios ──────────────────────────────────────────────────────────────
+    if (!ratios.length) {
+      $('fm-ratios').innerHTML = '<span style="color:var(--muted);font-size:12px;padding:16px;display:block">DONNÉES INDISPONIBLES</span>';
+    } else {
+      $('fm-ratios').innerHTML = `<div style="display:grid;gap:8px;padding:4px 0">${
+        ratios.map(r => {
+          const alertCls = r.alerte ? 'color:#ff4455' : 'color:var(--green)';
+          const icon     = r.alerte ? '🔴' : '🟢';
+          const fresh    = r.freshness === 'STALE' ? ' <span style="color:#ff6b35;font-size:9px">STALE</span>' :
+                           r.freshness === 'UNAVAILABLE' ? ' <span style="color:var(--muted);font-size:9px">N/A</span>' : '';
+          return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border-radius:6px;border-left:3px solid ${r.alerte ? '#ff4455' : 'var(--green)'}">
+            <span style="font-size:14px">${icon}</span>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:12px;font-weight:600;color:var(--fg)">${r.label}${fresh}</div>
+              <div style="font-size:11px;color:var(--muted)">${r.detail || ''}</div>
+            </div>
+            <div style="font-size:13px;font-weight:700;${alertCls};white-space:nowrap">${r.valeur ?? '—'}</div>
+          </div>`;
+        }).join('')
+      }</div>`;
+    }
+
+    // ── Anomalies ────────────────────────────────────────────────────────────
+    if (!anomalies.length) {
+      $('fm-anomalies').innerHTML = '<div style="padding:12px;color:var(--green);font-size:13px">✅ Aucune anomalie significative — marchés dans les normes 30j</div>';
+    } else {
+      $('fm-anomalies').innerHTML = anomalies.map(a => {
+        const lvlColor = a.niveau === 'CRITIQUE' ? '#c0392b' : '#e67e22';
+        return `<div style="border-left:3px solid ${lvlColor};padding:10px 12px;margin-bottom:8px;background:var(--bg2);border-radius:0 6px 6px 0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="background:${lvlColor};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">${a.niveau}</span>
+            <span style="font-size:12px;font-weight:700;color:var(--fg)">${a.label}</span>
+            <span style="margin-left:auto;font-size:11px;color:var(--muted)">${a.timestamp || ''}</span>
+          </div>
+          <div style="display:flex;gap:16px;flex-wrap:wrap;font-size:12px">
+            <span>Valeur : <b style="color:var(--fg)">${a.valeur ?? '—'}</b></span>
+            <span>Variation : <b style="color:${a.variation_pct >= 0 ? 'var(--green)' : '#ff4455'}">${a.variation_pct !== undefined ? (a.variation_pct >= 0 ? '+' : '') + a.variation_pct.toFixed(1) + '%' : '—'}</b></span>
+            <span>Z-score : <b style="color:#e67e22">${a.z_score !== undefined ? (a.z_score >= 0 ? '+' : '') + a.z_score.toFixed(1) + 'σ' : '—'}</b></span>
+          </div>
+          ${a.seuil_label ? `<div style="font-size:11px;color:var(--muted);margin-top:4px">⚠️ ${a.seuil_label}</div>` : ''}
+        </div>`;
+      }).join('');
+    }
+
+    // ── IPOs calendrier ──────────────────────────────────────────────────────
+    if (!ipos.length) {
+      $('fm-ipos').innerHTML = '<span style="color:var(--muted);font-size:12px;padding:16px;display:block">Aucun filing S-1 récent détecté (SEC EDGAR)</span>';
+    } else {
+      $('fm-ipos').innerHTML = ipos.map(i =>
+        `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+          <div style="font-size:12px;font-weight:600;color:var(--fg)">${i.titre}</div>
+          <div style="display:flex;gap:10px;font-size:11px;color:var(--muted);margin-top:2px">
+            <span>📅 ${i.date}</span>
+            ${i.url ? `<a href="${i.url}" target="_blank" rel="noopener" style="color:var(--accent)">→ SEC EDGAR</a>` : ''}
+          </div>
+        </div>`
+      ).join('');
+    }
+
+    // ── Conclusion ───────────────────────────────────────────────────────────
+    const concl = data.conclusion || '—';
+    const action = data.action_suggeree || '';
+    const tort   = data.pourquoi_tort   || '';
+    $('fm-conclusion').innerHTML =
+      `<div style="margin-bottom:10px">${concl}</div>` +
+      (action ? `<div style="font-size:12px;color:var(--accent);margin-bottom:8px">📈 ${action}</div>` : '') +
+      (tort ? `<details style="margin-top:8px"><summary style="font-size:11px;color:var(--muted);cursor:pointer">⚖️ Pourquoi j'ai tort (biais narratif)</summary><pre style="font-size:11px;color:var(--muted);margin-top:6px;white-space:pre-wrap">${tort}</pre></details>` : '');
+
+    if (data.disclaimer) {
+      $('fm-disclaimer').textContent = data.disclaimer;
+    }
   }
 
   async function loadRetraite() {
@@ -2098,6 +2210,7 @@
     blackswanScan:        () => blackswanScan().catch(() => {}),
     analyzeTickerSearch:  () => analyzeTickerSearch().catch(() => {}),
     addToWatchlist:       ticker => addToWatchlist(ticker).catch(() => {}),
+    refreshFluxMacro:     () => loadFluxMacro().catch(() => {}),
   };
 
   // ── Init ──────────────────────────────────────────────────

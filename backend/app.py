@@ -1321,6 +1321,31 @@ def get_veille_historique():
         return jsonify({"erreur": str(e)}), 500
 
 
+# ── Agent Flux Macro — Division Research ─────────────────────────────────────
+
+@app.route("/api/flux-macro")
+def get_flux_macro():
+    """Analyse flux de capitaux : ratios, anomalies, CFTC, calendrier IPOs."""
+    try:
+        force = request.args.get("force", "0") == "1"
+        from divisions.research.agent_flux_macro import get_agent_flux_macro
+        return jsonify(get_agent_flux_macro().analyser(forcer=force))
+    except Exception as exc:
+        logger.error("flux-macro: %s", exc)
+        return jsonify({"erreur": str(exc)}), 500
+
+
+@app.route("/api/flux-macro/journal")
+def get_flux_macro_journal():
+    try:
+        limite = int(request.args.get("limit", 50))
+        from divisions.research.agent_flux_macro import get_agent_flux_macro
+        return jsonify(get_agent_flux_macro().journal(limite=limite))
+    except Exception as exc:
+        logger.error("flux-macro/journal: %s", exc)
+        return jsonify({"erreur": str(exc)}), 500
+
+
 # ── Agent Dividendes ──────────────────────────────────────────────────────────
 
 @app.route("/api/dividendes")
@@ -1814,6 +1839,40 @@ _scheduler.add_job(
 )
 
 
+# ── Agent Flux Macro — 2×/jour (08h00 + 16h00 UTC = 10h00 + 18h00 Paris CEST)
+
+def _job_flux_macro():
+    logger.info("[SCHEDULER] Agent Flux Macro — analyse flux de capitaux")
+    try:
+        from divisions.research.agent_flux_macro import get_agent_flux_macro
+        result = get_agent_flux_macro().analyser(forcer=True)
+        nb_anom = len(result.get("anomalies", []))
+        confiance = result.get("confiance", "?")
+        logger.info(
+            "[SCHEDULER] Flux Macro ✓ — %d anomalie(s), confiance=%s, sources=%d",
+            nb_anom, confiance, result.get("nb_sources", 0),
+        )
+        if nb_anom == 0:
+            logger.info("[SCHEDULER] Flux Macro — aucune anomalie significative")
+    except Exception as exc:
+        logger.error("[SCHEDULER] Flux Macro ÉCHEC: %s", exc)
+
+
+_scheduler.add_job(
+    _job_flux_macro,
+    CronTrigger(hour=10, minute=0),   # 10h00 Paris ≈ 08h00 UTC (CEST)
+    id="flux_macro_matin",
+    replace_existing=True,
+)
+
+_scheduler.add_job(
+    _job_flux_macro,
+    CronTrigger(hour=18, minute=0),   # 18h00 Paris ≈ 16h00 UTC (CEST)
+    id="flux_macro_aprem",
+    replace_existing=True,
+)
+
+
 # ---------------------------------------------------------------------------
 # Watchdog — alertes Telegram sur arrêt/crash du serveur
 # ---------------------------------------------------------------------------
@@ -1886,6 +1945,7 @@ if __name__ == "__main__":
         f"• Veille stratégique RSS : toutes les heures (Bertez/Dalio/Howell/InflationGuy)\n"
         f"• Alertes prix : VPK.AS&lt;44€ · BIPC&lt;35$ · DNB.OL&lt;280kr · TTE.PA&gt;-5%\n"
         f"• Backup quotidien 04:00 | Watchdog actif\n"
+        f"• Flux Macro (Détective Capitaux) : 10h00 + 18h00 Paris\n"
         f"Objectif retraite Zoubida 2041 — 500 000€"
     )
     # Dev/Windows uniquement — sur RPi utiliser gunicorn via systemd (voir install_raspberry.sh)
