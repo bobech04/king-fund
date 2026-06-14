@@ -524,6 +524,76 @@
       </div>
     </div>
 
+    <!-- ══ FLUX MACRO — Le Détective de Capitaux ══ -->
+    <div class="section-header" style="margin-top:24px">
+      <span class="section-title">🔍 Flux Macro — Le Détective de Capitaux</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="fm-time">—</span>
+        <button class="btn btn-sm btn-ghost" onclick="App.refreshFluxMacro()">↻</button>
+      </div>
+    </div>
+
+    <!-- KPIs Flux Macro -->
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Anomalies</div>
+        <div class="kpi-val" id="fm-nb-anomalies" style="color:var(--yellow)">—</div>
+        <div class="kpi-sub">Signaux 2σ actifs</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Confiance</div>
+        <div class="kpi-val" id="fm-confiance">—</div>
+        <div class="kpi-sub">FORTE / MOYEN / FAIBLE</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Sources actives</div>
+        <div class="kpi-val neu" id="fm-nb-sources">—</div>
+        <div class="kpi-sub">yfinance · FRED · CFTC</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">IPOs détectées</div>
+        <div class="kpi-val" id="fm-nb-ipos" style="color:var(--accent)">—</div>
+        <div class="kpi-sub">SEC EDGAR S-1</div>
+      </div>
+    </div>
+
+    <!-- Ratios surveillés -->
+    <div class="card">
+      <div class="card-title">📊 Ratios Surveillés — Comptabilité en partie double des marchés</div>
+      <div id="fm-ratios">
+        <div style="text-align:center;padding:20px;color:var(--muted)"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Anomalies détectées -->
+    <div class="card" id="fm-anomalies-card">
+      <div class="card-title">⚠️ Anomalies Détectées</div>
+      <div id="fm-anomalies">
+        <div style="color:var(--muted);font-size:12px;padding:16px">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- Calendrier IPOs -->
+    <div class="card">
+      <div class="card-title">🏗️ Calendrier IPOs — SEC EDGAR S-1 récents</div>
+      <div id="fm-ipos">
+        <div style="color:var(--muted);font-size:12px;padding:16px">Chargement…</div>
+      </div>
+    </div>
+
+    <!-- Conclusion + disclaimer -->
+    <div class="card">
+      <div class="card-title">🎯 Conclusion Flux Macro</div>
+      <div id="fm-conclusion" style="font-size:13px;color:var(--fg);line-height:1.6;padding:4px 0">
+        <span style="color:var(--muted)">Chargement…</span>
+      </div>
+      <div style="margin-top:12px;padding:10px;background:var(--bg3);border-radius:6px;border-left:3px solid var(--yellow)">
+        <div style="font-size:10px;color:var(--muted);font-style:italic" id="fm-disclaimer">
+          Raisonnement qualitatif, non statistiquement prouvé. Les flux de capitaux ne sont pas prédictibles avec certitude.
+        </div>
+      </div>
+    </div>
+
   </section>
 
   <!-- ══════════════════════ 7. INVESTISSEMENT ══════════════════════ -->
