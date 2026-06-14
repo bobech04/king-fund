@@ -581,6 +581,33 @@
       </div>
     </div>
 
+    <!-- Régime de marché -->
+    <div class="card">
+      <div class="card-title">🏛️ Régime de Marché — Scénario Haut à Gauche</div>
+      <div id="fm-regime-card" style="padding:4px 0">
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:10px">
+          <span style="font-size:11px;color:var(--muted)">Régime détecté :</span>
+          <span id="fm-regime-badge" style="font-size:12px;font-weight:700;padding:3px 12px;border-radius:20px;background:var(--bg3);color:var(--muted)">—</span>
+        </div>
+        <div style="font-size:12px;color:var(--muted);margin-bottom:8px" id="fm-regime-desc">—</div>
+        <div style="font-size:11px;padding:8px;background:var(--bg3);border-radius:6px;border-left:3px solid var(--accent)" id="fm-regime-protection">—</div>
+        <div style="margin-top:8px;font-size:11px;color:var(--muted)">
+          corr(TLT,SPY) 5j : <b id="fm-corr-tlt-spy" style="color:var(--fg)">—</b>
+          &nbsp;|&nbsp; Ratio TLT/SPY : <b id="fm-ratio-tlt-spy" style="color:var(--fg)">—</b>
+        </div>
+        <div id="fm-regime-signaux" style="margin-top:8px;font-size:11px;color:#ff4455"></div>
+      </div>
+    </div>
+
+    <!-- Indicateurs liquidité macro -->
+    <div class="card">
+      <div class="card-title">💧 Indicateurs Liquidité Macro (FRED)</div>
+      <div id="fm-liquidite" style="display:grid;gap:8px;padding:4px 0">
+        <div style="color:var(--muted);font-size:12px">Chargement…</div>
+      </div>
+      <div id="fm-alertes-liquidite" style="margin-top:10px"></div>
+    </div>
+
     <!-- Conclusion + disclaimer -->
     <div class="card">
       <div class="card-title">🎯 Conclusion Flux Macro</div>
