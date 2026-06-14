@@ -271,6 +271,42 @@ def run_investissement_screener():
         return jsonify({"erreur": str(e)}), 500
 
 
+@app.route("/api/investissement/analyze")
+def api_investissement_analyze():
+    """
+    Analyse 17 étapes via pipeline réel obligatoire.
+    RÈGLE : toute donnée (prix, P/E, market cap…) vient de yfinance — jamais de mémoire Claude.
+    Retourne un disclaimer horodaté + statut fraîcheur dans _garde_fou.
+    """
+    ticker = request.args.get("ticker", "").strip().upper()
+    if not ticker:
+        return jsonify({"erreur": "Paramètre 'ticker' requis (ex: ?ticker=AAPL)"}), 400
+
+    from divisions.investissement.pipeline import PipelineInvestissement
+    from divisions.investissement.data_guard import verifier_fraicheur_prix, ajouter_disclaimer
+
+    fraicheur = verifier_fraicheur_prix(ticker)
+
+    try:
+        rapport = PipelineInvestissement().analyser_titre(ticker)
+    except Exception as e:
+        logger.error("investissement analyze [%s]: %s", ticker, e)
+        return jsonify({
+            "erreur": str(e),
+            "ticker": ticker,
+            "timestamp": datetime.utcnow().isoformat(),
+            "_garde_fou": {
+                "disclaimer": f"ANALYSE ÉCHOUÉE le {datetime.utcnow().isoformat()} — données non disponibles via yfinance",
+                "statut_donnees": "INDISPONIBLE",
+                "fraicheur_ok": False,
+                "generee_par": "pipeline_reel",
+            },
+        }), 500
+
+    rapport = ajouter_disclaimer(rapport, fraicheur)
+    return jsonify(rapport)
+
+
 # ── Alertes prix & Calendrier ────────────────────────────────────────────────
 
 @app.route("/api/alertes/seuils")

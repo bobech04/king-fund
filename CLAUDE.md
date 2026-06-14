@@ -136,3 +136,46 @@ BATTLE_DAYS      = 30
 TICK_INTERVAL    = 60       # seconds between engine ticks
 SYMBOLS          = ["AAPL", "MSFT", "TSLA", "BTC-USD", "ETH-USD", ...]
 ```
+
+---
+
+## Division Investissement — Règles anti-hallucination
+
+### INTERDICTION ABSOLUE — Données générées de mémoire
+
+Claude NE DOIT JAMAIS inventer ou estimer :
+- Prix d'actions, cours de clôture, variation journalière
+- Capitalisations boursières, P/E, P/B, ROE, dividendes
+- Données macro (PIB, inflation, taux directeurs)
+
+**Si la donnée ne provient pas d'un appel réel à yfinance ou au pipeline, elle n'existe pas.**
+
+### Workflow obligatoire pour toute analyse
+
+1. Appeler `GET /api/investissement/analyze?ticker=XXXX`
+   (ou `PipelineInvestissement().analyser_titre(ticker)` en code)
+2. Vérifier `_garde_fou.generee_par == "pipeline_reel"` dans la réponse
+3. Si `_garde_fou.statut_donnees != "OK"` → afficher tel quel (DONNÉES STALE / INDISPONIBLE)
+
+### Disclaimer obligatoire dans chaque rapport
+
+Injecté automatiquement par `divisions/investissement/data_guard.ajouter_disclaimer()` :
+
+```
+Prix vérifié le [YYYY-MM-DD HH:MM UTC] via yfinance | Statut données : [OK/STALE] | Si ce disclaimer est absent, l'analyse est suspecte
+```
+
+### Endpoints à utiliser
+
+| Besoin | Endpoint |
+|--------|----------|
+| Analyser un titre | `GET /api/investissement/analyze?ticker=XXXX` |
+| Watchlist 16 actifs | `GET /api/investissement/watchlist` |
+| Screener mondial | `GET /api/investissement/screener` |
+| Lancer un scan | `POST /api/investissement/screener/run` |
+
+### Fichiers clés
+
+- `backend/divisions/investissement/pipeline.py` — 17 étapes Graham-Buffett-Damodaran (NE PAS MODIFIER)
+- `backend/divisions/investissement/data_guard.py` — vérif fraîcheur yfinance + disclaimer
+- `backend/divisions/sources/yahoo_finance.py` — source de vérité marché (NE PAS SIMULER)
