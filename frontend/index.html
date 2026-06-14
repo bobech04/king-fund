@@ -482,6 +482,22 @@
       </div>
     </div>
 
+    <!-- Recherche universelle -->
+    <div class="card" style="margin-bottom:16px" id="inv-search-card">
+      <div class="card-title">🔍 Analyser un titre</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="text" id="inv-search-input"
+               placeholder="Ticker (ex: WPM, MC.PA, GTT.PA…)"
+               style="flex:1;min-width:180px;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);border-radius:6px;color:var(--fg);font-size:14px;outline:none"
+               onkeydown="if(event.key==='Enter')App.analyzeTickerSearch()">
+        <button class="btn" onclick="App.analyzeTickerSearch()"
+                style="background:#ffd700;color:#000;font-weight:700;padding:8px 20px;white-space:nowrap">
+          🔍 Analyser
+        </button>
+      </div>
+      <div id="inv-search-result" style="display:none;margin-top:16px"></div>
+    </div>
+
     <!-- KPIs watchlist -->
     <div class="kpi-grid" id="inv-kpis">
       <div class="kpi"><div class="kpi-label">Actifs Analysés</div><div class="kpi-val neu" id="inv-nb">—</div><div class="kpi-sub">13 titres watchlist</div></div>

@@ -1488,6 +1488,135 @@
     }
   }
 
+  // ── Analyse ticker universelle ────────────────────────────
+
+  const _INV_WATCHLIST = new Set([
+    'VPK.AS','GTT.PA','O','JNJ','VZ','TEL.OL','DNB.OL',
+    'BIPC','ADC','DSY.PA','SU.PA','TTE.PA','AIR.PA',
+  ]);
+
+  async function analyzeTickerSearch() {
+    const input = $('inv-search-input');
+    if (!input) return;
+    const ticker = input.value.trim().toUpperCase();
+    if (!ticker) { toast('Entrez un ticker (ex: WPM, MC.PA)', 'info'); return; }
+
+    const resultEl = $('inv-search-result');
+    resultEl.style.display = 'block';
+    resultEl.innerHTML = '<div style="text-align:center;padding:24px"><div class="spinner"></div>'
+      + '<p style="margin-top:10px;color:var(--muted)">Pipeline 17 étapes en cours… (15-30 s)</p></div>';
+
+    try {
+      const data = await apiFetch(`/investissement/analyze?ticker=${encodeURIComponent(ticker)}`, 90_000);
+      _renderAnalyzeResult(data, ticker);
+    } catch (e) {
+      resultEl.innerHTML = `<div style="padding:14px;color:var(--red);background:var(--bg2);`
+        + `border:1px solid #f87171;border-radius:8px">❌ Ticker invalide ou données indisponibles : <strong>${ticker}</strong></div>`;
+    }
+  }
+
+  function _renderAnalyzeResult(data, ticker) {
+    const resultEl = $('inv-search-result');
+    if (!resultEl) return;
+
+    if (data.erreur) {
+      resultEl.innerHTML = `<div style="padding:14px;color:var(--red);background:var(--bg2);`
+        + `border:1px solid #f87171;border-radius:8px">❌ ${data.erreur}</div>`;
+      return;
+    }
+
+    const score  = data.score ?? 0;
+    const signal = (data.signal || 'hold').toLowerCase();
+    const reco   = data.recommandation_finale || signal.toUpperCase();
+    const garde  = data._garde_fou || {};
+    const statut = garde.statut_donnees || '—';
+    const disc   = garde.disclaimer || '';
+    const stages = data.stages || [];
+    const inWl   = _INV_WATCHLIST.has(ticker);
+
+    const scoreColor = score >= 7 ? 'var(--green)' : score >= 4 ? '#facc15' : 'var(--red)';
+    const sigBg    = signal === 'buy'  ? '#1a3a1a' : signal === 'hold' ? '#2a2a1a' : '#3a1a1a';
+    const sigColor = signal === 'buy'  ? '#4ade80' : signal === 'hold' ? '#facc15' : '#f87171';
+    const statutColor = statut === 'OK' ? 'var(--green)' : '#facc15';
+
+    const stageRows = stages.map((s, i) => {
+      const sc  = s.score ?? 0;
+      const cls = sc >= 0.3 ? 'pos' : sc <= -0.3 ? 'neg' : 'neu';
+      const pct = Math.round(((sc + 1) / 2) * 100);
+      const bar = cls === 'pos' ? '#4ade80' : cls === 'neg' ? '#f87171' : '#6b7280';
+      return `<tr>
+        <td style="color:var(--muted);text-align:center;font-size:11px">${i + 1}</td>
+        <td style="font-size:12px">${s.name}</td>
+        <td class="${cls}" style="text-align:right;font-weight:700;white-space:nowrap;font-size:12px">${sc.toFixed(3)}</td>
+        <td style="width:80px;padding-left:8px">
+          <div style="background:var(--bg3);border-radius:3px;height:5px;overflow:hidden">
+            <div style="width:${pct}%;height:100%;background:${bar}"></div>
+          </div>
+        </td>
+      </tr>`;
+    }).join('');
+
+    const addBtnHtml = inWl ? '' : `
+      <div style="padding:12px 16px;border-top:1px solid var(--border)">
+        <button class="btn btn-sm" id="btn-add-wl-${ticker}"
+                onclick="App.addToWatchlist('${ticker}')"
+                style="background:var(--bg2);color:#60a5fa;border:1px solid #3b82f6;font-size:12px">
+          ➕ Ajouter à la watchlist
+        </button>
+      </div>`;
+
+    resultEl.innerHTML = `
+      <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <div style="display:flex;align-items:center;gap:16px;padding:16px;background:var(--bg2);flex-wrap:wrap">
+          <div>
+            <div style="font-size:20px;font-weight:700;color:var(--fg)">${data.symbol || ticker}</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Pipeline 17 critères · Graham · Buffett · Damodaran</div>
+          </div>
+          <div style="margin-left:auto;display:flex;gap:20px;align-items:center">
+            <div style="text-align:center">
+              <div style="font-size:26px;font-weight:800;color:${scoreColor}">${score.toFixed(1)}</div>
+              <div style="font-size:10px;color:var(--muted)">/10</div>
+            </div>
+            <span style="background:${sigBg};color:${sigColor};font-weight:700;padding:6px 16px;border-radius:6px;font-size:14px">${reco}</span>
+          </div>
+        </div>
+        <div style="padding:6px 16px;background:var(--bg3);font-size:10px;color:var(--muted);border-top:1px solid var(--border)">
+          <span style="color:${statutColor}">●</span> ${disc}
+        </div>
+        <div style="padding:16px">
+          <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.07em">17 Critères détaillés</div>
+          <div style="overflow-x:auto">
+            <table class="data-table" style="font-size:12px">
+              <thead><tr>
+                <th style="width:30px">#</th><th>Critère</th>
+                <th style="text-align:right">Score [-1, +1]</th><th style="width:80px">Jauge</th>
+              </tr></thead>
+              <tbody>${stageRows}</tbody>
+            </table>
+          </div>
+        </div>
+        ${addBtnHtml}
+      </div>`;
+  }
+
+  async function addToWatchlist(ticker) {
+    const btn = $('btn-add-wl-' + ticker);
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Ajout…'; }
+    try {
+      await apiPost(`/investissement/watchlist/add?ticker=${encodeURIComponent(ticker)}`, 15_000);
+      _INV_WATCHLIST.add(ticker);
+      if (btn) {
+        btn.textContent = '✓ Ajouté';
+        btn.style.color = '#4ade80';
+        btn.style.borderColor = '#4ade80';
+      }
+      toast(`✓ ${ticker} ajouté à la watchlist`, 'ok');
+    } catch (e) {
+      if (btn) { btn.disabled = false; btn.textContent = '➕ Ajouter à la watchlist'; }
+      toast(`Impossible d'ajouter ${ticker}`, 'error');
+    }
+  }
+
   // ── Liquidité / Black Swan ────────────────────────────────
 
   const BS_NIVEAU_STYLE = {
@@ -1876,10 +2005,12 @@
       const fn = loaders[tab];
       if (fn) fn().catch(() => {});
     },
-    forceCheck:    () => forceCheck().catch(() => {}),
-    fixDb:         () => fixDb().catch(() => {}),
-    runScreener:   () => runScreener().catch(() => {}),
-    blackswanScan: () => blackswanScan().catch(() => {}),
+    forceCheck:           () => forceCheck().catch(() => {}),
+    fixDb:                () => fixDb().catch(() => {}),
+    runScreener:          () => runScreener().catch(() => {}),
+    blackswanScan:        () => blackswanScan().catch(() => {}),
+    analyzeTickerSearch:  () => analyzeTickerSearch().catch(() => {}),
+    addToWatchlist:       ticker => addToWatchlist(ticker).catch(() => {}),
   };
 
   // ── Init ──────────────────────────────────────────────────

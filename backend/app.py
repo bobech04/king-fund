@@ -278,21 +278,28 @@ def api_investissement_analyze():
     RÈGLE : toute donnée (prix, P/E, market cap…) vient de yfinance — jamais de mémoire Claude.
     Retourne un disclaimer horodaté + statut fraîcheur dans _garde_fou.
     """
+    import traceback as _tb
     ticker = request.args.get("ticker", "").strip().upper()
     if not ticker:
         return jsonify({"erreur": "Paramètre 'ticker' requis (ex: ?ticker=AAPL)"}), 400
 
-    from divisions.investissement.pipeline import PipelineInvestissement
-    from divisions.investissement.data_guard import verifier_fraicheur_prix, ajouter_disclaimer
-
-    fraicheur = verifier_fraicheur_prix(ticker)
-
     try:
-        rapport = PipelineInvestissement().analyser_titre(ticker)
+        from divisions.investissement.pipeline import InvestmentPipeline, get_pipeline
+        from divisions.investissement.data_guard import verifier_fraicheur_prix, ajouter_disclaimer
+
+        fraicheur = verifier_fraicheur_prix(ticker)
+        rapport = get_pipeline().analyze(ticker)
+        # Normalise le champ pour ajouter_disclaimer
+        signal = rapport.get("signal", "hold")
+        rapport["recommandation_finale"] = {"buy": "ACHAT", "sell": "ÉVITER", "hold": "SURVEILLER"}.get(signal, signal.upper())
+        rapport = ajouter_disclaimer(rapport, fraicheur)
+        return jsonify(rapport)
     except Exception as e:
-        logger.error("investissement analyze [%s]: %s", ticker, e)
+        tb = _tb.format_exc()
+        logger.error("investissement analyze [%s]: %s\n%s", ticker, e, tb)
         return jsonify({
             "erreur": str(e),
+            "traceback": tb,
             "ticker": ticker,
             "timestamp": datetime.utcnow().isoformat(),
             "_garde_fou": {
@@ -303,8 +310,21 @@ def api_investissement_analyze():
             },
         }), 500
 
-    rapport = ajouter_disclaimer(rapport, fraicheur)
-    return jsonify(rapport)
+
+@app.route("/api/investissement/watchlist/add", methods=["POST"])
+def add_investissement_watchlist_ticker():
+    ticker = request.args.get("ticker", "").strip().upper()
+    if not ticker:
+        return jsonify({"erreur": "Paramètre 'ticker' requis (ex: ?ticker=AAPL)"}), 400
+    try:
+        from divisions.investissement.watchlist import get_watchlist_manager, WATCHLIST
+        if any(w["ticker"] == ticker for w in WATCHLIST):
+            return jsonify({"message": f"{ticker} déjà dans la watchlist", "ticker": ticker})
+        get_watchlist_manager().add_ticker(ticker)
+        return jsonify({"message": f"{ticker} ajouté à la watchlist", "ticker": ticker})
+    except Exception as e:
+        logger.error("watchlist add [%s]: %s", ticker, e)
+        return jsonify({"erreur": str(e)}), 500
 
 
 # ── Alertes prix & Calendrier ────────────────────────────────────────────────

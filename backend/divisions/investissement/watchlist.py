@@ -2,10 +2,12 @@
 Watchlist des 13 actifs — analyse pipeline 17 étapes + données yfinance.
 """
 from __future__ import annotations
+import json
 import logging
 import time
 import threading
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any
 
 import yfinance as yf
@@ -14,7 +16,8 @@ from .pipeline import InvestmentPipeline
 
 logger = logging.getLogger(__name__)
 
-CACHE_TTL = 3_600  # 1 h
+CACHE_TTL  = 3_600  # 1 h
+_EXTRA_PATH = Path(__file__).parent.parent.parent.parent / "data" / "watchlist_extra.json"
 
 WATCHLIST: list[dict[str, str]] = [
     {"ticker": "VPK.AS",  "nom": "Vopak",                   "bourse": "Euronext Amsterdam"},
@@ -31,6 +34,18 @@ WATCHLIST: list[dict[str, str]] = [
     {"ticker": "TTE.PA",  "nom": "TotalEnergies",            "bourse": "Euronext Paris"},
     {"ticker": "AIR.PA",  "nom": "Airbus",                   "bourse": "Euronext Paris"},
 ]
+
+
+# Charge les tickers ajoutés dynamiquement (persistance JSON)
+try:
+    if _EXTRA_PATH.exists():
+        _existing_tickers = {w["ticker"] for w in WATCHLIST}
+        for _extra in json.loads(_EXTRA_PATH.read_text("utf-8")):
+            if _extra.get("ticker") and _extra["ticker"] not in _existing_tickers:
+                WATCHLIST.append(_extra)
+                _existing_tickers.add(_extra["ticker"])
+except Exception:
+    pass
 
 
 def _safe(v, default=None):
@@ -71,6 +86,22 @@ class WatchlistManager:
     def get_cached_result(self, ticker: str) -> dict | None:
         with self._lock:
             return self._cache.get(ticker)
+
+    def add_ticker(self, ticker: str) -> None:
+        """Ajoute un ticker en mémoire et le persiste dans watchlist_extra.json."""
+        with self._lock:
+            if any(w["ticker"] == ticker for w in WATCHLIST):
+                return
+            item: dict[str, str] = {"ticker": ticker, "nom": ticker, "bourse": "—"}
+            WATCHLIST.append(item)
+            try:
+                extras: list = json.loads(_EXTRA_PATH.read_text("utf-8")) if _EXTRA_PATH.exists() else []
+            except Exception:
+                extras = []
+            if not any(e.get("ticker") == ticker for e in extras):
+                extras.append(item)
+                _EXTRA_PATH.parent.mkdir(parents=True, exist_ok=True)
+                _EXTRA_PATH.write_text(json.dumps(extras, ensure_ascii=False, indent=2), encoding="utf-8")
 
     def _analyser_un(self, ticker: str, item: dict) -> dict[str, Any]:
         ts = datetime.now(timezone.utc).isoformat()
