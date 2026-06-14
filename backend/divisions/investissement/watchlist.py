@@ -1,5 +1,5 @@
 """
-Watchlist des 13 actifs — analyse pipeline 17 étapes + données yfinance.
+Watchlist actifs King Fund — analyse pipeline 17 étapes + données yfinance.
 """
 from __future__ import annotations
 import json
@@ -29,10 +29,7 @@ WATCHLIST: list[dict[str, str]] = [
     {"ticker": "DNB.OL",  "nom": "DNB Bank",                 "bourse": "Oslo Bors"},
     {"ticker": "BIPC",    "nom": "Brookfield Infrastructure", "bourse": "NYSE"},
     {"ticker": "ADC",     "nom": "Agree Realty",              "bourse": "NYSE"},
-    {"ticker": "DSY.PA",  "nom": "Dassault Systèmes",        "bourse": "Euronext Paris"},
-    {"ticker": "SU.PA",   "nom": "Schneider Electric",       "bourse": "Euronext Paris"},
     {"ticker": "TTE.PA",  "nom": "TotalEnergies",            "bourse": "Euronext Paris"},
-    {"ticker": "AIR.PA",  "nom": "Airbus",                   "bourse": "Euronext Paris"},
 ]
 
 

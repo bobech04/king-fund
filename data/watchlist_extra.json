@@ -1,12 +1,25 @@
 [
-  {
-    "ticker": "WPM",
-    "nom": "WPM",
-    "bourse": "—"
-  },
-  {
-    "ticker": "NVDA",
-    "nom": "NVDA",
-    "bourse": "—"
-  }
+  {"ticker": "WPM",     "nom": "Wheaton Precious Metals",  "bourse": "NYSE"},
+  {"ticker": "TEN.PA",  "nom": "Tenaris",                  "bourse": "Euronext Paris"},
+  {"ticker": "UEC",     "nom": "Uranium Energy Corp",       "bourse": "NYSE"},
+  {"ticker": "RY",      "nom": "Royal Bank of Canada",     "bourse": "NYSE"},
+  {"ticker": "MAIN",    "nom": "Main Street Capital",      "bourse": "NYSE"},
+  {"ticker": "MRK",     "nom": "Merck",                    "bourse": "NYSE"},
+  {"ticker": "MSFT",    "nom": "Microsoft",                "bourse": "NASDAQ"},
+  {"ticker": "ML.PA",   "nom": "Michelin",                 "bourse": "Euronext Paris"},
+  {"ticker": "NTR",     "nom": "Nutrien",                  "bourse": "NYSE"},
+  {"ticker": "MOS",     "nom": "Mosaic",                   "bourse": "NYSE"},
+  {"ticker": "TPL",     "nom": "Texas Pacific Land",       "bourse": "NYSE"},
+  {"ticker": "UMI.BR",  "nom": "Umicore",                  "bourse": "Euronext Brussels"},
+  {"ticker": "SAN.PA",  "nom": "Sanofi",                   "bourse": "Euronext Paris"},
+  {"ticker": "SEB.PA",  "nom": "SEB",                      "bourse": "Euronext Paris"},
+  {"ticker": "SCO.PA",  "nom": "SCOR SE",                  "bourse": "Euronext Paris"},
+  {"ticker": "KB",      "nom": "KB Financial Group",       "bourse": "NYSE"},
+  {"ticker": "0857.HK", "nom": "PetroChina",               "bourse": "HKEX"},
+  {"ticker": "SPM.MI",  "nom": "Saipem",                   "bourse": "Borsa Italiana"},
+  {"ticker": "PBR",     "nom": "Petrobras",                "bourse": "NYSE"},
+  {"ticker": "PG",      "nom": "Procter & Gamble",         "bourse": "NYSE"},
+  {"ticker": "KO",      "nom": "Coca-Cola",                "bourse": "NYSE"},
+  {"ticker": "NEE",     "nom": "NextEra Energy",           "bourse": "NYSE"},
+  {"ticker": "WMS",     "nom": "Advanced Drainage Systems","bourse": "NYSE"}
 ]
