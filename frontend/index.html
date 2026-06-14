@@ -1,318 +1,726 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta name="theme-color" content="#0a0a0f" />
-  <meta name="mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="King Fund" />
-  <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/png" sizes="192x192" href="assets/icon-192.png" />
-  <link rel="apple-touch-icon" sizes="192x192" href="assets/icon-192.png" />
-  <title>👑 KING FUND — Family Office</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0a0e1a">
+  <meta name="description" content="King Fund — Moteur de trading algorithmique 30 agents IA">
+  <title>King Fund</title>
+  <link rel="stylesheet" href="assets/style.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/style.css" />
-  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 </head>
 <body>
 
-<div id="ptr-indicator">↓</div>
-
-<!-- ── HEADER ────────────────────────────────────────────────── -->
-<header class="header">
-  <!-- Ligne 1 : NAV totale + perf mois + badge régime -->
-  <div class="hdr-line hdr-line-1">
-    <span class="hdr-logo">👑 KING FUND</span>
-    <div class="hdr-right-1">
-      <div class="hdr-nav-block">
-        <span class="hdr-nav-label">PATRIMOINE TOTAL</span>
-        <span class="hdr-nav-val" id="hdr-nav">— €</span>
-        <span class="hdr-nav-sub">(dont 17 000€ réserve Algérie)</span>
+<header>
+  <div class="header-top">
+    <div class="brand">
+      <div class="brand-icon">♟</div>
+      <div>
+        <div class="brand-name">King Fund</div>
+        <div class="brand-sub">30 Agents IA · Trading Algorithmique</div>
       </div>
-      <span class="hdr-perf" id="hdr-perf-mois"></span>
-      <span class="hdr-regime serein" id="hdr-regime">SEREIN</span>
     </div>
-  </div>
-  <!-- Ligne 2 : Base investissable + cash disponible -->
-  <div class="hdr-line hdr-line-2">
-    <div class="hdr-kv">
-      <span class="hdr-label">Base invest.</span>
-      <span class="hdr-val" id="hdr-base-inv">— €</span>
-    </div>
-    <div class="hdr-kv">
-      <span class="hdr-label">Cash dispo.</span>
-      <span class="hdr-val" id="hdr-cash">— €</span>
-    </div>
-  </div>
-  <!-- Ligne 3 : horloge + statut -->
-  <div class="hdr-line hdr-line-3">
-    <div class="hdr-left-3">
-      <span class="header-clock" id="header-clock"></span>
-      <span class="battle-day" id="battle-day">J— / 30</span>
-      <div class="live-pill" id="live-pill"><span class="live-dot"></span>LIVE</div>
-    </div>
-    <div class="hdr-right-3">
-      <span class="update-time" id="update-time">—</span>
+    <div class="ws-badge" id="ws-badge" title="Statut connexion">
       <div class="ws-dot" id="ws-dot"></div>
-      <button class="hdr-refresh-btn" id="hdr-refresh-btn" title="Actualiser tableau de bord">⟳</button>
-      <button class="bell-btn" id="bell-btn" title="Alertes">
-        🔔<span class="bell-badge hidden" id="bell-badge">0</span>
-      </button>
+      <span id="ws-label">Déconnecté</span>
     </div>
   </div>
+  <nav class="tabs" role="tablist">
+    <button class="tab-btn active" data-tab="classement" role="tab">🏆 Classement</button>
+    <button class="tab-btn" data-tab="morning"     role="tab">🌅 Morning Brief</button>
+    <button class="tab-btn" data-tab="postmarket"  role="tab">📊 Post-Market</button>
+    <button class="tab-btn" data-tab="scheduler"   role="tab">⚙️ Scheduler</button>
+    <button class="tab-btn" data-tab="macro"       role="tab">🌍 CIO Macro</button>
+    <button class="tab-btn" data-tab="alertes"       role="tab">🚨 Alertes</button>
+    <button class="tab-btn" data-tab="investissement" role="tab">📈 Investissement</button>
+    <button class="tab-btn" data-tab="liquidite"      role="tab">🌊 Liquidité</button>
+    <button class="tab-btn" data-tab="retraite"      role="tab">🎯 Retraite</button>
+  </nav>
 </header>
 
-<!-- ── STATS BAR ─────────────────────────────────────────────── -->
-<div class="stats-bar">
-  <div class="stat">
-    <div class="stat-label">NAV</div>
-    <div class="stat-value accent" id="nav-total">—</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">TOP</div>
-    <div class="stat-value green" id="top-value">—</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">WINNERS</div>
-    <div class="stat-value gold" id="winners-count">0</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">BERTEZ</div>
-    <div class="stat-value muted" id="bertez-mode-val">—</div>
-  </div>
-  <div class="stat">
-    <div class="stat-label">BLACK SWAN</div>
-    <div class="stat-value muted" id="black-swan-val">—</div>
-  </div>
-</div>
-
-<!-- ── TICKER TAPE ─────────────────────────────────────────────── -->
-<div class="ticker-bar">
-  <span class="ticker-label">MOVERS</span>
-  <div class="ticker-wrap">
-    <div class="ticker-inner" id="ticker-inner">
-      <span class="ticker-loading">· · ·</span>
-    </div>
-  </div>
-</div>
-
-<!-- ── OFFLINE BANNER ────────────────────────────────────────── -->
-<div class="banner hidden" id="banner">⚠ WebSocket déconnecté — mode polling</div>
-
-
-
-<!-- ── MAIN ──────────────────────────────────────────────────── -->
 <main>
 
-  <!-- TAB 1 : TABLEAU DE BORD ────────────────────────────────── -->
-  <div class="tab-pane" id="tab-dashboard">
-    <div id="dashboard-wrap"><div class="loading-state">Chargement du tableau de bord…</div></div>
-  </div>
-
-  <!-- TAB 2 : PILIER 1 — PROTECTION ─────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-protection">
-    <div id="protection-wrap"><div class="loading-state">Chargement Protection…</div></div>
-  </div>
-
-  <!-- TAB 3 : PILIER 2 — CROISSANCE ─────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-croissance">
-    <div id="croissance-wrap">
-      <div class="filter-bar hidden" id="filter-bar">
-        <div class="filter-badge" id="filter-badge"></div>
-        <button class="filter-clear" id="filter-clear">✕ Effacer</button>
+  <!-- ══════════════════════ 1. CLASSEMENT ══════════════════════ -->
+  <section id="tab-classement" class="tab-panel active">
+    <div class="section-header">
+      <span class="section-title">Classement des 30 Traders</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="classement-time">—</span>
+        <button class="btn btn-sm btn-ghost" onclick="App.refresh('classement')">↻</button>
       </div>
-      <!-- groupe view toggled by JS -->
-      <div id="croissance-groups"></div>
-      <!-- division performance chart -->
-      <div class="div-perf-wrap" id="div-perf-wrap">
-        <div class="div-perf-label">PERFORMANCE DES DESKS</div>
-        <div class="div-perf-chart">
-          <canvas id="div-chart"></canvas>
+    </div>
+
+    <!-- KPIs globaux -->
+    <div class="kpi-grid" id="kpi-global">
+      <div class="kpi"><div class="kpi-label">P&L Total Desk</div><div class="kpi-val neu" id="kpi-pnl">—</div><div class="kpi-sub">Session</div></div>
+      <div class="kpi"><div class="kpi-label">Traders +</div><div class="kpi-val pos" id="kpi-pos">—</div><div class="kpi-sub">Positifs</div></div>
+      <div class="kpi"><div class="kpi-label">Traders −</div><div class="kpi-val neg" id="kpi-neg">—</div><div class="kpi-sub">Négatifs</div></div>
+      <div class="kpi"><div class="kpi-label">Win Rate Moyen</div><div class="kpi-val" id="kpi-wr">—</div><div class="kpi-sub">Tous traders</div></div>
+      <div class="kpi"><div class="kpi-label">Trades Total</div><div class="kpi-val" id="kpi-trades">—</div><div class="kpi-sub">Journée</div></div>
+      <div class="kpi"><div class="kpi-label">Volume</div><div class="kpi-val" id="kpi-vol">—</div><div class="kpi-sub">Échangé</div></div>
+    </div>
+
+    <!-- Black Swan — bannière (masquée en NORMAL) -->
+    <div id="cl-bs-banner" style="display:none;border-radius:10px;padding:10px 16px;margin-bottom:10px;font-size:13px;font-weight:600"></div>
+
+    <!-- Black Swan — strip compact -->
+    <div id="cl-bs-strip" style="
+      display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;
+      background:var(--bg2);border:1px solid var(--border);border-radius:8px;
+      padding:8px 14px;margin-bottom:12px;font-size:12px;
+    ">
+      <span style="color:var(--muted)">🌊 Black Swan</span>
+      <span>VIX : <strong id="cl-bs-vix" class="neu">—</strong></span>
+      <span>Spread HY : <strong id="cl-bs-spread" class="neu">—</strong></span>
+      <span>Mode : <strong id="cl-bs-mode" style="color:var(--muted)">—</strong></span>
+      <span id="cl-bs-stoppes" style="color:var(--muted)">—</span>
+    </div>
+
+    <!-- Filtres par classe d'actif -->
+    <div class="filters" id="filters">
+      <button class="filter-btn active" data-class="all">Tous</button>
+      <button class="filter-btn" data-class="equity">Equity</button>
+      <button class="filter-btn" data-class="fixed_income">Fixed Income</button>
+      <button class="filter-btn" data-class="fx">FX</button>
+      <button class="filter-btn" data-class="commodities">Commodités</button>
+      <button class="filter-btn" data-class="derivatives">Dérivés</button>
+      <button class="filter-btn" data-class="quant">Quant</button>
+      <button class="filter-btn" data-class="crypto">Crypto</button>
+      <button class="filter-btn" data-class="alternatives">Alternatives</button>
+      <button class="filter-btn" data-class="multi">Multi</button>
+    </div>
+
+    <!-- Liste traders -->
+    <div class="trader-list" id="trader-list">
+      <div style="text-align:center;padding:40px;color:var(--muted)">
+        <div class="spinner"></div>
+        <p style="margin-top:12px">Chargement…</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ 2. MORNING BRIEF ══════════════════════ -->
+  <section id="tab-morning" class="tab-panel">
+    <div class="section-header">
+      <span class="section-title">Morning Brief</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="brief-time">Généré à 06:30</span>
+        <button class="btn btn-sm btn-ghost" onclick="App.refresh('morning')">↻</button>
+      </div>
+    </div>
+
+    <!-- Bannière Black Swan (masquée en mode NORMAL) -->
+    <div id="brief-bs-banner" style="display:none;border-radius:10px;padding:12px 18px;margin-bottom:14px;font-size:13px;font-weight:600"></div>
+
+    <!-- Contexte marché du matin -->
+    <div class="kpi-grid" id="brief-indices">
+      <!-- Indices Asie remplis dynamiquement -->
+    </div>
+
+    <!-- Black Swan — indicateurs -->
+    <div class="card" id="brief-bs-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="card-title" style="margin-bottom:0">🌊 Black Swan — VIX · DSPX · Spreads crédit · Corrélation</div>
+        <span id="brief-bs-niveau-badge" style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;background:var(--bg3)">—</span>
+      </div>
+      <div id="brief-bs-body" style="font-size:12px;color:var(--muted)">Chargement…</div>
+    </div>
+
+    <!-- Banques centrales résumé -->
+    <div class="card" id="brief-bc">
+      <div class="card-title">Banques Centrales (20 analysées)</div>
+      <div id="brief-bc-list" style="color:var(--muted);font-size:12px">Chargement…</div>
+    </div>
+
+    <!-- Actualités -->
+    <div class="card" id="brief-news">
+      <div class="card-title">Actualités du matin</div>
+      <div id="brief-news-list" style="color:var(--muted);font-size:12px">Chargement…</div>
+    </div>
+
+    <!-- Rapport Anthropic -->
+    <div class="card">
+      <div class="card-title">Rapport Anthropic — Synthèse overnight</div>
+      <div class="narrative" id="brief-rapport">Chargement du Morning Brief…</div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ 3. POST-MARKET ══════════════════════ -->
+  <section id="tab-postmarket" class="tab-panel">
+    <div class="section-header">
+      <span class="section-title">Post-Market Review</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="pmr-date">18:15</span>
+        <button class="btn btn-sm btn-ghost" onclick="App.refresh('postmarket')">↻</button>
+      </div>
+    </div>
+
+    <!-- Bannière Black Swan clôture (masquée en mode NORMAL) -->
+    <div id="pmr-bs-banner" style="display:none;border-radius:10px;padding:12px 18px;margin-bottom:14px;font-size:13px;font-weight:600"></div>
+
+    <!-- Podium meilleur / pire -->
+    <div class="podium" id="pmr-podium">
+      <div class="podium-card best">
+        <div class="podium-label">⭐ Meilleur Trader</div>
+        <div class="podium-name" id="pmr-best-nom">—</div>
+        <div class="podium-role" id="pmr-best-role">—</div>
+        <div class="podium-pnl pos" id="pmr-best-pnl">—</div>
+        <div class="podium-stats" id="pmr-best-stats">—</div>
+      </div>
+      <div class="podium-card worst">
+        <div class="podium-label">⚠️ Trader en Difficulté</div>
+        <div class="podium-name" id="pmr-worst-nom">—</div>
+        <div class="podium-role" id="pmr-worst-role">—</div>
+        <div class="podium-pnl neg" id="pmr-worst-pnl">—</div>
+        <div class="podium-stats" id="pmr-worst-stats">—</div>
+      </div>
+    </div>
+
+    <!-- Stats desk -->
+    <div class="kpi-grid" id="pmr-kpis"></div>
+
+    <!-- Par classe d'actif -->
+    <div class="card">
+      <div class="card-title">Performance par Classe d'Actif</div>
+      <div id="pmr-classes"></div>
+    </div>
+
+    <!-- Par secteur -->
+    <div class="card">
+      <div class="card-title">Top Secteurs (P&L)</div>
+      <div id="pmr-secteurs"></div>
+    </div>
+
+    <!-- Classement complet -->
+    <div class="card">
+      <div class="card-title">Classement Complet</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Trader</th>
+              <th>Spécialité</th>
+              <th>P&L</th>
+              <th>Trades</th>
+              <th>Win %</th>
+            </tr>
+          </thead>
+          <tbody id="pmr-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Black Swan — impact clôture -->
+    <div class="card" id="pmr-bs-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="card-title" style="margin-bottom:0">🌊 Black Swan — Impact clôture</div>
+        <span id="pmr-bs-niveau-badge" style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;border:1px solid var(--border)">—</span>
+      </div>
+      <div id="pmr-bs-body" style="font-size:12px;color:var(--muted)">Chargement…</div>
+    </div>
+
+    <!-- Rapport narratif -->
+    <div class="card">
+      <div class="card-title">Rapport Narratif — Head of Trading (Claude)</div>
+      <div class="narrative" id="pmr-rapport">Chargement…</div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ 4. SCHEDULER ══════════════════════ -->
+  <section id="tab-scheduler" class="tab-panel">
+    <div class="section-header">
+      <span class="section-title">Scheduler 24H</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="sched-tz">Europe/Paris</span>
+        <button class="btn btn-sm btn-ghost" onclick="App.refresh('scheduler')">↻</button>
+      </div>
+    </div>
+
+    <!-- Statut global -->
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Statut</div>
+        <div class="kpi-val" id="sched-status" style="font-size:16px">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Jobs actifs</div>
+        <div class="kpi-val" id="sched-nb">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Prochain job</div>
+        <div class="kpi-val" id="sched-next" style="font-size:14px">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Black Swan — VIX</div>
+        <div class="kpi-val neu" id="sched-bs-vix">—</div>
+        <div class="kpi-sub" id="sched-bs-niveau">Mode : —</div>
+      </div>
+    </div>
+
+    <!-- Planning 24h (visuel) -->
+    <div class="card">
+      <div class="card-title">Planning Journalier (lun–ven)</div>
+      <div style="font-size:12px;color:var(--muted);line-height:1.8;font-family:monospace" id="sched-planning">
+        <div>06:00 · Revue Macro Mondiale (BCE, Indices Asie, GDELT)</div>
+        <div id="sched-plan-bs" style="color:var(--muted)">06:05 · <strong>Black Swan Scan</strong> (VIX, DSPX, FRED spreads, corrélation SPY-TLT)</div>
+        <div>06:15 · Analyse 20 Banques Centrales (FRED)</div>
+        <div>06:30 · Morning Brief Anthropic (NewsAPI + Banques Centrales)</div>
+        <div>09:00 · Scan Marchés Europe (Yahoo + Twelve Data Forex)</div>
+        <div>09:30 · Analyse 10 Experts Sectoriels (Yahoo + NewsAPI + AV)</div>
+        <div>12:00 · Indicateurs Eurostat mid-day</div>
+        <div>12:00 · Surveillance Secteurs (NewsAPI + AV — cycle 4h)</div>
+        <div>12:30 · Scan Marchés US (Yahoo + Alpha Vantage)</div>
+        <div>13:00 · Marchés Crypto (CoinGecko)</div>
+        <div>15:00 · Perspectives FMI / Mise à jour macro</div>
+        <div>15:30 · Risque Géopolitique (GDELT + NewsAPI)</div>
+        <div>16:00 · Surveillance Secteurs (cycle 4h)</div>
+        <div>18:00 · Clôture Marchés Europe (Yahoo + FMP)</div>
+        <div>18:15 · Post-Market Review 30 Traders (Anthropic)</div>
+        <div>19:00 · Risk Committee (vendredi uniquement — Anthropic)</div>
+        <div>20:00 · Rapport Quotidien Portefeuille (Anthropic)</div>
+        <div>23:00 · Marchés de Nuit (Yahoo + Twelve Data + CoinGecko)</div>
+        <div style="color:var(--muted)">*/30 · <strong>Black Swan Scan continu</strong> (toutes les 30 min, 24h/24)</div>
+      </div>
+    </div>
+
+    <!-- Black Swan — statut agent scheduler -->
+    <div class="card" id="sched-bs-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="card-title" style="margin-bottom:0">🌊 Agent Black Swan — Statut &amp; Dernière exécution</div>
+        <span id="sched-bs-badge" style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;border:1px solid var(--border)">—</span>
+      </div>
+      <div id="sched-bs-body" style="font-size:12px;color:var(--muted)">Chargement…</div>
+    </div>
+
+    <!-- Table des jobs -->
+    <div class="card">
+      <div class="card-title">État des Jobs</div>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Job</th>
+              <th>Statut</th>
+              <th>Prochaine exécution</th>
+              <th>Dernier résultat</th>
+            </tr>
+          </thead>
+          <tbody id="sched-table"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Derniers résultats -->
+    <div class="card">
+      <div class="card-title">Derniers Résultats</div>
+      <div id="sched-results" style="color:var(--muted);font-size:12px">Chargement…</div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ 5. MACRO CIO ══════════════════════ -->
+  <section id="tab-macro" class="tab-panel">
+    <div class="section-header">
+      <span class="section-title">CIO — Tableau de Bord Macro</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="macro-time">—</span>
+        <button class="btn btn-sm btn-ghost" onclick="App.refresh('macro')">↻</button>
+      </div>
+    </div>
+
+    <!-- Bannière Black Swan CIO (masquée en mode NORMAL) -->
+    <div id="macro-bs-banner" style="display:none;border-radius:10px;padding:12px 18px;margin-bottom:14px;font-size:13px;font-weight:600"></div>
+
+    <!-- Indices Asie -->
+    <div class="card">
+      <div class="card-title">Indices Asie</div>
+      <div class="market-grid" id="macro-asie"></div>
+    </div>
+
+    <!-- Indices Europe -->
+    <div class="card">
+      <div class="card-title">Indices Europe</div>
+      <div class="market-grid" id="macro-europe"></div>
+    </div>
+
+    <!-- Indices US -->
+    <div class="card">
+      <div class="card-title">Marchés US</div>
+      <div class="market-grid" id="macro-us"></div>
+    </div>
+
+    <!-- Black Swan — lecture CIO -->
+    <div class="card" id="macro-bs-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="card-title" style="margin-bottom:0">🌊 Risque de Liquidité — Black Swan</div>
+        <span id="macro-bs-badge" style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;border:1px solid var(--border)">—</span>
+      </div>
+      <div id="macro-bs-body" style="font-size:12px;color:var(--muted)">Chargement…</div>
+    </div>
+
+    <!-- Forex & Matières premières -->
+    <div class="card">
+      <div class="card-title">Forex &amp; Matières Premières</div>
+      <div class="market-grid" id="macro-forex"></div>
+    </div>
+
+    <!-- Crypto -->
+    <div class="card">
+      <div class="card-title">Crypto (CoinGecko)</div>
+      <div class="market-grid" id="macro-crypto"></div>
+    </div>
+
+    <!-- Banques centrales -->
+    <div class="card">
+      <div class="card-title">Banques Centrales — Politique Monétaire</div>
+      <div id="macro-bc" style="color:var(--muted);font-size:12px">Chargement…</div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ 6. ALERTES ══════════════════════ -->
+  <section id="tab-alertes" class="tab-panel">
+    <div class="section-header">
+      <span class="section-title">Alertes &amp; Supervision</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="alertes-time">—</span>
+        <button class="btn btn-sm btn-ghost" onclick="App.refresh('alertes')">↻</button>
+      </div>
+    </div>
+
+    <!-- KPIs résumé -->
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Critiques</div>
+        <div class="kpi-val neg" id="alertes-crit">0</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Warnings</div>
+        <div class="kpi-val" style="color:var(--yellow)" id="alertes-warn">0</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Info</div>
+        <div class="kpi-val" style="color:var(--accent)" id="alertes-info">0</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Serveur</div>
+        <div class="kpi-val neu" id="maint-global">—</div>
+        <div class="kpi-sub" id="maint-global-sub">—</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Corrections Auto</div>
+        <div class="kpi-val" style="color:var(--accent)" id="maint-corrections">0</div>
+        <div class="kpi-sub">DB locked fixés</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Black Swan — VIX</div>
+        <div class="kpi-val neu" id="al-bs-vix">—</div>
+        <div class="kpi-sub" id="al-bs-niveau">Mode : —</div>
+      </div>
+    </div>
+
+    <!-- Black Swan inline card -->
+    <div class="card" id="al-bs-card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="card-title" style="margin-bottom:0">🌊 Black Swan — Surveillance Liquidité</div>
+        <button class="btn btn-sm btn-ghost" onclick="App.blackswanScan()" style="font-size:11px">▶ Scan</button>
+      </div>
+      <div id="al-bs-body" style="font-size:12px;color:var(--muted)">Chargement…</div>
+    </div>
+
+    <!-- Santé Système -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="card-title" style="margin-bottom:0">🔧 Santé Système</div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-sm btn-ghost" onclick="App.forceCheck()" title="Déclencher un cycle de vérification immédiat">⚡ Vérifier</button>
+          <button class="btn btn-sm btn-ghost" onclick="App.fixDb()" title="Forcer la réparation SQLite">🗄️ Réparer DB</button>
         </div>
       </div>
-      <div class="divisions-grid" id="divisions-grid">
-        <div class="loading-state" style="grid-column:1/-1">Chargement des divisions</div>
+      <div class="composant-grid" id="maint-composants">
+        <div style="color:var(--muted);font-size:12px">Chargement…</div>
       </div>
-      <!-- full leaderboard below -->
-      <div id="leaderboard"></div>
+      <div id="maint-last-check" style="font-size:10px;color:var(--muted);margin-top:8px;text-align:right"></div>
     </div>
-  </div>
 
-  <!-- TAB 4 : PILIER 3 — FISCALITÉ ──────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-fiscalite">
-    <div id="fiscalite-wrap"><div class="loading-state">Chargement des données fiscales…</div></div>
-  </div>
-
-  <!-- TAB 5 : PILIER 4 — INTELLIGENCE ───────────────────────── -->
-  <div class="tab-pane hidden" id="tab-intelligence">
-    <div id="intelligence-wrap"><div class="loading-state">Chargement Intelligence…</div></div>
-  </div>
-
-  <!-- TAB 6 : PILIER 5 — RETRAITE ────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-retraite">
-    <div id="retraite-wrap"><div class="loading-state">Chargement Retraite…</div></div>
-  </div>
-
-  <!-- TAB 7 : MARCHÉS ────────────────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-marches">
-    <div id="marches-wrap"><div class="loading-state">Chargement des marchés…</div></div>
-  </div>
-
-  <!-- TAB 8 : SECTEURS ───────────────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-secteurs">
-    <div id="secteurs-wrap"><div class="loading-state">Chargement des secteurs…</div></div>
-  </div>
-
-  <!-- TAB 9 : LIQUIDITÉ ──────────────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-liquidite">
-    <div id="liquidite-wrap"><div class="loading-state">Chargement liquidité…</div></div>
-  </div>
-
-  <!-- TAB GOUVERNANCE ────────────────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-gouvernance">
-    <div class="loading-state">Chargement Gouvernance…</div>
-  </div>
-
-  <!-- TAB 10 : MORNING BRIEF ─────────────────────────────────── -->
-  <div class="tab-pane hidden" id="tab-morning-brief">
-    <div id="morning-brief-wrap"><div class="loading-state">Chargement Morning Brief…</div></div>
-  </div>
-
-  <!-- MODAL APPORT ────────────────────────────────────────────── -->
-  <div class="overlay hidden" id="apport-overlay">
-    <div class="modal" id="apport-modal" style="max-width:380px">
-      <div class="modal-header">
-        <button class="btn-close" id="apport-close">✕</button>
-        <div class="modal-title"><h2 class="modal-name">Ajouter un apport</h2></div>
-      </div>
-      <div style="padding:20px;display:flex;flex-direction:column;gap:14px">
-        <label style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">
-          Montant (€)
-          <input id="apport-montant" type="number" min="1" step="0.01" placeholder="500"
-            style="margin-top:6px;width:100%;background:var(--surface2);border:1px solid var(--border);
-                   color:var(--text);border-radius:8px;padding:10px 12px;font-size:1rem;outline:none" />
-        </label>
-        <label style="font-size:0.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">
-          Note (optionnel)
-          <input id="apport-note" type="text" placeholder="Salaire, économies…"
-            style="margin-top:6px;width:100%;background:var(--surface2);border:1px solid var(--border);
-                   color:var(--text);border-radius:8px;padding:10px 12px;font-size:0.9rem;outline:none" />
-        </label>
-        <button id="apport-submit" style="background:var(--accent);color:#000;border:none;border-radius:8px;
-          padding:12px;font-weight:700;font-size:0.9rem;cursor:pointer;letter-spacing:.05em">
-          AJOUTER L'APPORT
-        </button>
-        <div id="apport-feedback" style="font-size:0.75rem;text-align:center;min-height:18px"></div>
+    <!-- Alertes critiques -->
+    <div class="card">
+      <div class="card-title">🔴 Alertes Critiques (24h)</div>
+      <div id="alertes-crit-list">
+        <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">
+          Aucune alerte critique
+        </div>
       </div>
     </div>
-  </div>
 
-  <!-- Position Detail Modal -->
-  <div class="overlay hidden" id="pos-detail-overlay">
-    <div class="modal pos-detail-modal" id="pos-detail-modal">
-      <div class="modal-header">
-        <button class="btn-close" onclick="_closePositionDetail()">✕</button>
-        <div class="modal-title" id="pos-detail-title"></div>
+    <!-- Alertes warnings -->
+    <div class="card">
+      <div class="card-title">🟡 Warnings</div>
+      <div id="alertes-warn-list">
+        <div style="color:var(--muted);font-size:12px;text-align:center;padding:20px">
+          Aucun warning
+        </div>
       </div>
-      <div id="pos-detail-body"></div>
     </div>
-  </div>
+
+    <!-- Surveillance continue experts sectoriels -->
+    <div class="card">
+      <div class="card-title">Surveillance Continue — État des Experts</div>
+      <div id="alertes-surveillance" style="color:var(--muted);font-size:12px">Chargement…</div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ 7. INVESTISSEMENT ══════════════════════ -->
+  <section id="tab-investissement" class="tab-panel">
+
+    <div class="section-header">
+      <span class="section-title">Division Investissement — Analyse 17 étapes · Graham · DCF · Thèse Claude</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="inv-time">—</span>
+        <button class="btn btn-sm btn-ghost" onclick="App.refresh('investissement')">↻</button>
+      </div>
+    </div>
+
+    <!-- KPIs watchlist -->
+    <div class="kpi-grid" id="inv-kpis">
+      <div class="kpi"><div class="kpi-label">Actifs Analysés</div><div class="kpi-val neu" id="inv-nb">—</div><div class="kpi-sub">13 titres watchlist</div></div>
+      <div class="kpi"><div class="kpi-label">Signal BUY</div><div class="kpi-val pos" id="inv-buy-cnt">—</div><div class="kpi-sub">Achat recommandé</div></div>
+      <div class="kpi"><div class="kpi-label">Signal HOLD</div><div class="kpi-val neu" id="inv-hold-cnt">—</div><div class="kpi-sub">À surveiller</div></div>
+      <div class="kpi"><div class="kpi-label">Signal SELL</div><div class="kpi-val neg" id="inv-sell-cnt">—</div><div class="kpi-sub">Éviter / Vendre</div></div>
+    </div>
+
+    <!-- Watchlist table -->
+    <div class="card">
+      <div class="card-title">Watchlist — 13 Actifs · Score /10 · Marge Graham · Signal · Thèse</div>
+      <div id="inv-watchlist-table" style="overflow-x:auto">
+        <div style="text-align:center;padding:30px;color:var(--muted)"><div class="spinner"></div><p style="margin-top:10px">Analyse pipeline 17 étapes en cours…</p></div>
+      </div>
+    </div>
+
+    <!-- Screener Mondial -->
+    <div class="section-header" style="margin-top:24px">
+      <span class="section-title">Agent Screener Mondial — Top 50 Opportunités Graham</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="screener-time">—</span>
+        <button class="btn btn-sm" onclick="App.runScreener()" style="background:#ffd700;color:#000;font-weight:600">▶ Lancer Scan</button>
+      </div>
+    </div>
+
+    <!-- Screener KPIs -->
+    <div class="kpi-grid" id="screener-kpis">
+      <div class="kpi"><div class="kpi-label">Univers Scanné</div><div class="kpi-val neu" id="sc-univers">—</div><div class="kpi-sub">Titres analysés</div></div>
+      <div class="kpi"><div class="kpi-label">Candidats Graham</div><div class="kpi-val" id="sc-candidats">—</div><div class="kpi-sub">Après filtre PER/PBR/dette</div></div>
+      <div class="kpi"><div class="kpi-label">Analysés Pipeline</div><div class="kpi-val" id="sc-analyses">—</div><div class="kpi-sub">Top 50 sous-évalués</div></div>
+      <div class="kpi"><div class="kpi-label">BUY Automatique</div><div class="kpi-val pos" id="sc-buy">—</div><div class="kpi-sub">Score ≥7 + marge ≥30%</div></div>
+    </div>
+
+    <!-- Screener BUY signals -->
+    <div class="card" id="screener-buy-card" style="display:none">
+      <div class="card-title" style="color:var(--green)">🟢 BUY Automatique — Signaux Actifs</div>
+      <div id="screener-buy-list"></div>
+    </div>
+
+    <!-- Screener top opportunities -->
+    <div class="card">
+      <div class="card-title">Top Opportunités Détectées (pipeline 17 étapes + WACC Damodaran)</div>
+      <div id="screener-top-table" style="overflow-x:auto">
+        <div style="color:var(--muted);font-size:12px;padding:16px">Aucun scan effectué — cliquez sur ▶ Lancer Scan.</div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ══════════════════════ 8. LIQUIDITÉ / BLACK SWAN ══════════════════════ -->
+  <section id="tab-liquidite" class="tab-panel">
+
+    <div class="section-header">
+      <span class="section-title">Surveillance Black Swan — VIX · DSPX · Spreads crédit · Corrélation</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="bs-time">—</span>
+        <button class="btn btn-sm btn-ghost" onclick="App.refresh('liquidite')">↻</button>
+        <button class="btn btn-sm" id="bs-scan-btn" onclick="App.blackswanScan()" style="background:#ffd700;color:#000;font-weight:600">▶ Scanner</button>
+      </div>
+    </div>
+
+    <!-- Niveau alerte bannière -->
+    <div id="bs-banner" style="
+      border-radius:10px; padding:14px 20px; margin-bottom:16px;
+      font-size:14px; font-weight:600; text-align:center;
+      background:var(--bg2); border:1px solid var(--border);
+    ">Chargement en cours…</div>
+
+    <!-- KPIs indicateurs -->
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">VIX</div>
+        <div class="kpi-val" id="bs-vix">—</div>
+        <div class="kpi-sub" id="bs-vix-var">Seuil critique : 34</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">DSPX / Skew</div>
+        <div class="kpi-val neu" id="bs-dspx">—</div>
+        <div class="kpi-sub">Risque de queue (&gt;140 = alerte)</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Spread HY (bps)</div>
+        <div class="kpi-val" id="bs-spread">—</div>
+        <div class="kpi-sub">FRED BAMLH0A0HYM2 · seuil : 700bps</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Corr. SPY/TLT</div>
+        <div class="kpi-val neu" id="bs-corr">—</div>
+        <div class="kpi-sub">Corrélation 20j actions/obligations</div>
+      </div>
+    </div>
+
+    <!-- Mode portefeuille -->
+    <div class="card">
+      <div class="card-title">Mode Portefeuille</div>
+      <div id="bs-mode-detail" style="padding:8px 0;color:var(--muted);font-size:13px">—</div>
+    </div>
+
+    <!-- Traders momentum stoppés -->
+    <div class="card" id="bs-traders-card">
+      <div class="card-title">Traders Momentum — Statut</div>
+      <div id="bs-traders-list" style="font-size:13px;color:var(--muted)">—</div>
+    </div>
+
+    <!-- Actifs recommandés (barbell) -->
+    <div class="card" id="bs-actifs-card">
+      <div class="card-title">Allocation Barbell Recommandée (si mode CRITIQUE)</div>
+      <div id="bs-actifs-detail" style="font-size:13px;color:var(--muted)">—</div>
+    </div>
+
+    <!-- Messages analyse Black Swan -->
+    <div class="card">
+      <div class="card-title">Analyse Détaillée Black Swan</div>
+      <div id="bs-messages" style="font-family:monospace;font-size:12px;color:var(--text);line-height:1.7">—</div>
+    </div>
+
+    <!-- DSPX Dispersion — Desk Liquidité -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="card-title" style="margin-bottom:0">📊 DSPX Dispersion — Régime Alpha</div>
+        <span id="bs-dspx-regime-badge" style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;background:var(--bg3);color:var(--muted)">—</span>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(3,1fr);margin-bottom:10px">
+        <div class="kpi">
+          <div class="kpi-label">DSPX actuel</div>
+          <div class="kpi-val neu" id="bs-dspx2">—</div>
+          <div class="kpi-sub">Percentile 50j : <span id="bs-dspx-pct">—</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Signal Alpha</div>
+          <div class="kpi-val" id="bs-dspx-alpha">—</div>
+          <div class="kpi-sub" id="bs-dspx-alpha-sub">—</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Corr. croisée moy.</div>
+          <div class="kpi-val neu" id="bs-dspx-corr-moy">—</div>
+          <div class="kpi-sub" id="bs-dspx-corr-regime">—</div>
+        </div>
+      </div>
+      <div id="bs-dspx-messages" style="font-family:monospace;font-size:12px;color:var(--muted);line-height:1.6">—</div>
+    </div>
+
+    <!-- Agent Bertez — WTI & Thèse Macro -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div class="card-title" style="margin-bottom:0">🛢 Agent Bertez — WTI & Thèse Macro</div>
+        <span id="bs-bertez-signal-badge" style="font-size:11px;font-weight:700;padding:2px 10px;border-radius:20px;background:var(--bg3);color:var(--muted)">—</span>
+      </div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:10px">
+        <div class="kpi">
+          <div class="kpi-label">WTI Spot</div>
+          <div class="kpi-val" id="bs-bertez-wti">—</div>
+          <div class="kpi-sub">USD/baril</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Var. 5 jours</div>
+          <div class="kpi-val" id="bs-bertez-var5">—</div>
+          <div class="kpi-sub" id="bs-bertez-var30-sub">Var. 30j : <span id="bs-bertez-var30">—</span></div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Tendance</div>
+          <div class="kpi-val" id="bs-bertez-tendance">—</div>
+          <div class="kpi-sub">WTI momentum</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Régime Macro</div>
+          <div class="kpi-val" id="bs-bertez-regime">—</div>
+          <div class="kpi-sub">Thèse Bertez</div>
+        </div>
+      </div>
+      <div id="bs-bertez-these" style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:8px;font-style:italic">—</div>
+      <div id="bs-bertez-actifs" style="font-size:12px;color:var(--text)"></div>
+    </div>
+
+  </section>
+
+  <!-- ══════════════════════ 9. RETRAITE ══════════════════════ -->
+  <section id="tab-retraite" class="tab-panel">
+    <div class="section-header">
+      <span class="section-title">🎯 Retraite — Pilier Long Terme</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="ret-time">—</span>
+        <button class="btn btn-sm btn-ghost" onclick="App.refresh('retraite')">↻</button>
+      </div>
+    </div>
+
+    <!-- Jauge progression -->
+    <div class="card">
+      <div class="card-title">Progression vers l'objectif retraite</div>
+      <div class="kpi-grid" style="grid-template-columns:repeat(4,1fr);margin-bottom:12px">
+        <div class="kpi">
+          <div class="kpi-label">Capital actuel</div>
+          <div class="kpi-val pos" id="ret-base">—</div>
+          <div class="kpi-sub">Investissable</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Objectif</div>
+          <div class="kpi-val" id="ret-objectif">—</div>
+          <div class="kpi-sub">Retraite cible</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Apport mensuel</div>
+          <div class="kpi-val" id="ret-apport">—</div>
+          <div class="kpi-sub">Contribution</div>
+        </div>
+        <div class="kpi">
+          <div class="kpi-label">Jours restants</div>
+          <div class="kpi-val" id="ret-jours">—</div>
+          <div class="kpi-sub">Taux : <span id="ret-taux">—</span>/an</div>
+        </div>
+      </div>
+      <div style="margin-bottom:4px;display:flex;justify-content:space-between;font-size:11px;color:var(--muted)">
+        <span id="ret-pct-label">0%</span>
+        <span id="ret-progress-label">—</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" id="ret-progress-fill" style="width:0%"></div>
+      </div>
+    </div>
+
+    <!-- Carte positions PRU -->
+    <div class="card">
+      <div class="card-title">📌 Positions PRU</div>
+      <div id="ret-positions" style="font-size:13px;color:var(--muted)">Chargement…</div>
+    </div>
+
+  </section>
 
 </main>
 
-<!-- ── TRADER DETAIL MODAL ───────────────────────────────────── -->
-<div class="overlay hidden" id="overlay">
-  <div class="modal" id="modal">
-    <div class="modal-header">
-      <button class="btn-close" id="btn-close">✕</button>
-      <div class="modal-title">
-        <h2 class="modal-name" id="modal-name"></h2>
-        <div class="modal-strategy" id="modal-strategy"></div>
-      </div>
-      <div class="modal-rank-badge" id="modal-rank-badge"></div>
-    </div>
-    <div class="modal-div-row" id="modal-div-row"></div>
-    <div class="modal-kpi">
-      <div class="kpi-block">
-        <div class="kpi-label">VALEUR</div>
-        <div class="kpi-value" id="modal-value"></div>
-      </div>
-      <div class="kpi-block">
-        <div class="kpi-label">P&amp;L</div>
-        <div class="kpi-value" id="modal-pnl"></div>
-      </div>
-      <div class="kpi-block">
-        <div class="kpi-label">GRADE</div>
-        <div class="kpi-value" id="modal-grade-value">—</div>
-      </div>
-      <div class="kpi-block">
-        <div class="kpi-label">BUDGET SITG</div>
-        <div class="kpi-value" id="modal-sitg-value">—</div>
-      </div>
-    </div>
-    <div class="modal-progress-wrap">
-      <div class="progress-labels">
-        <span>500 €</span>
-        <span id="modal-progress-pct"></span>
-        <span>10 000 €</span>
-      </div>
-      <div class="progress-bg">
-        <div class="progress-fill" id="modal-progress"></div>
-      </div>
-    </div>
-    <div class="modal-section">
-      <div class="section-label">ÉVOLUTION</div>
-      <div class="chart-container">
-        <canvas id="modal-chart"></canvas>
-      </div>
-    </div>
-    <div class="modal-section">
-      <div class="section-label">POSITIONS</div>
-      <div id="modal-positions"></div>
-    </div>
-    <div class="modal-section">
-      <div class="section-label">DERNIERS TRADES</div>
-      <div id="modal-trades"></div>
-    </div>
-  </div>
-</div>
-
-<!-- ── NOTIFICATION HISTORY PANEL ─────────────────────────────── -->
-<div class="notif-panel" id="notif-panel">
-  <div class="notif-panel-header">
-    <span>ALERTES</span>
-    <button class="notif-clear-btn" id="notif-clear-btn">Tout effacer</button>
-  </div>
-  <div id="notif-list"><div class="notif-empty">Aucune alerte</div></div>
-</div>
-
-<!-- ── TOAST NOTIFICATIONS ────────────────────────────────────── -->
-<div id="toast-container" aria-live="polite" aria-atomic="false"></div>
-
-<!-- ── BOTTOM NAV ─────────────────────────────────────────────── -->
-<nav class="bottom-nav" id="bottom-nav">
-  <button class="bnav-btn active" data-tab="dashboard" onclick="switchTab('dashboard')">
-    <span class="bnav-icon">📊</span>
-    <span class="bnav-label">Portfolio</span>
-  </button>
-  <button class="bnav-btn" data-tab="marches" onclick="switchTab('marches')">
-    <span class="bnav-icon">🌍</span>
-    <span class="bnav-label">Marché</span>
-  </button>
-  <button class="bnav-btn" data-tab="intelligence" onclick="switchTab('intelligence')">
-    <span class="bnav-icon">🗳️</span>
-    <span class="bnav-label">Vote</span>
-  </button>
-  <button class="bnav-btn" id="bnav-alertes" onclick="document.getElementById('bell-btn').click()">
-    <span class="bnav-icon">🔔</span>
-    <span class="bnav-badge hidden" id="bnav-bell-badge">0</span>
-    <span class="bnav-label">Alertes</span>
-  </button>
-</nav>
+<!-- Toast de notification -->
+<div id="toast" style="
+  position:fixed; bottom:20px; right:20px;
+  background:var(--bg2); border:1px solid var(--border);
+  border-radius:10px; padding:10px 16px;
+  font-size:12px; color:var(--text);
+  transform:translateY(80px); opacity:0;
+  transition:all .3s; z-index:999;
+  max-width:280px;
+"></div>
 
 <script src="app.js"></script>
 </body>
