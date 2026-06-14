@@ -38,6 +38,7 @@
     macro:          {},
     alertes:        {},
     retraite:       {},
+    dividendes:     {},
     blackswan:      null,
     ws:             null,
     wsConnected:    false,
@@ -1787,6 +1788,72 @@
     </table></div>`;
   }
 
+  async function loadDividendes() {
+    let data;
+    try {
+      data = await apiFetch('/dividendes', 20_000);
+    } catch (e) {
+      $('div-table').innerHTML = '<span style="color:var(--muted)">Erreur API dividendes.</span>';
+      return;
+    }
+    state.dividendes = data;
+
+    const revM  = data.revenu_mensuel_total || 0;
+    const obj   = data.objectif_mensuel    || 0;
+    const ecart = data.ecart_objectif      || 0;
+    const pct   = obj > 0 ? Math.min(revM / obj * 100, 100) : 0;
+
+    $('div-rev-mensuel').textContent = revM.toFixed(2) + ' €';
+    $('div-objectif').textContent    = obj.toFixed(0) + ' €';
+    $('div-ecart').textContent       = (ecart >= 0 ? '+' : '') + ecart.toFixed(2) + ' €';
+    $('div-ecart').className         = 'kpi-val ' + (ecart >= 0 ? 'pos' : 'neg');
+    $('div-fiables').textContent     = data.nb_dividendes_fiables || 0;
+    $('div-coupes').textContent      = data.nb_coupes_detectees   || 0;
+    $('div-coupes').className        = 'kpi-val ' + ((data.nb_coupes_detectees || 0) > 0 ? 'neg' : 'neu');
+    $('div-pct-label').textContent   = pct.toFixed(1) + '%';
+    $('div-progress-label').textContent = revM.toFixed(2) + ' € / ' + obj.toFixed(0) + ' €';
+    $('div-progress-fill').style.width  = pct + '%';
+    $('div-time').textContent = data.timestamp ? 'Mis à jour ' + timeAgo(data.timestamp) : '—';
+
+    renderDividendes(data.positions || []);
+  }
+
+  function renderDividendes(positions) {
+    if (!positions.length) {
+      $('div-table').innerHTML = '<span style="color:var(--muted)">Aucune position.</span>';
+      return;
+    }
+    const rows = positions.map(p => {
+      const sc      = p.scoring || {};
+      const score   = sc.score != null ? sc.score.toFixed(1) : '—';
+      const fiable  = sc.fiable;
+      const coupe   = p.coupe_detectee;
+      const yld     = p.div_yield != null ? p.div_yield.toFixed(1) + '%' : '—';
+      const payout  = p.payout_ratio != null ? p.payout_ratio.toFixed(0) + '%' : '—';
+      const scoreClass = sc.score >= 6 ? 'pos' : sc.score >= 3 ? 'warn' : 'neg';
+      return `<tr${coupe ? ' style="background:rgba(239,68,68,.06)"' : ''}>
+        <td><strong>${p.ticker || '—'}</strong>${coupe ? ' <span style="color:#ef4444;font-size:10px">✂ COUPE</span>' : ''}</td>
+        <td style="color:var(--muted)">${p.nom || '—'}</td>
+        <td>${(p.montant_investi || 0).toFixed(0)} €</td>
+        <td>${p.prix != null ? p.prix.toFixed(2) + ' €' : '—'}</td>
+        <td>${p.div_annuel_action != null ? p.div_annuel_action.toFixed(2) + ' €' : '—'}</td>
+        <td class="${parseFloat(yld) > 10 ? 'warn' : 'pos'}">${yld}</td>
+        <td class="pos">${(p.rev_mensuel || 0).toFixed(2)} €</td>
+        <td class="${parseFloat(payout) > 100 ? 'neg' : parseFloat(payout) > 75 ? 'warn' : 'pos'}">${payout}</td>
+        <td class="${scoreClass}">${score}/10</td>
+        <td>${fiable ? '<span style="color:#22c55e;font-weight:700">✓</span>' : '<span style="color:var(--muted)">—</span>'}</td>
+      </tr>`;
+    }).join('');
+    $('div-table').innerHTML = `<table class="data-table">
+      <thead><tr>
+        <th>Ticker</th><th>Nom</th><th>Investi</th><th>Prix</th>
+        <th>Div/action</th><th>Rendement</th><th>Rev/mois</th>
+        <th>Payout</th><th>Score</th><th>Fiable</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+  }
+
   // ── Public API ────────────────────────────────────────────
   window.App = {
     refresh(tab) {
@@ -1800,6 +1867,7 @@
         investissement: loadInvestissement,
         liquidite:      loadLiquidite,
         retraite:       loadRetraite,
+        dividendes:     loadDividendes,
       };
       const fn = loaders[tab];
       if (fn) fn().catch(() => {});
