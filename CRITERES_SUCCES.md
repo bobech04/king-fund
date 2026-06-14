@@ -33,6 +33,26 @@
 - Chaque agent (Actualités, Dividendes, Risk Parity, Benchmark) a-t-il produit au moins une alerte/décision qui t'a semblé utile sur la période ?
 - Si un agent reste totalement silencieux et inutile → passer en mode silencieux (pas suppression)
 
+### Agent Flux Macro ("Le Détective de Capitaux")
+
+- Les **régimes marché** détectés (NORMAL / ROTATION / CRISE_LIQUIDITE / EFFONDREMENT) changent-ils de façon cohérente avec l'actualité réelle ?
+- La **détection d'anomalies** (2σ sur 48h vs moyenne 30j) déclenche-t-elle des alertes crédibles ou génère-t-elle du bruit excessif ?
+- Les **checklist anti-biais** (10 items, 7 bloquants) font-elles baisser la confiance quand c'est justifié, sans paralyser le signal ?
+- Le job tourne-t-il bien 2× par jour (10h00 et 18h00 Paris) sans échec silencieux ?
+
+### Alpha-Lab — Backtests Signaux & Facteurs Académiques
+
+- **Signal TrendFollow** : verdict VALIDE attendu (t-stat ≥ 2.0, Sharpe OOS ≥ 0.50). Si passage en BRUIT → investiguer les données Fama-French, pas le signal.
+- **Signal Bertez** : verdict OVERFITTE attendu (t-stat ≥ 2.0 mais Sharpe OOS < 0.25 sur le proxy HML+CAPE). Normal — valeur dans la thèse macro, pas dans la mécanique statistique.
+- Les **4 facteurs** (Value, Momentum, Quality, LowVol) produisent-ils des classements cross-sectionnels stables sur la watchlist 13 actifs ?
+- Le rapport mensuel (1er du mois 07h00) arrive-t-il sur Telegram sans erreur ?
+
+### Screener mondial (02h30 UTC — nuit)
+
+- Le job `screener_mondial` tourne-t-il chaque nuit à 02h30 UTC sans timeout ni crash silencieux ?
+- Les top 50 Graham issus des 120 titres (Euronext Paris/Amsterdam, Oslo, NYSE) semblent-ils cohérents avec les valorisations réelles ?
+- Les signaux BUY auto (score ≥ 7 + marge ≥ 30%) sont-ils cross-validés par le Comité Sélection avant toute action réelle ?
+
 ---
 
 ## 5. AGD-01 (vétos)
