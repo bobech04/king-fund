@@ -394,13 +394,15 @@ Envoyé sur Telegram le 1er de chaque mois (avant le rapport mensuel). Contient 
 | 🏆 **Classement** | Tous les jours — qui mène la battle, qui est en difficulté |
 | 🌅 **Morning Brief** | Chaque matin avant une décision — direction des marchés |
 | 📊 **Post-Market** | Le soir — bilan de la journée, podium traders |
-| ⚙️ **Scheduler** | Si un job semble ne pas tourner — état des 24 tâches automatiques |
+| ⚙️ **Scheduler** | Si un job semble ne pas tourner — état des tâches automatiques |
 | 🌍 **CIO Macro** | En cas de doute sur le contexte macro — indices, banques centrales, forex, crypto |
 | 🚨 **Alertes** | Après une alerte Telegram — détail des alertes critiques/warnings en cours |
-| 📈 **Investissement** | Avant un achat — watchlist Graham, screener mondial, signaux BUY |
+| 📈 **Investissement** | Avant un achat — barre de recherche ticker, watchlist Graham, screener mondial, signaux BUY |
 | 💎 **Patrimoine** | Une fois par semaine — bilan patrimoine, apports, PRU, projection retraite |
-| 💧 **Liquidité** | Si le marché semble agité — score Howell, régime macro mondial |
-| 🧠 **Intelligence** | Après toute alerte Telegram importante — Comité, Veille Stratégique, Alpha Lab, Audit AGD-01 |
+| 🌊 **Liquidité** | Si le marché semble agité — score Howell, régime macro mondial |
+| 🧠 **Intelligence** | Après toute alerte Telegram importante — Veille Stratégique, Flux Macro, Alpha Lab, Comité, Audit AGD-01 |
+| 🎯 **Retraite** | Pour suivre la progression vers l'objectif 2047 — jauge patrimoniale, projection long terme |
+| 📊 **Dividendes** | Pour vérifier les revenus passifs — calendrier paiements, alertes coupe dividende |
 
 ---
 
@@ -410,6 +412,8 @@ Envoyé sur Telegram le 1er de chaque mois (avant le rapport mensuel). Contient 
 |---|---|
 | **06h30** | Morning Brief généré (trader 19) |
 | **08h00** (lundi) | Rapport hebdomadaire AGD-01 → Telegram |
+| **10h00** (quotidien) | Agent Flux Macro — matin (régimes marché, anomalies capitaux) |
+| **18h00** (quotidien) | Agent Flux Macro — après-midi (mise à jour régime + IPOs) |
 | **H:05** (toutes les heures) | Veille Stratégique : scan RSS (Bertez, Dalio, Howell, InflationGuy) |
 | **Toutes les 30 min** | Alertes prix surveillance (8h–20h) + Actualités CRITIQUE/IMPORTANT |
 | **Toutes les 5 min** | Watchdog : vérification santé du serveur |
@@ -435,4 +439,4 @@ Envoyé sur Telegram le 1er de chaque mois (avant le rapport mensuel). Contient 
 
 ---
 
-*Dernière mise à jour : juin 2026*
+*Dernière mise à jour : 14 juin 2026*
