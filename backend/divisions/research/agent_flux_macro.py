@@ -1246,6 +1246,50 @@ class AgentFluxMacro:
             logger.debug("[FluxMacro] AGD-01 validation: %s", exc)
         return niveau
 
+    def _valider_avec_agd01(self, signal: dict) -> bool:
+        """
+        Avocat du diable : soumet le signal CRITIQUE directement à Claude.
+        Prompt 'prouve que cette thèse est fausse' avant tout envoi Telegram CRITIQUE.
+        Retourne True si validé, False si rejeté. Fail-open en cas d'erreur.
+        """
+        try:
+            from config import ANTHROPIC_API_KEY
+            if not ANTHROPIC_API_KEY:
+                return True
+            import anthropic
+            anomalie_label = signal.get("anomalie_label", "anomalie macro inconnue")
+            conclusion     = signal.get("conclusion", "")
+            mecanisme      = signal.get("mecanisme", "")
+            regime         = signal.get("regime", "NORMAL")
+            prompt = (
+                f"Un agent de détection de flux macro a émis ce signal CRITIQUE :\n\n"
+                f"Anomalie : {anomalie_label}\n"
+                f"Régime marché : {regime}\n"
+                f"Mécanisme identifié : {mecanisme[:300]}\n"
+                f"Conclusion : {conclusion[:300]}\n\n"
+                f"Prouve que cette thèse est fausse. Donne exactement 3 raisons concrètes "
+                f"pour lesquelles ce signal pourrait être un faux positif (dark pools, "
+                f"biais de confirmation, corrélation spurieuse, délai FRED, etc.). "
+                f"Termine UNIQUEMENT par VALIDE si les contre-arguments sont faibles "
+                f"et le signal mérite d'être transmis, ou REJETE si les contre-arguments "
+                f"sont convaincants et le signal doit être ignoré."
+            )
+            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+            msg = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=400,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            reponse = msg.content[0].text.strip().upper()
+            if "REJETE" in reponse or "REJETÉ" in reponse:
+                logger.info("[FluxMacro] Avocat du diable : CRITIQUE REJETÉ ← %s", anomalie_label)
+                return False
+            logger.info("[FluxMacro] Avocat du diable : CRITIQUE VALIDÉ ← %s", anomalie_label)
+            return True
+        except Exception as exc:
+            logger.debug("[FluxMacro] _valider_avec_agd01: %s", exc)
+            return True
+
     # ── Main entry point ────────────────────────────────────────────────────
 
     def analyser(self, forcer: bool = False) -> dict:
@@ -1391,6 +1435,15 @@ class AgentFluxMacro:
                         ipos        = ipos,
                         regime      = regime_info.get("regime", "NORMAL"),
                     )
+                    signal_ctx = {
+                        "anomalie_label": anomalie.get("label", ""),
+                        "conclusion":     conclusion,
+                        "mecanisme":      mecanisme,
+                        "regime":         regime_info.get("regime", "NORMAL"),
+                    }
+                    if not self._valider_avec_agd01(signal_ctx):
+                        logger.info("[FluxMacro] Signal CRITIQUE rejeté par avocat du diable")
+                        continue
                     niveau_valide = self._soumettre_agd01(msg, anomalie["niveau"])
                     if niveau_valide in ("CRITIQUE", "IMPORTANT"):
                         try:
