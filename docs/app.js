@@ -1826,20 +1826,24 @@
     const rows = positions.map(p => {
       const sc      = p.scoring || {};
       const score   = sc.score != null ? sc.score.toFixed(1) : '—';
-      const fiable  = sc.fiable;
-      const coupe   = p.coupe_detectee;
-      const yld     = p.div_yield != null ? p.div_yield.toFixed(1) + '%' : '—';
-      const payout  = p.payout_ratio != null ? p.payout_ratio.toFixed(0) + '%' : '—';
+      const fiable   = sc.fiable;
+      const coupe    = p.coupe_detectee;
+      const isReit   = p.is_reit || sc.is_reit;
+      const yld      = p.div_yield != null ? p.div_yield.toFixed(1) + '%' : '—';
+      const payoutVal= p.payout_ratio != null ? p.payout_ratio.toFixed(0) + '%' : '—';
+      const payoutCell = isReit
+        ? `<span style="color:var(--muted)">${payoutVal} <span style="font-size:10px">(FFO)</span></span>`
+        : `<span class="${parseFloat(payoutVal) > 100 ? 'neg' : parseFloat(payoutVal) > 75 ? 'warn' : 'pos'}">${payoutVal}</span>`;
       const scoreClass = sc.score >= 6 ? 'pos' : sc.score >= 3 ? 'warn' : 'neg';
       return `<tr${coupe ? ' style="background:rgba(239,68,68,.06)"' : ''}>
-        <td><strong>${p.ticker || '—'}</strong>${coupe ? ' <span style="color:#ef4444;font-size:10px">✂ COUPE</span>' : ''}</td>
+        <td><strong>${p.ticker || '—'}</strong>${coupe ? ' <span style="color:#ef4444;font-size:10px">✂ COUPE</span>' : ''}${isReit ? ' <span style="color:var(--muted);font-size:10px">REIT</span>' : ''}</td>
         <td style="color:var(--muted)">${p.nom || '—'}</td>
         <td>${(p.montant_investi || 0).toFixed(0)} €</td>
         <td>${p.prix != null ? p.prix.toFixed(2) + ' €' : '—'}</td>
         <td>${p.div_annuel_action != null ? p.div_annuel_action.toFixed(2) + ' €' : '—'}</td>
         <td class="${parseFloat(yld) > 10 ? 'warn' : 'pos'}">${yld}</td>
         <td class="pos">${(p.rev_mensuel || 0).toFixed(2)} €</td>
-        <td class="${parseFloat(payout) > 100 ? 'neg' : parseFloat(payout) > 75 ? 'warn' : 'pos'}">${payout}</td>
+        <td>${payoutCell}</td>
         <td class="${scoreClass}">${score}/10</td>
         <td>${fiable ? '<span style="color:#22c55e;font-weight:700">✓</span>' : '<span style="color:var(--muted)">—</span>'}</td>
       </tr>`;
