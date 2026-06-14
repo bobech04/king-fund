@@ -251,6 +251,7 @@ def generer_rapport(force: bool = False) -> dict:
         "crises_testees": list(CRISES.keys()),
         "signaux":        {k: v.to_dict() for k, v in signaux.items()},
         "traders_map":    TRADER_ARCHETYPES,
+        "signal_regime_coherent": False,  # mis à jour en Bloc 4
     }
 
     with _LOCK:
@@ -262,4 +263,42 @@ def generer_rapport(force: bool = False) -> dict:
         "(✅%d VALIDES | 🔇%d BRUITS | ⚠️%d OVERFITS)",
         time.time() - t0, len(signaux), len(valides), len(bruits), len(overfits),
     )
+
+    # ── Bloc 3 : Bertez VALIDE → soumettre à AGD-01 pour avocat du diable ──
+    if "Bertez_Energy" in valides:
+        _notifier_agd01_bertez_valide(signaux.get("Bertez_Energy"))
+
     return rapport
+
+
+def _notifier_agd01_bertez_valide(res) -> None:
+    """
+    Quand le signal Bertez passe VALIDE (t≥2 + Sharpe OOS≥0.5),
+    soumet le résultat à AGD-01 pour avocat du diable et audit.
+    Ne bloque pas le rapport en cas d'erreur.
+    """
+    try:
+        from divisions.gerant_delegue.agd_01 import get_gerant_delegue
+        agd = get_gerant_delegue()
+        contexte = (
+            f"[ALPHA LAB — BERTEZ SIGNAL VALIDE]\n"
+            f"Signal Bertez_Energy validé statistiquement :\n"
+            f"  t-stat={res.t_stat:.2f} (seuil≥2.0) | Sharpe OOS={res.sharpe_oos:.3f} (seuil≥0.50)\n"
+            f"  Sharpe IS={res.sharpe_is:.3f} | Max Drawdown={res.max_drawdown*100:.1f}%\n"
+            f"  Observations={res.n_obs} mois (French 1926+)\n\n"
+            "Proxy HML<0 + CAPE>25 → régime défensif Bertez activé.\n"
+            "Confronte cette validation académique à ta thèse macro actuelle.\n"
+            "Donne 3 raisons pour lesquelles ce signal pourrait être faux ou non applicable aujourd'hui."
+        )
+        result = agd.evaluer_decision(
+            ticker="ALPHA_LAB_BERTEZ",
+            action="signal_valide",
+            montant=0.0,
+            contexte=contexte,
+            perf_annualisee=0.0,
+            patrimoine=18082.0,
+        )
+        decision = result.get("decision", "")
+        logger.info("[AlphaLab] AGD-01 réponse Bertez VALIDE → %s", decision)
+    except Exception as exc:
+        logger.debug("[AlphaLab] AGD-01 notification Bertez: %s", exc)
