@@ -45,6 +45,166 @@ LIMITES_FONDAMENTALES = [
     "Raisonnement qualitatif uniquement — Phase 1 (tests de Granger en Phase 2)",
 ]
 
+# ---------------------------------------------------------------------------
+# RÉGIMES DE MARCHÉ (Institut des Libertés — 4 états)
+# ---------------------------------------------------------------------------
+
+REGIMES_MARCHE: dict[str, dict] = {
+    "NORMAL": {
+        "description": "Taux réels bas, liquidité abondante, obligations antifragiles",
+        "protection": "Portefeuille standard — actifs réels + dividendes",
+    },
+    "ROTATION": {
+        "description": "Absorption IPOs, baisse temporaire actifs refuge, corrélation stocks/bonds normale",
+        "protection": "Accumulation actifs refuge pendant la baisse temporaire",
+    },
+    "CRISE_LIQUIDITE": {
+        "description": (
+            "Haut à gauche — cash is king. Obligations ET actions baissent simultanément. "
+            "Actifs vendus par contrainte. Signal : corr(TLT, SPY) > 0 sur 5 jours glissants."
+        ),
+        "protection": "Augmenter cash — réduire exposition actifs risqués — garder or physique",
+    },
+    "EFFONDREMENT": {
+        "description": (
+            "1929-like — monopoles + décorrélation valorisations/réalité + "
+            "ruptures d'approvisionnement simultanées"
+        ),
+        "protection": "Cash + or physique + actifs hors système",
+    },
+}
+
+# ---------------------------------------------------------------------------
+# PRÉCÉDENTS IPO/ABSORPTION — Base historique complète
+# Source : REGLE_MONETAIRE_ETERNELLE + Institut des Libertés
+# ---------------------------------------------------------------------------
+
+PRECEDENTS_IPO_ABSORPTION: list[dict] = [
+    {
+        "nom":        "Alibaba IPO 2014",
+        "montant":    25.0,
+        "effet_or":   -3.0,
+        "effet_hk":   -2.5,
+        "regime":     "NORMAL",
+        "note":       "Premier test à grande échelle de la RME. Or -3% dans les 3 semaines avant.",
+    },
+    {
+        "nom":        "Facebook IPO 2012",
+        "montant":    16.0,
+        "effet_or":   -1.8,
+        "effet_hk":   -1.2,
+        "regime":     "NORMAL",
+        "note":       "Première méga-IPO tech US. Rotation prévisible mais effet limité par QE Fed.",
+    },
+    {
+        "nom":        "Saudi Aramco IPO 2019",
+        "montant":    29.0,
+        "effet_or":   -2.1,
+        "effet_hk":   -4.0,
+        "regime":     "NORMAL",
+        "note":       "EM sous-performance -4% vs MSCI World. Fonds souverains MO massivement présents.",
+    },
+    {
+        "nom":        "Krach 1929 — Absorption extrême",
+        "montant":    None,
+        "effet_or":   None,
+        "effet_hk":   None,
+        "regime":     "EFFONDREMENT",
+        "note": (
+            "Référence EFFONDREMENT : monopoles (US Steel, Standard Oil) + décorrélation "
+            "valorisations/réalité + ruptures approvisionnement simultanées. "
+            "Pas d'équivalent moderne direct."
+        ),
+    },
+    {
+        "nom":        "SpaceX IPO 2026 (en cours)",
+        "montant":    85.0,
+        "effet_or":   -6.2,
+        "effet_hk":   -8.3,
+        "regime":     "ROTATION→CRISE_LIQUIDITE",
+        "note": (
+            "6x Aramco = TERRITOIRE INCONNU. Pas de précédent fiable à cette échelle. "
+            "Manipulation indice Nasdaq (poids estimé 5%→15%). "
+            "Fonds souverains MO absents. Risque glissement ROTATION→CRISE_LIQUIDITE."
+        ),
+    },
+]
+
+# ---------------------------------------------------------------------------
+# DISTINCTION VENTES OR — 3 cas (Institut des Libertés)
+# Indicateurs CFTC + TIC + WGC pour identifier la nature de la vente
+# ---------------------------------------------------------------------------
+
+DISTINCTION_VENTES_OR: dict[str, dict] = {
+    "CAS_A_CONTRAINTE_SOUVERAINE": {
+        "description": "Banques centrales / fonds souverains vendent pour financer dépenses",
+        "indicateurs": [
+            "TIC Data : flux ventes obligations US par banques centrales étrangères",
+            "WGC (World Gold Council) : rapport trimestriel ventes banques centrales",
+            "Signal : ventes massives OR + ventes simultanées Treasuries US",
+        ],
+        "action": "Signal CRITIQUE — crise de balance des paiements d'un souverain",
+        "source_verification": "ticdata.treasury.gov (délai 6 sem.) | gold.org/goldhub",
+    },
+    "CAS_B_FINANCEMENT_IPO": {
+        "description": "Institutionnels vendent OR pour libérer cash et souscrire à une IPO majeure",
+        "indicateurs": [
+            "CFTC COT : baisse positions Long MM (Managed Money) sur GC=F",
+            "Calendrier IPO : montant levé > 10 Md$ dans les 30 jours",
+            "Signal : ventes OR corrélées J-30→J-3 avant date IPO",
+        ],
+        "action": "Signal ROTATION — opportunité d'accumulation OR post-IPO",
+        "source_verification": "CFTC Socrata (hebdo) | SEC EDGAR S-1 filings",
+    },
+    "CAS_C_STRATEGIQUE": {
+        "description": "Rotation stratégique vers actifs risqués (risk-on) ou vers cash",
+        "indicateurs": [
+            "VIX < 15 + hausse SPY simultanée → risk-on (OR vendu pour actions)",
+            "VIX > 25 + baisse SPY simultanée → CRISE_LIQUIDITE (OR vendu par contrainte)",
+            "CFTC : positions Short MM augmentent sans événement calendrier identifié",
+        ],
+        "action": "Analyser VIX + SPY + TLT simultanément pour distinguer risk-on vs contrainte",
+        "source_verification": "yfinance (^VIX, SPY, TLT) | CFTC Socrata",
+    },
+}
+
+# ---------------------------------------------------------------------------
+# RÈGLE ANTIFRAGILITÉ OBLIGATIONS (Principes fondamentaux)
+# Source : Taleb / Gavekal / Institut des Libertés
+# ---------------------------------------------------------------------------
+
+REGLE_ANTIFRAGILITE_OBLIGATIONS = """
+RÈGLE ANTIFRAGILITÉ DES OBLIGATIONS
+
+SOURCE : Taleb (Antifragile) — Gavekal — Institut des Libertés
+
+PRINCIPE
+  En régime NORMAL : les obligations d'État (TLT) sont ANTIFRAGILES.
+  Quand les actions baissent (stress marché), les obligations MONTENT.
+  → Le portefeuille 60/40 fonctionne : les obligations amortissent les chocs.
+
+RUPTURE DE L'ANTIFRAGILITÉ (CRISE_LIQUIDITE)
+  En régime CRISE_LIQUIDITE : TLT ET SPY baissent SIMULTANÉMENT.
+  → Les obligations PERDENT leur propriété antifragile.
+  → Le cash devient le seul actif refuge.
+  Signal mesurable : corr(TLT_returns, SPY_returns) > 0 sur 5 jours glissants.
+
+EXEMPLES HISTORIQUES
+  • Mars 2020 (COVID crash) : TLT et SPY ont baissé simultanément pendant 3 jours
+    avant l'intervention Fed. Signal précurseur de CRISE_LIQUIDITE transitoire.
+  • 2022 (hausse taux Fed) : TLT -30%, SPY -20% sur l'année. Corrélation positive
+    durable → régime CRISE_LIQUIDITE confirmé sur toute l'année 2022.
+  • 2008 (post-Lehman) : TLT a MONTÉ (refuge) → pas de CRISE_LIQUIDITE pure,
+    mais EFFONDREMENT partiel. Distinction importante.
+
+APPLICATION KING FUND
+  → Surveiller corr(TLT, SPY) sur 5 jours glissants via _detect_regime_marche()
+  → Si > 0 : déclencher alerte CRITIQUE CRISE_LIQUIDITE
+  → Dans ce régime : réduire exposition, augmenter cash, conserver or physique
+
+DISCLAIMER : Raisonnement qualitatif. Non statistiquement prouvé.
+"""
+
 # yfinance tickers — mapping nom_affichage → ticker_yf
 TICKERS_YF: dict[str, str] = {
     "XAUUSD": "GC=F",       # Gold futures (proxy XAU/USD spot)
@@ -55,6 +215,10 @@ TICKERS_YF: dict[str, str] = {
     "USDJPY": "USDJPY=X",    # USD/JPY (proxy carry trade yen)
     "GLD":    "GLD",         # SPDR Gold Shares ETF
     "USO":    "USO",         # United States Oil Fund
+    "TLT":    "TLT",         # iShares 20+ Year Treasury — détection antifragilité obligations
+    "SPY":    "SPY",         # SPDR S&P 500 ETF — ratio TLT/SPY → CRISE_LIQUIDITE
+    "COPX":   "COPX",        # Global X Copper Miners ETF — cuivre = signal croissance réelle vs financière
+    "UNG":    "UNG",         # United States Natural Gas Fund — signal énergie/inflation
 }
 
 FRED_SERIES = ["DGS3MO", "DGS10", "T10YIE"]
@@ -80,6 +244,12 @@ BIAIS_CHECKLIST: dict[str, dict] = {
     "limite_position":       {"question": "Recommandation < 15% du portefeuille ?",                        "blocage": True},
     "sycophanie_llm":        {"question": "Analyse contraire à la thèse dominante si données le justifient ?", "blocage": False},
     "hallucination":         {"question": "Toutes les données vérifiées via sources primaires ?",           "blocage": True},
+    "precedent_comparable":  {
+        "question":         "Le précédent historique est-il vraiment comparable en taille et contexte ?",
+        "note":             "SpaceX 85Mds$ = 6x Aramco = TERRITOIRE INCONNU. Pas de précédent fiable.",
+        "blocage":          False,
+        "action_si_echec":  "Déclasser confiance à MOYEN, ajouter avertissement dans rapport",
+    },
 }
 
 _FETCH_TIMEOUT = 30  # seconds for all external requests
@@ -431,6 +601,247 @@ class AgentFluxMacro:
 
         return ipos
 
+    def _fetch_commodites_critiques(self) -> dict[str, Any]:
+        """
+        Surveillance matières premières critiques : acide sulfurique, urée, terres rares.
+        Sources : Reuters Business RSS (gratuit).
+        Notes manuelles : IEA Strategic Petroleum Reserve (hebdo), USGS, BEA.
+        """
+        resultats: dict[str, Any] = {"ok": False, "alertes": [], "note": ""}
+        try:
+            url = "https://feeds.reuters.com/reuters/businessNews"
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "king-fund-research@kingfund.local",
+                    "Accept":     "application/rss+xml,application/xml",
+                },
+            )
+            with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+
+            root = ET.fromstring(raw)
+            mots_cles = [
+                "sulfuric acid", "sulfurique", "urea", "urée",
+                "rare earth", "terres rares", "strategic petroleum",
+                "petroleum reserve", "IEA reserve", "supply disruption",
+                "reconstruction reserves", "acide sulfurique",
+            ]
+            alertes: list[dict] = []
+            for item in root.iter("item"):
+                titre = item.findtext("title") or ""
+                desc  = item.findtext("description") or ""
+                texte = (titre + " " + desc).lower()
+                for mc in mots_cles:
+                    if mc.lower() in texte:
+                        alertes.append({
+                            "titre":   self._sanitize(titre, 150),
+                            "date":    self._sanitize(item.findtext("pubDate") or "", 50),
+                            "mot_cle": mc,
+                            "niveau":  "IMPORTANT",
+                        })
+                        break
+
+            resultats["ok"]      = True
+            resultats["alertes"] = alertes[:5]
+        except Exception as exc:
+            logger.debug("[FluxMacro] _fetch_commodites_critiques: %s", exc)
+
+        resultats["note"] = (
+            "Rapport BEA trimestriel : surveiller bea.gov → ratio profits US/PIB (non disponible temps réel). "
+            "IEA Strategic Petroleum Reserve (hebdo gratuit) : iea.org/topics/strategic-petroleum-reserves. "
+            "Mécanisme reconstruction réserves : post-conflit (Iran, MO), les pays reconstituent réserves "
+            "pétrole + alimentaires → absorbe liquidités ET fait monter prix commodités. "
+            "USGS critical minerals : usgs.gov/centers/national-minerals-information-center."
+        )
+        return resultats
+
+    # ── Régimes de marché ────────────────────────────────────────────────────
+
+    @staticmethod
+    def _corr_pearson(xs: list[float], ys: list[float]) -> float | None:
+        """Corrélation de Pearson entre deux séries de même longueur."""
+        if len(xs) != len(ys) or len(xs) < 2:
+            return None
+        try:
+            n = len(xs)
+            mean_x = sum(xs) / n
+            mean_y = sum(ys) / n
+            num    = sum((x - mean_x) * (y - mean_y) for x, y in zip(xs, ys))
+            den_x  = sum((x - mean_x) ** 2 for x in xs)
+            den_y  = sum((y - mean_y) ** 2 for y in ys)
+            den    = (den_x * den_y) ** 0.5
+            if den < 1e-12:
+                return None
+            return round(num / den, 4)
+        except Exception:
+            return None
+
+    def _detect_regime_marche(self, prix_data: dict[str, Any]) -> dict[str, Any]:
+        """
+        Détecte le régime de marché actuel parmi 4 états.
+        Signal CRISE_LIQUIDITE : corr(TLT, SPY) > 0 sur 5 jours glissants
+          → les deux baissent ensemble (obligations perdent antifragilité).
+        Signal ROTATION : or + HK divergent simultanément (> 2% en 5 j).
+        """
+        regime  = "NORMAL"
+        signaux: list[str] = []
+        probabilites = {"NORMAL": 70.0, "ROTATION": 10.0, "CRISE_LIQUIDITE": 10.0, "EFFONDREMENT": 10.0}
+
+        tlt   = prix_data.get("TLT", {})
+        spy   = prix_data.get("SPY", {})
+        xau   = prix_data.get("XAUUSD", {})
+        hsi   = prix_data.get("HSI", {})
+
+        corr_tlt_spy: float | None  = None
+        ratio_tlt_spy: float | None = None
+
+        tlt_hist = tlt.get("hist_30d") or []
+        spy_hist = spy.get("hist_30d") or []
+
+        if len(tlt_hist) >= 5 and len(spy_hist) >= 5:
+            tlt_5d = tlt_hist[-5:]
+            spy_5d = spy_hist[-5:]
+            tlt_ret = [tlt_5d[i] - tlt_5d[i - 1] for i in range(1, len(tlt_5d))]
+            spy_ret = [spy_5d[i] - spy_5d[i - 1] for i in range(1, len(spy_5d))]
+            corr_tlt_spy = self._corr_pearson(tlt_ret, spy_ret)
+
+            if tlt.get("price") and spy.get("price") and spy["price"] > 0:
+                ratio_tlt_spy = round(tlt["price"] / spy["price"], 6)
+
+            if corr_tlt_spy is not None and corr_tlt_spy > 0:
+                regime = "CRISE_LIQUIDITE"
+                signaux.append(
+                    f"SIGNAL CRITIQUE : corr(TLT, SPY) = {corr_tlt_spy:+.3f} > 0 sur 5 jours "
+                    f"(obligations ET actions baissent ensemble — antifragilité perdue)"
+                )
+                probabilites = {"NORMAL": 5.0, "ROTATION": 10.0, "CRISE_LIQUIDITE": 75.0, "EFFONDREMENT": 10.0}
+
+        # Signal ROTATION (seulement si pas déjà en CRISE_LIQUIDITE)
+        if regime == "NORMAL":
+            xau_hist = xau.get("hist_30d") or []
+            hsi_hist = hsi.get("hist_30d") or []
+            xau_p    = xau.get("price")
+            hsi_p    = hsi.get("price")
+
+            xau_baisse = (
+                len(xau_hist) >= 5 and xau_p and xau_hist[-5]
+                and (xau_p - xau_hist[-5]) / xau_hist[-5] < -0.02
+            )
+            hsi_baisse = (
+                len(hsi_hist) >= 5 and hsi_p and hsi_hist[-5]
+                and (hsi_p - hsi_hist[-5]) / hsi_hist[-5] < -0.02
+            )
+
+            if xau_baisse and hsi_baisse:
+                regime = "ROTATION"
+                xau_pct = (xau_p - xau_hist[-5]) / xau_hist[-5] * 100
+                hsi_pct = (hsi_p - hsi_hist[-5]) / hsi_hist[-5] * 100
+                signaux.append(
+                    f"SIGNAL ROTATION : Or {xau_pct:+.1f}% et Hang Seng {hsi_pct:+.1f}% "
+                    f"en 5 jours — pression vendeuse simultanée (absorption IPO probable)"
+                )
+                probabilites = {"NORMAL": 20.0, "ROTATION": 60.0, "CRISE_LIQUIDITE": 15.0, "EFFONDREMENT": 5.0}
+
+        return {
+            "regime":           regime,
+            "signaux":          signaux,
+            "probabilites":     probabilites,
+            "corr_tlt_spy_5j":  corr_tlt_spy,
+            "ratio_tlt_spy":    ratio_tlt_spy,
+            "description":      REGIMES_MARCHE[regime]["description"],
+            "protection":       REGIMES_MARCHE[regime]["protection"],
+        }
+
+    @staticmethod
+    def _parse_montant(valo_str: str) -> float | None:
+        """Parse '85 Mds$' ou '25 Md$' → float en milliards."""
+        m = re.search(r'(\d+(?:[.,]\d+)?)', str(valo_str).replace(',', '.'))
+        return float(m.group(1).replace(',', '.')) if m else None
+
+    def comparer_precedents(self, montant_ipo: float) -> dict[str, Any]:
+        """
+        Compare montant_ipo (en Mds$) aux précédents historiques PRECEDENTS_IPO_ABSORPTION.
+        Avertit si 'territoire inconnu' (> 2x le plus grand précédent avec montant connu).
+        Déclasse la confiance à MOYEN si territoire_inconnu = True.
+        """
+        montants_connus = [
+            p for p in PRECEDENTS_IPO_ABSORPTION
+            if p.get("montant") is not None
+        ]
+        if not montants_connus:
+            return {"ok": False, "raison": "Aucun précédent avec montant disponible"}
+
+        max_historique  = max(p["montant"] for p in montants_connus)
+        ratio           = round(montant_ipo / max_historique, 2) if max_historique > 0 else None
+        territoire_inconnu = ratio is not None and ratio > 2.0
+
+        plus_proche = min(montants_connus, key=lambda p: abs(p["montant"] - montant_ipo))
+
+        avertissement = (
+            f"⚠️ TERRITOIRE INCONNU : {montant_ipo}Mds$ = {ratio:.1f}x le plus grand précédent "
+            f"({max_historique}Mds$ — {max(montants_connus, key=lambda p: p['montant'])['nom']}). "
+            "Pas de précédent fiable. Déclasser confiance à MOYEN."
+            if territoire_inconnu else
+            f"Dans les précédents connus. Plus proche : {plus_proche['nom']} "
+            f"({plus_proche['montant']}Mds$)"
+        )
+
+        return {
+            "ok":                True,
+            "montant_analyse":   montant_ipo,
+            "max_historique":    max_historique,
+            "ratio_vs_max":      ratio,
+            "territoire_inconnu": territoire_inconnu,
+            "avertissement":     avertissement,
+            "plus_proche":       plus_proche,
+            "precedents":        PRECEDENTS_IPO_ABSORPTION,
+        }
+
+    def _generer_section_haut_gauche(self, regime_info: dict) -> str:
+        """Génère la section 'SCÉNARIO HAUT À GAUCHE' à insérer dans chaque rapport."""
+        regime      = regime_info.get("regime", "NORMAL")
+        probabilites = regime_info.get("probabilites", {})
+        signaux     = regime_info.get("signaux", [])
+        corr        = regime_info.get("corr_tlt_spy_5j")
+        ratio       = regime_info.get("ratio_tlt_spy")
+
+        signaux_str = (
+            "\n".join(f"  ⚡ {s}" for s in signaux)
+            if signaux else "  Aucun signal actif détecté"
+        )
+        prob_str = "\n".join(
+            f"  {'▶' if r == regime else '  '} {r:<20} {probabilites.get(r, 0):.0f}%"
+            for r in ["NORMAL", "ROTATION", "CRISE_LIQUIDITE", "EFFONDREMENT"]
+        )
+        recommandations = {
+            "NORMAL":          "Portefeuille standard — actifs réels + dividendes",
+            "ROTATION":        "Accumulation actifs refuge pendant la baisse temporaire",
+            "CRISE_LIQUIDITE": "Augmenter cash — réduire exposition actifs risqués — garder or physique",
+            "EFFONDREMENT":    "Cash + or physique + actifs hors système",
+        }
+        corr_str = f"{corr:+.4f}" if corr is not None else "N/A"
+        ratio_str = f"{ratio:.6f}" if ratio is not None else "N/A"
+
+        return (
+            "═══════════════════════════════════════════════════════\n"
+            "SECTION HAUT À GAUCHE — SCÉNARIOS RÉGIME DE MARCHÉ\n"
+            "═══════════════════════════════════════════════════════\n"
+            f"RÉGIME ACTUEL DÉTECTÉ : ► {regime} ◄\n"
+            f"Description : {REGIMES_MARCHE.get(regime, {}).get('description', '?')}\n\n"
+            f"Indicateur clé : corr(TLT, SPY) 5j = {corr_str} | Ratio TLT/SPY = {ratio_str}\n\n"
+            "Probabilités estimées par régime :\n"
+            f"{prob_str}\n\n"
+            "Signaux actifs :\n"
+            f"{signaux_str}\n\n"
+            f"RECOMMANDATION KING FUND ({regime}) :\n"
+            f"  {recommandations.get(regime, '?')}\n\n"
+            "RAPPEL — Signal CRISE_LIQUIDITE :\n"
+            "  Si corr(TLT, SPY) > 0 sur 5 jours glissants → obligations perdent antifragilité.\n"
+            "  Dans ce régime, la seule protection est le CASH et les actifs physiques hors système.\n"
+            "═══════════════════════════════════════════════════════"
+        )
+
     # ── Anomaly detection ───────────────────────────────────────────────────
 
     def _detect_anomalies(self, prix_data: dict[str, Any]) -> list[dict]:
@@ -594,6 +1005,7 @@ class AgentFluxMacro:
         ipos: list[dict],
         fred_ok: bool,
         cftc_ok: bool,
+        montant_ipo: float | None = None,
     ) -> dict[str, bool]:
         """
         Évalue la checklist anti-biais pour les anomalies détectées.
@@ -632,6 +1044,13 @@ class AgentFluxMacro:
         # hallucination: toutes les données viennent de sources réelles fetchées
         results["hallucination"] = n_sources >= 1  # au moins yfinance actif
 
+        # precedent_comparable: vérifie si le précédent est vraiment comparable
+        if montant_ipo is not None:
+            comp = self.comparer_precedents(montant_ipo)
+            results["precedent_comparable"] = not comp.get("territoire_inconnu", False)
+        else:
+            results["precedent_comparable"] = True  # pas d'IPO → biais non applicable
+
         return results
 
     def _calcul_confiance(self, biais_results: dict[str, bool],
@@ -651,10 +1070,17 @@ class AgentFluxMacro:
             return "INSUFFISANT"
 
         if n_bloq_ok >= 6 and sources_count >= 3 and timeframes_count >= 3:
-            return "FORTE"
-        if n_bloq_ok >= 4 and sources_count >= 2 and timeframes_count >= 2:
-            return "MOYEN"
-        return "FAIBLE"
+            confiance = "FORTE"
+        elif n_bloq_ok >= 4 and sources_count >= 2 and timeframes_count >= 2:
+            confiance = "MOYEN"
+        else:
+            confiance = "FAIBLE"
+
+        # Downgrade si précédent non comparable (action_si_echec du biais)
+        if not biais_results.get("precedent_comparable", True) and confiance == "FORTE":
+            confiance = "MOYEN"
+
+        return confiance
 
     # ── Telegram formatting ─────────────────────────────────────────────────
 
@@ -668,6 +1094,7 @@ class AgentFluxMacro:
         action: str,
         confiance: str,
         ipos: list[dict],
+        regime: str = "NORMAL",
     ) -> str:
         now = datetime.now(timezone.utc)
         date_str  = now.strftime("%Y-%m-%d")
@@ -682,7 +1109,7 @@ class AgentFluxMacro:
             ipo_str = f"\n🏗️ IPO détectée : {self._sanitize(ipos[0]['titre'], 80)} ({ipos[0]['date']})"
 
         return (
-            f"[{niveau}] AGENT FLUX MACRO\n\n"
+            f"[{niveau}] AGENT FLUX MACRO — RÉGIME : {regime}\n\n"
             f"📅 {date_str} {heure_str} UTC\n\n"
             f"⚠️ ANOMALIE : {anomalie.get('label','?')} "
             f"{anomalie.get('variation_pct', 0):+.1f}% (z={anomalie.get('z_score',0):+.1f}σ)\n\n"
@@ -692,6 +1119,7 @@ class AgentFluxMacro:
             f"🎯 CONCLUSION : {conclusion}\n\n"
             f"📈 ACTION SUGGÉRÉE : {action}\n\n"
             f"🔒 CONFIANCE : {confiance}\n\n"
+            f"🏛️ RÉGIME MARCHÉ : {regime} — {REGIMES_MARCHE.get(regime, {}).get('protection', '?')}\n\n"
             f"⚠️ Soumis à AGD-01 pour validation\n\n"
             f"⚠️ DISCLAIMER : {DISCLAIMER}"
         )
@@ -750,7 +1178,7 @@ class AgentFluxMacro:
             # ── Étape 1/2 : Fetch données + détection ──────────────────────
             prix_result = self._fetch_prix()
             if prix_result.get("ok"):
-                sources_actives.append("yfinance (XAUUSD/GC=F, HSI, AAXJ, URTH, IRX, USDJPY, GLD, USO)")
+                sources_actives.append("yfinance (XAUUSD/GC=F, HSI, AAXJ, URTH, IRX, USDJPY, GLD, USO, TLT, SPY, COPX, UNG)")
             else:
                 erreurs.append(f"yfinance: {prix_result.get('erreur','erreur inconnue')}")
 
@@ -771,10 +1199,22 @@ class AgentFluxMacro:
             if ipos:
                 sources_actives.append(f"SEC EDGAR ({len(ipos)} filing(s) S-1 récents)")
 
+            commodites = self._fetch_commodites_critiques()
+            if commodites.get("alertes"):
+                sources_actives.append(
+                    f"Reuters commodités ({len(commodites['alertes'])} alerte(s) matières premières)"
+                )
+
             # ── Étape 1 : DÉTECTER anomalies ───────────────────────────────
-            prix_data  = prix_result.get("data", {})
-            anomalies  = self._detect_anomalies(prix_data) if prix_result.get("ok") else []
+            prix_data   = prix_result.get("data", {})
+            anomalies   = self._detect_anomalies(prix_data) if prix_result.get("ok") else []
             ratios_etat = self._compute_ratios_etat(prix_data) if prix_result.get("ok") else []
+            regime_info = self._detect_regime_marche(prix_data) if prix_result.get("ok") else {
+                "regime": "NORMAL", "signaux": [], "probabilites": {},
+                "corr_tlt_spy_5j": None, "ratio_tlt_spy": None,
+                "description": REGIMES_MARCHE["NORMAL"]["description"],
+                "protection":  REGIMES_MARCHE["NORMAL"]["protection"],
+            }
 
             # ── Étape 5 : IDENTIFIER MÉCANISME (qualitative, Phase 1) ──────
             mecanisme = ""
@@ -833,6 +1273,8 @@ class AgentFluxMacro:
                 "• Le TIC Data a 6 semaines de retard — données actuelles non disponibles"
             )
 
+            section_haut_gauche = self._generer_section_haut_gauche(regime_info)
+
             # ── Alertes Telegram (si anomalie critique + confiance suffisante) ─
             alertes_envoyees: list[str] = []
             for anomalie in anomalies:
@@ -846,6 +1288,7 @@ class AgentFluxMacro:
                         action      = action_suggeree,
                         confiance   = confiance,
                         ipos        = ipos,
+                        regime      = regime_info.get("regime", "NORMAL"),
                     )
                     niveau_valide = self._soumettre_agd01(msg, anomalie["niveau"])
                     if niveau_valide in ("CRITIQUE", "IMPORTANT"):
@@ -896,8 +1339,12 @@ class AgentFluxMacro:
                 "disclaimer":        DISCLAIMER,
                 "stale_tickers":     prix_result.get("stale", []),
                 "timeframes_verifies": timeframes,
-                "tic_data_note":     "TIC Data non chargé — délai structurel 6 semaines (source: ticdata.treasury.gov)",
-                "wgc_note":          "World Gold Council API non disponible publiquement — DONNÉES INDISPONIBLES",
+                "tic_data_note":      "TIC Data non chargé — délai structurel 6 semaines (source: ticdata.treasury.gov)",
+                "wgc_note":           "World Gold Council API non disponible publiquement — DONNÉES INDISPONIBLES",
+                "regime":             regime_info,
+                "section_haut_gauche": section_haut_gauche,
+                "commodites_critiques": commodites,
+                "distinction_ventes_or": DISTINCTION_VENTES_OR,
             }
             self._cache_ts = now
             return self._cache
@@ -936,7 +1383,7 @@ class AgentFluxMacro:
         # ── Fetch données réelles ───────────────────────────────────────────
         prix_result = self._fetch_prix()
         if prix_result.get("ok"):
-            sources_actives.append("yfinance (GC=F, HSI, AAXJ, URTH, IRX, USDJPY, GLD, USO)")
+            sources_actives.append("yfinance (GC=F, HSI, AAXJ, URTH, IRX, USDJPY, GLD, USO, TLT, SPY, COPX, UNG)")
 
         fred_result = self._fetch_fred()
         fred_ok     = fred_result.get("ok", False)
@@ -956,6 +1403,15 @@ class AgentFluxMacro:
         prix_data   = prix_result.get("data", {})
         anomalies   = self._detect_anomalies(prix_data) if prix_result.get("ok") else []
         ratios_etat = self._compute_ratios_etat(prix_data) if prix_result.get("ok") else []
+        regime_info = self._detect_regime_marche(prix_data) if prix_result.get("ok") else {
+            "regime": "NORMAL", "signaux": [], "probabilites": {},
+            "corr_tlt_spy_5j": None, "ratio_tlt_spy": None,
+            "description": REGIMES_MARCHE["NORMAL"]["description"],
+            "protection":  REGIMES_MARCHE["NORMAL"]["protection"],
+        }
+
+        montant_num  = evenement.get("montant") or self._parse_montant(valo)
+        precedents_comp = self.comparer_precedents(montant_num) if montant_num else None
 
         # ── Application RÈGLE MONÉTAIRE ÉTERNELLE ──────────────────────────
         # L'événement injecté EST la cause candidate — on applique le corollaire IPO
@@ -990,7 +1446,8 @@ class AgentFluxMacro:
         # ── Checklist biais avec événement injecté ─────────────────────────
         ipos_fictifs = [{"titre": nom_evt, "date": date_evt, "url": ""}]
         biais_results = self._run_biais_checklist(
-            anomalies, sources_actives, ipos_fictifs, fred_ok, cftc_ok
+            anomalies, sources_actives, ipos_fictifs, fred_ok, cftc_ok,
+            montant_ipo=montant_num,
         )
         # causalite_temporelle : True car événement injecté fournit la cause candidate
         biais_results["causalite_temporelle"] = True
@@ -998,6 +1455,9 @@ class AgentFluxMacro:
         biais_results["mecanisme_explicite"]  = bool(valo and valo != "N/D")
 
         confiance = self._calcul_confiance(biais_results, len(sources_actives), 3)
+        # Downgrade supplémentaire si territoire inconnu (action_si_echec biais precedent_comparable)
+        if precedents_comp and precedents_comp.get("territoire_inconnu") and confiance == "FORTE":
+            confiance = "MOYEN"
 
         # ── Taux réels (FRED) ───────────────────────────────────────────────
         fred_data  = fred_result.get("data", {})
@@ -1082,13 +1542,18 @@ class AgentFluxMacro:
             },
             "cftc":                cftc_result if cftc_ok else {"ok": False, "reason": "DONNÉES INDISPONIBLES"},
             "mecanisme_rme":       mecanisme_rme,
-            "biais_checklist":     biais_results,
-            "confiance":           confiance,
-            "conclusion":          conclusion,
-            "action_suggeree":     action,
-            "pourquoi_tort":       pourquoi_tort,
-            "limites":             LIMITES_FONDAMENTALES,
-            "disclaimer":          DISCLAIMER,
+            "biais_checklist":      biais_results,
+            "confiance":            confiance,
+            "conclusion":           conclusion,
+            "action_suggeree":      action,
+            "pourquoi_tort":        pourquoi_tort,
+            "limites":              LIMITES_FONDAMENTALES,
+            "disclaimer":           DISCLAIMER,
+            "regime":               regime_info,
+            "section_haut_gauche":  self._generer_section_haut_gauche(regime_info),
+            "precedents_ipo":       precedents_comp,
+            "distinction_ventes_or": DISTINCTION_VENTES_OR,
+            "regle_antifragilite":  REGLE_ANTIFRAGILITE_OBLIGATIONS.strip(),
         }
         return rapport
 
