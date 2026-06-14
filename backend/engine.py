@@ -162,6 +162,30 @@ class TradingEngine:
         "Expert Commerce":  "🛒",
         "Morning Brief":    "🌅",
     }
+    _DIVISION_TO_CLASSE = {
+        "Groupe A — EU Valeurs":        "equity",
+        "Groupe B — Macro Dalio":       "fixed_income",
+        "Groupe C — Protecteurs Taleb": "alternatives",
+        "Investissement":               "equity",
+        "Banque Centrale":              "fixed_income",
+        "Expert Tech":                  "equity",
+        "Expert Crypto":                "crypto",
+        "Expert Commerce":              "equity",
+        "Morning Brief":                "multi",
+        "Standard":                     "multi",
+    }
+    _SYMBOL_TO_CLASSE = {
+        "BTC-USD": "crypto",  "ETH-USD": "crypto",
+        "BTC":     "crypto",  "ETH":     "crypto",
+        "GC=F":    "commodities", "CL=F": "commodities", "NG=F": "commodities",
+        "SI=F":    "commodities", "HG=F": "commodities",
+        "EURUSD=X": "fx", "DX-Y.NYB": "fx", "GBPUSD=X": "fx",
+        "USDJPY=X": "fx", "EURGBP=X": "fx",
+        "TLT": "fixed_income", "IEF": "fixed_income", "SHY": "fixed_income",
+        "BND": "fixed_income", "AGG": "fixed_income",
+        "SPY": "equity", "QQQ": "equity", "IWM": "equity",
+        "EEM": "equity", "VNQ": "alternatives",
+    }
 
     def _get_division(self, trader) -> str:
         doc = (trader.__class__.__doc__ or "").strip()
@@ -839,6 +863,101 @@ class TradingEngine:
         leaderboard.sort(key=lambda x: x["value"], reverse=True)
         for rank, entry in enumerate(leaderboard, 1):
             entry["rank"] = rank
+
+        # ── Per-trader DB stats (nb_trades, meilleur_ticker, win_rate) ────────
+        _db_nb_trades: dict   = {}
+        _db_best_ticker: dict = {}
+        _db_win_rate: dict    = {}
+        try:
+            _conn = db_connect()
+            try:
+                for _row in _conn.execute(
+                    "SELECT trader_id, COUNT(*) as cnt FROM trades GROUP BY trader_id"
+                ).fetchall():
+                    _db_nb_trades[int(_row["trader_id"])] = int(_row["cnt"])
+                _seen_trd: set = set()
+                for _row in _conn.execute(
+                    "SELECT trader_id, symbol, COUNT(*) as cnt FROM trades "
+                    "WHERE action='buy' GROUP BY trader_id, symbol "
+                    "ORDER BY trader_id, cnt DESC"
+                ).fetchall():
+                    _tid = int(_row["trader_id"])
+                    if _tid not in _seen_trd:
+                        _db_best_ticker[_tid] = _row["symbol"]
+                        _seen_trd.add(_tid)
+                # Win rate : derniers 40 trades par trader (même algo que refresh_feedback)
+                _wr_rows = _conn.execute(
+                    "SELECT trader_id, action, symbol, price FROM ("
+                    "  SELECT trader_id, action, symbol, price, id,"
+                    "  ROW_NUMBER() OVER (PARTITION BY trader_id ORDER BY id DESC) rn"
+                    "  FROM trades"
+                    ") WHERE rn <= 40 ORDER BY trader_id, id ASC"
+                ).fetchall()
+                _wr_trades: dict = {}
+                for _r in _wr_rows:
+                    _wr_trades.setdefault(int(_r["trader_id"]), []).append(_r)
+                for _tid2, _tlist in _wr_trades.items():
+                    _wins = 0; _losses = 0; _lb: dict = {}
+                    for _r in _tlist:
+                        _act, _sym, _pr = _r["action"], _r["symbol"], float(_r["price"])
+                        if _act == "buy":
+                            _lb[_sym] = _pr
+                        elif _act == "sell":
+                            _bp = _lb.pop(_sym, None)
+                            if _bp is not None:
+                                if _pr > _bp:
+                                    _wins += 1
+                                else:
+                                    _losses += 1
+                    if _wins + _losses >= 5:
+                        _db_win_rate[_tid2] = _wins / (_wins + _losses)
+            finally:
+                _conn.close()
+        except Exception:
+            pass
+
+        # ── Classement (champs attendus par le frontend) ─────────────────────
+        classement = []
+        for _entry in leaderboard:
+            _tid  = _entry["id"]
+            _div  = _entry["division"]
+            _nb_t = _db_nb_trades.get(_tid, 0)
+            _wr   = round(_db_win_rate.get(_tid, 0.0) * 100, 0)
+            _best = _db_best_ticker.get(_tid)
+            _cls  = self._SYMBOL_TO_CLASSE.get(
+                _best or "",
+                self._DIVISION_TO_CLASSE.get(_div, "multi"),
+            )
+            classement.append({
+                "trader_id":       f"TRD{_tid:03d}",
+                "nom":             _entry["name"],
+                "role":            _div,
+                "specialite":      _entry["strategy"],
+                "classe_actif":    _cls,
+                "pnl_jour":        _entry["pnl"],
+                "nb_trades":       _nb_t,
+                "taux_victoire":   _wr,
+                "meilleur_ticker": _best,
+                "rank":            _entry["rank"],
+                "value":           _entry["value"],
+                "pnl_pct":         _entry["pnl_pct"],
+                "grade":           _entry["grade"],
+                "eliminated":      _entry["eliminated"],
+            })
+
+        # ── Stats globaux ─────────────────────────────────────────────────────
+        _wr_vals = list(_db_win_rate.values())
+        _stats = {
+            "pnl_total_desk":      round(sum(e["pnl"] for e in leaderboard), 2),
+            "nb_traders_positifs": sum(1 for e in leaderboard if e["pnl"] >= 0),
+            "nb_traders_negatifs": sum(1 for e in leaderboard if e["pnl"] < 0),
+            "taux_victoire_moyen": round(
+                sum(_wr_vals) / len(_wr_vals) * 100, 1
+            ) if _wr_vals else 0.0,
+            "nb_trades_total":     sum(_db_nb_trades.values()),
+            "volume_total":        0,
+        }
+
         liq_score     = None
         liq_regime    = None
         bertez_signal = None
@@ -857,6 +976,8 @@ class TradingEngine:
             "battle_day":       min(battle_day, BATTLE_DAYS),
             "target":           TARGET_CAPITAL,
             "leaderboard":      leaderboard,
+            "classement":       classement,
+            "stats":            _stats,
             "timestamp":        datetime.utcnow().isoformat(),
             "liquidity_score":  liq_score,
             "liquidity_regime": liq_regime,
