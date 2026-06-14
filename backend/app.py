@@ -327,6 +327,72 @@ def add_investissement_watchlist_ticker():
         return jsonify({"erreur": str(e)}), 500
 
 
+# ── Alertes (agrégation bus + agents) ────────────────────────────────────────
+
+@app.route("/api/alertes")
+def get_alertes():
+    """Agrège alertes critiques/warnings/infos depuis le bus et les agents."""
+    critiques: list = []
+    warnings:  list = []
+    infos:     list = []
+    ts = datetime.utcnow().isoformat()
+
+    # Source 1 — bus : 50 derniers messages
+    try:
+        hub = getattr(engine, "_hub", None)
+        if hub:
+            for msg in hub._bus.messages_recents(n=50):
+                item = {
+                    "titre":     msg.titre,
+                    "detail":    msg.entite or "",
+                    "expert":    msg.source,
+                    "timestamp": msg.timestamp,
+                }
+                if msg.niveau == "critique":
+                    critiques.append(item)
+                elif msg.niveau == "warning":
+                    warnings.append(item)
+                else:
+                    infos.append(item)
+    except Exception as e:
+        logger.debug("alertes bus: %s", e)
+
+    # Source 2 — seuils prix d'entrée
+    try:
+        from divisions.gerant_delegue.agent_alertes_prix import get_agent_alertes_prix
+        for s in (get_agent_alertes_prix().verifier_seuils() or []):
+            if s.get("alerte"):
+                warnings.append({
+                    "titre":     f"Seuil atteint — {s.get('ticker', '')}",
+                    "detail":    s.get("message", ""),
+                    "expert":    "📊 Alertes Prix",
+                    "timestamp": ts,
+                })
+    except Exception as e:
+        logger.debug("alertes seuils: %s", e)
+
+    # Source 3 — calendrier corporate (J≤2 → warning, sinon info)
+    try:
+        from divisions.gerant_delegue.agent_calendrier import get_agent_calendrier
+        for evt in (get_agent_calendrier().prochains_evenements() or []):
+            item = {
+                "titre":     evt.get("titre", ""),
+                "detail":    evt.get("detail", ""),
+                "expert":    "📅 Calendrier",
+                "timestamp": ts,
+            }
+            (warnings if evt.get("jours_restants", 99) <= 2 else infos).append(item)
+    except Exception as ex:
+        logger.debug("alertes calendrier: %s", ex)
+
+    return jsonify({
+        "critiques": critiques[:20],
+        "warnings":  warnings[:20],
+        "infos":     infos[:30],
+        "timestamp": ts,
+    })
+
+
 # ── Alertes prix & Calendrier ────────────────────────────────────────────────
 
 @app.route("/api/alertes/seuils")
@@ -783,6 +849,203 @@ def get_bus_state():
         "howell_resume":     f"VIX={vix_val:.1f} | Budget×{liq_f:.2f}" if vix_val else f"Budget×{liq_f:.2f}",
         "bus_stats":         raw.get("bus", {}),
     })
+
+
+# ── Black Swan — surveillance VIX + indicateurs de risque systémique ─────────
+
+_bs_cache:    dict  = {}
+_bs_cache_ts: float = 0.0
+_BS_TTL = 60   # 1 min
+
+
+def _build_blackswan_etat() -> dict:
+    hub  = getattr(engine, "_hub", None)
+    halt = hub.black_swan_halt if hub else False
+    vix  = hub.last_vix if hub else None
+
+    # VIX variation 24h
+    vix_var = None
+    try:
+        import yfinance as yf
+        hist = yf.Ticker("^VIX").history(period="5d", interval="1d", auto_adjust=True)
+        if len(hist) >= 2:
+            v0 = float(hist["Close"].iloc[-2])
+            v1 = float(hist["Close"].iloc[-1])
+            vix_var = round((v1 / v0 - 1) * 100, 2) if v0 else None
+            if vix is None:
+                vix = round(v1, 2)
+    except Exception:
+        pass
+
+    # DSPX — réutilise le cache du endpoint /api/dspx/etat
+    dspx_val = _dspx_cache.get("dspx") if _dspx_cache else None
+
+    # Corrélation SPY/TLT — réutilise le cache du endpoint /api/correlations/actoblig
+    corr = _corr_cache.get("correlation_20j") if _corr_cache else None
+
+    # Spread HY — parse résumé FRED Credit du desk liquidité
+    hy_spread = None
+    try:
+        import re
+        from divisions.middle_office import get_liquidity_desk
+        summary = get_liquidity_desk().get_data().get("agent_summaries", {}).get("FRED_Credit", "")
+        m = re.search(r"HY=([\d.]+)bp", summary or "")
+        if m:
+            hy_spread = float(m.group(1))
+    except Exception:
+        pass
+
+    # Niveau
+    if halt or (vix is not None and vix >= 35):
+        niveau = "CRITIQUE"
+    elif vix is not None and vix >= 25:
+        niveau = "WARNING"
+    elif vix is not None:
+        niveau = "NORMAL"
+    else:
+        niveau = "INCONNU"
+
+    mode    = "BARBELL" if (halt or (vix is not None and vix >= 34)) else "NORMAL"
+    stoppes = [f"TRD{i:02d}" for i in range(1, 31)] if halt else []
+    actifs  = (
+        {"refuges": ["GC=F", "IAU", "GTT.PA", "VPK.AS"], "defensifs": ["TLT", "cash"]}
+        if mode == "BARBELL" else {}
+    )
+
+    msgs = []
+    if vix is not None:
+        if halt:
+            msgs.append(f"🚨 HALT — VIX={vix:.1f} ≥ 35 — Trading suspendu")
+        elif vix >= 34:
+            msgs.append(f"⚠️ VIX critique : {vix:.1f} — Mode BARBELL recommandé")
+        elif vix >= 25:
+            msgs.append(f"⚡ VIX élevé : {vix:.1f} — Vigilance")
+        else:
+            msgs.append(f"✅ VIX normal : {vix:.1f} — Allocation standard")
+    else:
+        msgs.append("Données VIX non disponibles")
+    if hy_spread is not None:
+        tag = "🚨" if hy_spread > 700 else "⚠️" if hy_spread > 500 else "✅"
+        msgs.append(f"{tag} Spread HY : {hy_spread:.0f}bps")
+    if corr is not None and corr > 0:
+        msgs.append(f"⚠️ Corr SPY/TLT positive ({corr:+.2f}) — perte antifragilité")
+
+    return {
+        "niveau":                   niveau,
+        "indicateurs": {
+            "vix":                  vix,
+            "vix_variation_24h":    vix_var,
+            "credit_spread_hy":     hy_spread,
+            "dspx":                 dspx_val,
+            "correlation_spy_tlt":  corr,
+        },
+        "mode_portefeuille":        mode,
+        "traders_momentum_stoppes": stoppes,
+        "actifs_recommandes":       actifs,
+        "messages_analyse":         msgs,
+        "halt_actif":               halt,
+        "timestamp":                datetime.utcnow().isoformat(),
+    }
+
+
+@app.route("/api/blackswan/etat")
+def get_blackswan_etat():
+    global _bs_cache, _bs_cache_ts
+    now = _time.monotonic()
+    if _bs_cache and (now - _bs_cache_ts) < _BS_TTL:
+        return jsonify(_bs_cache)
+    try:
+        result       = _build_blackswan_etat()
+        _bs_cache    = result
+        _bs_cache_ts = now
+        return jsonify(result)
+    except Exception as e:
+        logger.error("blackswan etat: %s", e)
+        if _bs_cache:
+            return jsonify(_bs_cache)
+        return jsonify({
+            "niveau": "INCONNU",
+            "message": "Pas encore de scan effectué",
+            "indicateurs": {
+                "vix": None, "vix_variation_24h": None,
+                "credit_spread_hy": None, "dspx": None, "correlation_spy_tlt": None,
+            },
+            "mode_portefeuille": "NORMAL",
+            "traders_momentum_stoppes": [],
+            "actifs_recommandes": {},
+            "messages_analyse": [],
+            "timestamp": datetime.utcnow().isoformat(),
+        })
+
+
+@app.route("/api/blackswan/scan", methods=["POST"])
+def post_blackswan_scan():
+    global _bs_cache, _bs_cache_ts
+    try:
+        hub = getattr(engine, "_hub", None)
+        if hub is not None:
+            hub.run_cycle_vix()
+            _time.sleep(2)
+        result       = _build_blackswan_etat()
+        _bs_cache    = result
+        _bs_cache_ts = _time.monotonic()
+        return jsonify(result)
+    except Exception as e:
+        logger.error("blackswan scan: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
+# ── Macro — indices mondiaux (Asie / Europe / US / Forex / Crypto) ────────────
+
+_macro_cache:    dict  = {}
+_macro_cache_ts: float = 0.0
+_MACRO_TTL = 900   # 15 min
+
+_MACRO_TICKERS: dict = {
+    "indices_asie":   ["^N225", "^HSI", "000300.SS"],
+    "indices_europe": ["^FCHI", "^GDAXI", "^FTSE", "^STOXX50E"],
+    "indices_us":     ["^GSPC", "^IXIC", "^DJI", "^VIX"],
+    "forex":          ["EURUSD=X", "GC=F", "CL=F"],
+    "crypto":         ["BTC-USD", "ETH-USD"],
+}
+
+
+@app.route("/api/macro")
+def get_macro():
+    global _macro_cache, _macro_cache_ts
+    now = _time.monotonic()
+    if _macro_cache and (now - _macro_cache_ts) < _MACRO_TTL:
+        return jsonify(_macro_cache)
+    try:
+        import yfinance as yf
+        all_tickers = [t for grp in _MACRO_TICKERS.values() for t in grp]
+        raw: dict = {}
+        for ticker in all_tickers:
+            try:
+                hist = yf.Ticker(ticker).history(period="5d", interval="1d", auto_adjust=True)
+                if not hist.empty and len(hist) >= 2:
+                    p1 = float(hist["Close"].iloc[-1])
+                    p0 = float(hist["Close"].iloc[-2])
+                    raw[ticker] = {"prix": round(p1, 2), "variation_pct": round((p1 / p0 - 1) * 100, 2) if p0 else 0}
+                elif not hist.empty:
+                    raw[ticker] = {"prix": round(float(hist["Close"].iloc[-1]), 2), "variation_pct": 0}
+            except Exception:
+                raw[ticker] = None
+
+        result = {grp: {t: raw.get(t) for t in tickers} for grp, tickers in _MACRO_TICKERS.items()}
+        result["timestamp"] = datetime.utcnow().isoformat()
+        _macro_cache    = result
+        _macro_cache_ts = now
+        return jsonify(result)
+    except Exception as e:
+        logger.error("macro: %s", e)
+        if _macro_cache:
+            return jsonify(_macro_cache)
+        return jsonify({
+            **{grp: {t: None for t in tickers} for grp, tickers in _MACRO_TICKERS.items()},
+            "erreur": str(e),
+            "timestamp": datetime.utcnow().isoformat(),
+        })
 
 
 # ── CIO Allocation macro ──────────────────────────────────────────────────────
