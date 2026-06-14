@@ -1870,8 +1870,9 @@
       state.intelligence = data;
       renderIntelligence(data);
     }
-    // Charger Flux Macro en parallèle (non bloquant)
+    // Charger Flux Macro et Alpha Lab en parallèle (non bloquant)
     loadFluxMacro().catch(() => {});
+    loadAlphaLab().catch(() => {});
   }
 
   function renderIntelligence(data) {
@@ -2185,6 +2186,150 @@
     </table>`;
   }
 
+  // ── Alpha Lab — Backtests Signaux & Facteurs Académiques ──────────────────
+
+  async function loadAlphaLab() {
+    $('al-signaux-table').innerHTML  = '<div style="text-align:center;padding:20px;color:var(--muted)"><div class="spinner"></div></div>';
+    $('al-facteurs-table').innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)"><div class="spinner"></div></div>';
+    $('al-crises-table').innerHTML   = '<div style="color:var(--muted);font-size:12px;padding:16px">Chargement…</div>';
+    let data;
+    try {
+      data = await apiFetch('/alpha-lab/rapport', 90_000);
+    } catch (e) {
+      $('al-signaux-table').innerHTML = '<span style="color:var(--muted);padding:16px;display:block">Erreur chargement Alpha Lab.</span>';
+      return;
+    }
+    state.alphaLab = data;
+    renderAlphaLab(data);
+  }
+
+  function renderAlphaLab(data) {
+    const signaux  = data.signaux  || {};
+    const facteurs = data.facteurs || {};
+    const ts       = data.signaux && data.signaux.ts ? 'Mis à jour ' + timeAgo(data.signaux.ts) : '—';
+
+    $('al-time').textContent = ts;
+
+    // ── KPIs ────────────────────────────────────────────────────────────────
+    const nSignaux  = (data.signaux || {}).n_signaux || Object.keys(signaux.signaux || {}).length;
+    const valides   = (data.signaux || {}).valides || [];
+    $('al-n-signaux').textContent = (data.signaux || {}).n_signaux ?? '—';
+    $('al-n-valides').textContent = valides.length;
+
+    const sigData   = (data.signaux || {}).signaux || {};
+    const VERDICT_COLOR = { VALIDE: 'var(--green)', BRUIT: 'var(--muted)', OVERFITTE: 'var(--yellow)', INCONNU: 'var(--muted)' };
+    const VERDICT_ICON  = { VALIDE: '✅', BRUIT: '🔇', OVERFITTE: '⚠️', INCONNU: '—' };
+
+    const trendf = sigData.TrendFollow;
+    if (trendf) {
+      const el = $('al-trendf-verdict');
+      el.textContent  = VERDICT_ICON[trendf.verdict] + ' ' + trendf.verdict;
+      el.style.color  = VERDICT_COLOR[trendf.verdict];
+      $('al-trendf-sub').textContent = 'OOS ' + (trendf.sharpe_oos !== undefined ? trendf.sharpe_oos.toFixed(2) : '—');
+    }
+
+    const bertez = sigData.Bertez_Energy;
+    if (bertez) {
+      const el = $('al-bertez-verdict');
+      el.textContent  = VERDICT_ICON[bertez.verdict] + ' ' + bertez.verdict;
+      el.style.color  = VERDICT_COLOR[bertez.verdict];
+      $('al-bertez-sub').textContent = 'OOS ' + (bertez.sharpe_oos !== undefined ? bertez.sharpe_oos.toFixed(2) : '—');
+    }
+
+    // ── Badge régime cohérent (Bloc 4) ─────────────────────────────────────
+    const badge = $('al-regime-badge');
+    if ((data.signaux || {}).signal_regime_coherent) {
+      badge.style.display = 'block';
+    } else {
+      badge.style.display = 'none';
+    }
+
+    // ── Table backtests ──────────────────────────────────────────────────────
+    const sigEntries = Object.entries(sigData);
+    if (!sigEntries.length) {
+      $('al-signaux-table').innerHTML = '<span style="color:var(--muted);font-size:12px;padding:16px;display:block">Aucun signal disponible.</span>';
+    } else {
+      const rows = sigEntries.map(([name, s]) => {
+        const vc = VERDICT_COLOR[s.verdict] || 'var(--muted)';
+        const vi = VERDICT_ICON[s.verdict]  || '—';
+        const mdd = s.max_drawdown !== undefined ? (s.max_drawdown * 100).toFixed(1) + '%' : '—';
+        return `<tr>
+          <td style="font-weight:600;color:var(--fg)">${name}</td>
+          <td style="color:${s.sharpe_is >= 0.5 ? 'var(--green)' : 'var(--muted)'}">${s.sharpe_is !== undefined ? s.sharpe_is.toFixed(3) : '—'}</td>
+          <td style="color:${s.sharpe_oos >= 0.5 ? 'var(--green)' : s.sharpe_oos < 0.25 ? '#ff4455' : 'var(--yellow)'}">${s.sharpe_oos !== undefined ? s.sharpe_oos.toFixed(3) : '—'}</td>
+          <td style="color:${Math.abs(s.t_stat || 0) >= 2 ? 'var(--green)' : 'var(--muted)'}">${s.t_stat !== undefined ? s.t_stat.toFixed(2) : '—'}</td>
+          <td style="color:#ff6b35">${mdd}</td>
+          <td style="font-weight:700;color:${vc}">${vi} ${s.verdict}</td>
+        </tr>`;
+      }).join('');
+      $('al-signaux-table').innerHTML = `<div style="overflow-x:auto"><table class="data-table">
+        <thead><tr>
+          <th>Signal</th><th>Sharpe IS</th><th>Sharpe OOS</th><th>t-stat</th><th>Max DD</th><th>Verdict</th>
+        </tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;padding:0 4px">
+        Seuils : VALIDE si |t|≥2 &amp; Sharpe OOS≥0.50 · OVERFITTE si |t|≥2 &amp; Sharpe OOS&lt;0.25 · sinon BRUIT
+      </div>`;
+    }
+
+    // ── Table facteurs watchlist ─────────────────────────────────────────────
+    const actifs = (facteurs.actifs || []);
+    if (!actifs.length) {
+      $('al-facteurs-table').innerHTML = '<span style="color:var(--muted);font-size:12px;padding:16px;display:block">Données facteurs indisponibles.</span>';
+    } else {
+      const frows = actifs.map(a => {
+        const sc    = a.scores || {};
+        const rank  = a.composite_rank;
+        const rankColor = rank >= 75 ? 'var(--green)' : rank >= 40 ? 'var(--yellow)' : '#ff4455';
+        const err   = a.erreur ? `<span style="color:var(--muted);font-size:10px">${a.erreur.slice(0,40)}</span>` : '';
+        return `<tr>
+          <td style="font-weight:600;color:var(--accent)">${a.ticker}${err}</td>
+          <td>${sc.value   !== undefined ? sc.value.toFixed(0)    : '—'}</td>
+          <td>${sc.momentum !== undefined ? sc.momentum.toFixed(0) : '—'}</td>
+          <td>${sc.quality  !== undefined ? sc.quality.toFixed(0)  : '—'}</td>
+          <td>${sc.lowvol   !== undefined ? sc.lowvol.toFixed(0)   : '—'}</td>
+          <td style="font-weight:700;color:var(--fg)">${a.composite !== undefined ? a.composite.toFixed(1) : '—'}</td>
+          <td style="font-weight:700;color:${rankColor}">${rank !== undefined ? rank.toFixed(0) + '%' : '—'}</td>
+        </tr>`;
+      }).join('');
+      $('al-facteurs-table').innerHTML = `<div style="overflow-x:auto"><table class="data-table">
+        <thead><tr>
+          <th>Ticker</th><th>Value</th><th>Momentum</th><th>Quality</th><th>LowVol</th><th>Composite</th><th>Rang %</th>
+        </tr></thead>
+        <tbody>${frows}</tbody>
+      </table></div>
+      <div style="font-size:10px;color:var(--muted);margin-top:8px;padding:0 4px">
+        Poids égaux 25% chacun · Rang% : 100 = meilleur cross-sectionnel
+      </div>`;
+    }
+
+    // ── Crises — signal TrendFollow ─────────────────────────────────────────
+    const crisesData = trendf && trendf.crises_perf ? trendf.crises_perf : null;
+    if (!crisesData || !Object.keys(crisesData).length) {
+      $('al-crises-table').innerHTML = '<span style="color:var(--muted);font-size:12px;padding:16px;display:block">Données crises non disponibles.</span>';
+    } else {
+      const crows = Object.entries(crisesData).map(([name, c]) => {
+        const ret   = c.rendement_total !== undefined ? (c.rendement_total * 100).toFixed(1) + '%' : '—';
+        const retColor = c.rendement_total >= 0 ? 'var(--green)' : '#ff4455';
+        const sh    = c.sharpe !== undefined ? c.sharpe.toFixed(2) : '—';
+        return `<tr>
+          <td style="font-weight:600;color:var(--fg)">${name.replace(/_/g, ' ')}</td>
+          <td style="color:var(--muted);font-size:11px">${c.periode || '—'}</td>
+          <td>${c.n_mois || '—'} mois</td>
+          <td style="font-weight:700;color:${retColor}">${ret}</td>
+          <td style="color:${parseFloat(sh) >= 0.5 ? 'var(--green)' : 'var(--muted)'}">${sh}</td>
+        </tr>`;
+      }).join('');
+      $('al-crises-table').innerHTML = `<div style="overflow-x:auto"><table class="data-table">
+        <thead><tr>
+          <th>Crise</th><th>Période</th><th>Durée</th><th>Rendement total</th><th>Sharpe</th>
+        </tr></thead>
+        <tbody>${crows}</tbody>
+      </table></div>`;
+    }
+  }
+
   // ── Public API ────────────────────────────────────────────
   window.App = {
     refresh(tab) {
@@ -2211,6 +2356,7 @@
     analyzeTickerSearch:  () => analyzeTickerSearch().catch(() => {}),
     addToWatchlist:       ticker => addToWatchlist(ticker).catch(() => {}),
     refreshFluxMacro:     () => loadFluxMacro().catch(() => {}),
+    refreshAlphaLab:      () => loadAlphaLab().catch(() => {}),
   };
 
   // ── Init ──────────────────────────────────────────────────
