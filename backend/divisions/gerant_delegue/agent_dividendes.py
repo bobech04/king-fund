@@ -64,13 +64,13 @@ def _scoring_dividende(info: dict) -> dict:
     fcf       = info.get("freeCashflow")  or 0
     market_cap= info.get("marketCap")     or 1
 
-    # Rendement raisonnable (2%-8%)
-    if 0.02 <= div_yield <= 0.08:
+    # Rendement raisonnable (2%-8%) — dividendYield yfinance est en %
+    if 2.0 <= div_yield <= 8.0:
         score += 2.5
-        notes.append(f"Rendement sain {div_yield:.1%}")
-    elif div_yield > 0.08:
+        notes.append(f"Rendement sain {div_yield:.1f}%")
+    elif div_yield > 8.0:
         score += 1.0
-        notes.append(f"Rendement élevé — risque coupe {div_yield:.1%}")
+        notes.append(f"Rendement élevé — risque coupe {div_yield:.1f}%")
     else:
         notes.append("Rendement faible ou absent")
 
@@ -164,7 +164,7 @@ class AgentDividendes:
                 "prix":          round(prix, 2),
                 "nb_titres":     round(nb_titres, 3),
                 "div_annuel_action": round(div_ann, 3),
-                "div_yield":     round(div_yield * 100, 2),   # en %
+                "div_yield":     round(div_yield, 2),   # déjà en % via yfinance
                 "rev_annuel":    round(rev_annuel, 2),
                 "rev_mensuel":   round(rev_mensuel, 2),
                 "payout_ratio":  round(payout * 100, 1) if payout else None,
