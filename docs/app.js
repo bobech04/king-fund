@@ -1757,7 +1757,8 @@
 
   function renderPositionsPRU(data) {
     const container = $('ret-positions');
-    const positions = Array.isArray(data) ? data : (data.positions || []);
+    const raw = Array.isArray(data) ? data : (data.positions || {});
+    const positions = Array.isArray(raw) ? raw : Object.values(raw);
     if (!positions.length) {
       container.innerHTML = '<span style="color:var(--muted)">Aucune position enregistrée.</span>';
       return;
