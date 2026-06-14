@@ -1,6 +1,6 @@
 [
   {"ticker": "WPM",     "nom": "Wheaton Precious Metals",  "bourse": "NYSE"},
-  {"ticker": "TEN.MI",  "nom": "Tenaris",                  "bourse": "Borsa Italiana"},
+  {"ticker": "TEN.PA",  "nom": "Tenaris",                  "bourse": "Euronext Paris"},
   {"ticker": "UEC",     "nom": "Uranium Energy Corp",       "bourse": "NYSE"},
   {"ticker": "RY",      "nom": "Royal Bank of Canada",     "bourse": "NYSE"},
   {"ticker": "MAIN",    "nom": "Main Street Capital",      "bourse": "NYSE"},
@@ -12,8 +12,8 @@
   {"ticker": "TPL",     "nom": "Texas Pacific Land",       "bourse": "NYSE"},
   {"ticker": "UMI.BR",  "nom": "Umicore",                  "bourse": "Euronext Brussels"},
   {"ticker": "SAN.PA",  "nom": "Sanofi",                   "bourse": "Euronext Paris"},
-  {"ticker": "SK.PA",   "nom": "SEB SA",                   "bourse": "Euronext Paris"},
-  {"ticker": "SCR.PA",  "nom": "SCOR SE",                  "bourse": "Euronext Paris"},
+  {"ticker": "SEB.PA",  "nom": "SEB SA",                   "bourse": "Euronext Paris"},
+  {"ticker": "SCO.PA",  "nom": "SCOR SE",                  "bourse": "Euronext Paris"},
   {"ticker": "KB",      "nom": "KB Financial Group",       "bourse": "NYSE"},
   {"ticker": "0857.HK", "nom": "PetroChina",               "bourse": "HKEX"},
   {"ticker": "SPM.MI",  "nom": "Saipem",                   "bourse": "Borsa Italiana"},
