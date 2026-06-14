@@ -123,11 +123,23 @@ class AgentBenchmark:
                     debut_ytd = date(date.today().year, 1, 1)
                     sub = close[close.index.date >= debut_ytd]
                     if len(sub) >= 2:
-                        perfs["YTD"] = round((sub.iloc[-1] / sub.iloc[0] - 1) * 100, 2)
+                        perfs["YTD"] = round((float(sub.iloc[-1]) / float(sub.iloc[0]) - 1) * 100, 2)
                     else:
                         perfs["YTD"] = None
                 else:
                     perfs[label_p] = _perf_pct(close, n_bars)
+
+            # Performance depuis le début de la bataille
+            try:
+                sub_b = close[close.index.date >= _BATTLE_START]
+                if len(sub_b) >= 2:
+                    perfs["since_battle"] = round(
+                        (float(sub_b.iloc[-1]) / float(sub_b.iloc[0]) - 1) * 100, 2
+                    )
+                else:
+                    perfs["since_battle"] = None
+            except Exception:
+                perfs["since_battle"] = None
 
             return {
                 "label":        label,
@@ -211,9 +223,12 @@ class AgentBenchmark:
                 sharpe_port = _sharpe(rets, _TAUX_SANS_RISQUE / 252)
                 max_dd_port = _max_drawdown(nav_s)
 
-                # Alpha réel vs chaque benchmark
+                # Alpha réel vs chaque benchmark (période = depuis _BATTLE_START)
                 for label, bdata in bench_data.items():
-                    perf_b = bdata.get("performances", {}).get("total") or bdata.get("performances", {}).get("YTD")
+                    perfs_b = bdata.get("performances", {})
+                    perf_b = (perfs_b.get("since_battle") or
+                              perfs_b.get("1m") or
+                              perfs_b.get("YTD"))
                     if perf_b is not None and portfolio_perfs.get("total") is not None:
                         alpha[label] = round(portfolio_perfs["total"] - perf_b, 2)
 

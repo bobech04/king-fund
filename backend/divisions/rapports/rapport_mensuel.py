@@ -54,15 +54,39 @@ def _collecter_donnees(engine) -> dict:
 
     # ── Benchmark CAC40 / SP500 ───────────────────────────────────────────────
     benchmark = {}
+    alpha_cac = None
+    alpha_sp  = None
     try:
         from divisions.gerant_delegue.agent_benchmark import get_agent_benchmark
-        benchmark = get_agent_benchmark().analyser(forcer=False)
+        benchmark = get_agent_benchmark().analyser(forcer=True)
+        _alpha    = benchmark.get("alpha_reel", {})
+        alpha_cac = _alpha.get("CAC40")
+        alpha_sp  = _alpha.get("SP500")
     except Exception as e:
-        logger.debug("Benchmark: %s", e)
+        logger.debug("Benchmark agent: %s", e)
 
-    _alpha    = benchmark.get("alpha_reel", {})
-    alpha_cac = _alpha.get("CAC40")
-    alpha_sp  = _alpha.get("SP500")
+    # Fallback direct yfinance si alpha encore None (DB snapshots vide ou NAV insuffisante)
+    # Alpha = performance King Fund (perf_pct) − performance indice depuis le début de la bataille
+    if alpha_cac is None or alpha_sp is None:
+        try:
+            import yfinance as yf
+            from divisions.gerant_delegue.agent_benchmark import _BATTLE_START
+            battle_start_str = str(_BATTLE_START)
+            for sym, attr in [("^FCHI", "cac"), ("^GSPC", "sp")]:
+                hist = yf.Ticker(sym).history(
+                    start=battle_start_str, interval="1d", auto_adjust=True
+                )
+                if not hist.empty and len(hist) >= 2:
+                    bench_perf = round(
+                        (float(hist["Close"].iloc[-1]) / float(hist["Close"].iloc[0]) - 1) * 100, 2
+                    )
+                    alpha_val = round(perf_pct - bench_perf, 2)
+                    if attr == "cac" and alpha_cac is None:
+                        alpha_cac = alpha_val
+                    elif attr == "sp" and alpha_sp is None:
+                        alpha_sp = alpha_val
+        except Exception as e:
+            logger.debug("Benchmark yfinance fallback: %s", e)
 
     # ── AGD-01 audit — décisions du mois ─────────────────────────────────────
     decisions_agd = []
