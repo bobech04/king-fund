@@ -6,6 +6,7 @@ import signal
 import threading
 import logging
 import sys
+import time as _time
 from datetime import datetime
 from functools import wraps
 from pathlib import Path
@@ -1230,7 +1231,6 @@ def get_bertez_analyse():
 
 # ── DSPX Dispersion ──────────────────────────────────────────────────────────
 
-import time as _time
 _dspx_cache:  dict = {}
 _dspx_cache_ts: float = 0.0
 _DSPX_TTL = 300   # 5 min
