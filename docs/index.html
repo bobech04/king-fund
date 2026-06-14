@@ -33,6 +33,7 @@
     <button class="tab-btn" data-tab="scheduler"   role="tab">⚙️ Scheduler</button>
     <button class="tab-btn" data-tab="macro"       role="tab">🌍 CIO Macro</button>
     <button class="tab-btn" data-tab="alertes"       role="tab">🚨 Alertes</button>
+    <button class="tab-btn" data-tab="intelligence"   role="tab">🧠 Intelligence</button>
     <button class="tab-btn" data-tab="investissement" role="tab">📈 Investissement</button>
     <button class="tab-btn" data-tab="liquidite"      role="tab">🌊 Liquidité</button>
     <button class="tab-btn" data-tab="retraite"      role="tab">🎯 Retraite</button>
@@ -469,6 +470,60 @@
       <div class="card-title">Surveillance Continue — État des Experts</div>
       <div id="alertes-surveillance" style="color:var(--muted);font-size:12px">Chargement…</div>
     </div>
+  </section>
+
+  <!-- ══════════════════════ 6.5. INTELLIGENCE ══════════════════════ -->
+  <section id="tab-intelligence" class="tab-panel">
+    <div class="section-header">
+      <span class="section-title">🧠 Intelligence — Veille Stratégique &amp; Actualités</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="intel-time">—</span>
+        <button class="btn btn-sm btn-ghost" onclick="App.refresh('intelligence')">↻</button>
+      </div>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi">
+        <div class="kpi-label">Total articles</div>
+        <div class="kpi-val neu" id="intel-total">—</div>
+        <div class="kpi-sub">4 sources RSS</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Critique</div>
+        <div class="kpi-val neg" id="intel-critique">—</div>
+        <div class="kpi-sub">Alerte immédiate</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Important</div>
+        <div class="kpi-val" style="color:var(--yellow)" id="intel-important">—</div>
+        <div class="kpi-sub">À surveiller</div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-label">Info</div>
+        <div class="kpi-val" style="color:var(--muted)" id="intel-info">—</div>
+        <div class="kpi-sub">Fond de veille</div>
+      </div>
+    </div>
+
+    <!-- Veille Stratégique -->
+    <div class="card">
+      <div class="card-title">📡 Veille Stratégique — Macro · Liquidité · Dette · Énergie</div>
+      <div id="intel-articles">
+        <div style="text-align:center;padding:30px;color:var(--muted)">
+          <div class="spinner"></div><p style="margin-top:10px">Chargement des flux RSS…</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- Actualités filtrées par source -->
+    <div class="card">
+      <div class="card-title">🎯 Actualités filtrées — Bertez · Dalio · Howell · InflationGuy</div>
+      <div id="intel-sources">
+        <div style="color:var(--muted);font-size:12px;padding:16px">Chargement…</div>
+      </div>
+    </div>
+
   </section>
 
   <!-- ══════════════════════ 7. INVESTISSEMENT ══════════════════════ -->

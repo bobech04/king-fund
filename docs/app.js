@@ -37,6 +37,7 @@
     scheduler:      {},
     macro:          {},
     alertes:        {},
+    intelligence:   {},
     retraite:       {},
     dividendes:     {},
     blackswan:      null,
@@ -1855,6 +1856,91 @@
     }
   }
 
+  async function loadIntelligence() {
+    $('intel-articles').innerHTML = '<div style="text-align:center;padding:30px;color:var(--muted)"><div class="spinner"></div><p style="margin-top:10px">Chargement des flux RSS…</p></div>';
+    $('intel-sources').innerHTML  = '<div style="color:var(--muted);font-size:12px;padding:16px">Chargement…</div>';
+    let data;
+    try {
+      data = await apiFetch('/veille-strategique', 30_000);
+    } catch (e) {
+      $('intel-articles').innerHTML = '<span style="color:var(--muted);padding:16px;display:block">Erreur chargement veille stratégique.</span>';
+      $('intel-sources').innerHTML  = '';
+      return;
+    }
+    state.intelligence = data;
+    renderIntelligence(data);
+  }
+
+  function renderIntelligence(data) {
+    const articles = data.articles || [];
+    const etat     = data.etat    || {};
+
+    $('intel-total').textContent     = etat.nb_total    ?? articles.length;
+    $('intel-critique').textContent  = etat.nb_critique ?? 0;
+    $('intel-important').textContent = etat.nb_important ?? 0;
+    $('intel-info').textContent      = etat.nb_info     ?? 0;
+    $('intel-time').textContent      = etat.derniere_maj ? 'Mis à jour ' + timeAgo(etat.derniere_maj) : '—';
+
+    if (!articles.length) {
+      $('intel-articles').innerHTML = '<span style="color:var(--muted);padding:16px;display:block">Aucun article disponible — flux RSS vides ou inaccessibles.</span>';
+      $('intel-sources').innerHTML  = '';
+      return;
+    }
+
+    const BADGE = {
+      CRITIQUE:  '<span style="background:#c0392b;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-right:6px">CRITIQUE</span>',
+      IMPORTANT: '<span style="background:#e67e22;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-right:6px">IMPORTANT</span>',
+      INFO:      '<span style="background:var(--bg3);color:var(--muted);font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-right:6px">INFO</span>',
+    };
+    const BORDER = { CRITIQUE: '#c0392b', IMPORTANT: '#e67e22', INFO: 'var(--border)' };
+
+    function articleCard(a) {
+      const themes = (a.themes || []).map(t =>
+        `<span style="font-size:10px;color:var(--accent);margin-right:4px">#${t}</span>`
+      ).join('');
+      const desc = a.description
+        ? `<div style="font-size:12px;color:var(--muted);margin-top:4px;line-height:1.5">${a.description.slice(0, 250)}${a.description.length > 250 ? '…' : ''}</div>`
+        : '';
+      const date = a.publie_a ? `<span style="font-size:10px;color:var(--muted)">${a.publie_a.slice(0, 22)}</span>` : '';
+      const link = a.url ? `<a href="${a.url}" target="_blank" rel="noopener" style="font-size:11px;color:var(--accent);margin-left:8px">→ Lire</a>` : '';
+      return `<div style="border-left:3px solid ${BORDER[a.niveau] || BORDER.INFO};padding:10px 12px;margin-bottom:10px;background:var(--bg2);border-radius:0 6px 6px 0">
+        <div style="display:flex;align-items:center;flex-wrap:wrap;gap:4px;margin-bottom:4px">
+          ${BADGE[a.niveau] || BADGE.INFO}
+          <span style="font-size:11px;color:var(--accent);font-weight:600">${a.source || ''}</span>
+          <span style="flex:1"></span>${date}${link}
+        </div>
+        <div style="font-size:13px;font-weight:600;color:var(--fg)">${a.titre || '—'}</div>
+        ${desc}
+        <div style="margin-top:4px">${themes}</div>
+      </div>`;
+    }
+
+    // Tous les articles — CRITIQUE → IMPORTANT → INFO
+    const ordre = { CRITIQUE: 0, IMPORTANT: 1, INFO: 2 };
+    const sorted = [...articles].sort((a, b) => (ordre[a.niveau] ?? 3) - (ordre[b.niveau] ?? 3));
+    $('intel-articles').innerHTML = sorted.map(articleCard).join('') || '<span style="color:var(--muted)">Aucun article.</span>';
+
+    // Actualités filtrées par source
+    const SOURCES_CLES = ['Bruno Bertez', 'Ray Dalio', 'CrossBorderCapital', 'InflationGuy'];
+    let html2 = '';
+    for (const src of SOURCES_CLES) {
+      const arts = articles.filter(a => a.source === src);
+      const label = src === 'CrossBorderCapital' ? 'Howell (CrossBorderCapital)' : src;
+      if (!arts.length) {
+        html2 += `<div style="margin-bottom:16px">
+          <div style="font-size:12px;font-weight:700;color:var(--fg);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)">${label}</div>
+          <span style="color:var(--muted);font-size:12px">Aucun article récent.</span>
+        </div>`;
+        continue;
+      }
+      html2 += `<div style="margin-bottom:16px">
+        <div style="font-size:12px;font-weight:700;color:var(--fg);margin-bottom:6px;padding-bottom:4px;border-bottom:1px solid var(--border)">${label} — ${arts.length} article${arts.length > 1 ? 's' : ''}</div>
+        ${arts.slice(0, 3).map(articleCard).join('')}
+      </div>`;
+    }
+    $('intel-sources').innerHTML = html2;
+  }
+
   async function loadRetraite() {
     const [retResult, pruResult] = await Promise.allSettled([
       apiFetch('/patrimoine/retraite', 15_000),
@@ -1997,6 +2083,7 @@
         scheduler:      loadScheduler,
         macro:          loadMacro,
         alertes:        loadAlertes,
+        intelligence:   loadIntelligence,
         investissement: loadInvestissement,
         liquidite:      loadLiquidite,
         retraite:       loadRetraite,
