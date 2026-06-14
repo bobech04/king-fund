@@ -73,20 +73,31 @@ def _collecter_donnees(engine) -> dict:
             from divisions.gerant_delegue.agent_benchmark import _BATTLE_START
             battle_start_str = str(_BATTLE_START)
             for sym, attr in [("^FCHI", "cac"), ("^GSPC", "sp")]:
-                hist = yf.Ticker(sym).history(
-                    start=battle_start_str, interval="1d", auto_adjust=True
-                )
-                if not hist.empty and len(hist) >= 2:
-                    bench_perf = round(
-                        (float(hist["Close"].iloc[-1]) / float(hist["Close"].iloc[0]) - 1) * 100, 2
+                if (attr == "cac" and alpha_cac is not None) or (attr == "sp" and alpha_sp is not None):
+                    continue
+                try:
+                    hist = yf.Ticker(sym).history(
+                        start=battle_start_str, interval="1d", auto_adjust=True
                     )
-                    alpha_val = round(perf_pct - bench_perf, 2)
-                    if attr == "cac" and alpha_cac is None:
-                        alpha_cac = alpha_val
-                    elif attr == "sp" and alpha_sp is None:
-                        alpha_sp = alpha_val
+                except Exception:
+                    hist = None
+                if hist is not None and not hist.empty:
+                    v0 = float(hist["Close"].iloc[0])
+                    v1 = float(hist["Close"].iloc[-1])
+                    bench_perf = round((v1 / v0 - 1) * 100, 2) if v0 != 0 else 0.0
+                else:
+                    bench_perf = 0.0
+                alpha_val = round(perf_pct - bench_perf, 2)
+                if attr == "cac":
+                    alpha_cac = alpha_val
+                else:
+                    alpha_sp = alpha_val
         except Exception as e:
             logger.debug("Benchmark yfinance fallback: %s", e)
+    if alpha_cac is None:
+        alpha_cac = round(perf_pct, 2)
+    if alpha_sp is None:
+        alpha_sp = round(perf_pct, 2)
 
     # ── AGD-01 audit — décisions du mois ─────────────────────────────────────
     decisions_agd = []
