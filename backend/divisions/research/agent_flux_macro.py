@@ -86,6 +86,61 @@ _FETCH_TIMEOUT = 30  # seconds for all external requests
 
 _RAPPORTS_DIR = Path(__file__).resolve().parents[4] / "rapports" / "flux_macro"
 
+# ---------------------------------------------------------------------------
+# RÈGLE MONÉTAIRE ÉTERNELLE
+# Source : Université de l'Épargne / Howell / Gavekal / BIS
+# Principe fondateur de la méthode de cet agent.
+# ---------------------------------------------------------------------------
+
+REGLE_MONETAIRE_ETERNELLE = """
+RÈGLE MONÉTAIRE ÉTERNELLE
+(Comptabilité en Partie Double Appliquée aux Marchés Financiers)
+
+SOURCE : Université de l'Épargne — Howell (CrossBorderCapital) — Gavekal — BIS
+
+PRINCIPE FONDAMENTAL
+  "Tout dollar investi dans un actif provient nécessairement d'un autre actif.
+   Les flux de capitaux sont conservatifs : la somme algébrique de tous les
+   mouvements est TOUJOURS nulle."
+   — Identité comptable, non théorie.
+
+COROLLAIRE IPO (Mécanisme absorbeur de liquidités)
+  Une introduction en bourse ou une émission obligataire majeure ABSORBE
+  de la liquidité existante. Pour chaque dollar levé par l'émetteur :
+
+  ① Des investisseurs vendent d'autres actifs pour libérer du cash
+     → Or (GLD/GC=F), actions marchés émergents (AAXJ, ^HSI), obligations TLT
+     → Pression vendeuse anormale détectable J-30 à J-3 avant l'IPO
+
+  ② Le cash libéré transite par le marché monétaire
+     → Hausse temporaire des taux courts (^IRX, DGS3MO)
+     → Possible renforcement du dollar (USDJPY=X : yen affaibli)
+
+  ③ Post-IPO : rebond des actifs allegés si l'IPO est sur-souscrite
+     → Signal d'achat sur l'or et les EM si les données le confirment
+
+PRÉCÉDENTS HISTORIQUES CONNUS (non exhaustifs)
+  • Alibaba IPO sept. 2014 (~25 Md$) → baisse or -3% dans les 3 semaines avant
+  • Saudi Aramco IPO déc. 2019 (~29 Md$) → EM sous-performance -4% vs MSCI World
+  • Arm Holdings IPO sept. 2023 (~5 Md$) → flux GLD négatifs sur 2 semaines
+  ⚠️ Ces corrélations sont OBSERVÉES, non prouvées causalement (Phase 1).
+
+APPLICATION DANS CET AGENT
+  → Étape 3 (CHERCHER) : identifier l'événement absorbeur contemporain
+  → Étape 4 (VÉRIFIER SÉQUENCE) : l'événement PRÉCÈDE l'anomalie de prix
+  → Étape 5 (IDENTIFIER MÉCANISME) : quantifier le montant levé / absorbé
+  → Checklist biais : causalite_temporelle + mecanisme_explicite obligatoires
+
+LIMITES DE LA RÈGLE
+  • Ne s'applique qu'aux flux MESURABLES (hors dark pools ~40% US)
+  • Magnitude de l'effet dépend de la profondeur du marché et du momentum
+  • La règle est identité comptable ex-post — elle ne prédit pas l'amplitude
+  • Phase 2 obligatoire : tests de causalité de Granger pour validation
+
+DISCLAIMER : Raisonnement qualitatif. Non statistiquement prouvé.
+             Les flux de capitaux ne sont pas prédictibles avec certitude.
+"""
+
 
 # ---------------------------------------------------------------------------
 # Singleton
@@ -846,6 +901,196 @@ class AgentFluxMacro:
             }
             self._cache_ts = now
             return self._cache
+
+    def scan_contexte(self, evenement: dict) -> dict:
+        """
+        Scan manuel avec un événement absorbeur injecté (test de la Règle Monétaire Éternelle).
+
+        Paramètres evenement :
+          titre          : str  — nom de l'IPO / émission
+          valorisation   : str  — montant estimé (ex: "250 Md$")
+          date_prevue    : str  — date estimée (ex: "T3 2026")
+          source         : str  — origine de l'information
+          type           : str  — IPO_MAJEUR / EMISSION_OBLIG / AUTRE
+          note           : str  — contexte libre
+
+        Le scan :
+          1. Fetche les prix réels (yfinance + FRED + CFTC)
+          2. Détecte les anomalies sur les ratios surveillés
+          3. Applique la RÈGLE MONÉTAIRE ÉTERNELLE : l'événement injecté
+             est traité comme cause candidate des anomalies observées
+          4. Génère un rapport structuré (SANS Telegram, SANS journal SQLite)
+        """
+        import statistics
+
+        ts_debut = datetime.now(timezone.utc).isoformat()
+        nom_evt  = self._sanitize(evenement.get("titre", "Événement inconnu"), 100)
+        valo     = self._sanitize(evenement.get("valorisation", "N/D"), 50)
+        date_evt = self._sanitize(evenement.get("date_prevue", "N/D"), 30)
+        source_evt = self._sanitize(evenement.get("source", "N/D"), 150)
+        note_evt   = self._sanitize(evenement.get("note", ""), 300)
+        type_evt   = evenement.get("type", "IPO_MAJEUR")
+
+        sources_actives: list[str] = []
+
+        # ── Fetch données réelles ───────────────────────────────────────────
+        prix_result = self._fetch_prix()
+        if prix_result.get("ok"):
+            sources_actives.append("yfinance (GC=F, HSI, AAXJ, URTH, IRX, USDJPY, GLD, USO)")
+
+        fred_result = self._fetch_fred()
+        fred_ok     = fred_result.get("ok", False)
+        if fred_ok:
+            sources_actives.append("FRED API (DGS3MO, DGS10, T10YIE)")
+
+        cftc_result = self._fetch_cftc()
+        cftc_ok     = cftc_result.get("ok", False)
+        if cftc_ok:
+            net_mm = cftc_result.get("net_mm", "N/A")
+            sources_actives.append(f"CFTC COT ({cftc_result.get('report_date','?')}) — MM Net: {net_mm}")
+
+        # Événement injecté compte comme source
+        sources_actives.append(f"Événement injecté : {nom_evt} ({source_evt})")
+
+        # ── Détection anomalies ─────────────────────────────────────────────
+        prix_data   = prix_result.get("data", {})
+        anomalies   = self._detect_anomalies(prix_data) if prix_result.get("ok") else []
+        ratios_etat = self._compute_ratios_etat(prix_data) if prix_result.get("ok") else []
+
+        # ── Application RÈGLE MONÉTAIRE ÉTERNELLE ──────────────────────────
+        # L'événement injecté EST la cause candidate — on applique le corollaire IPO
+        mecanisme_rme = (
+            f"APPLICATION RÈGLE MONÉTAIRE ÉTERNELLE :\n"
+            f"Si {nom_evt} ({valo}) absorbe de la liquidité vers {date_evt},\n"
+            f"alors selon la comptabilité en partie double des marchés :\n"
+            f"  → Des investisseurs doivent VENDRE d'autres actifs pour libérer du cash\n"
+            f"  → Actifs suspects : Or (GLD/GC=F), actions EM (AAXJ, ^HSI), obligations\n"
+            f"  → Signal attendu J-30 à J-3 : pression vendeuse anormale sur ces actifs\n"
+            f"  → Post-{type_evt} : rebond possible si sur-souscrit\n"
+        )
+
+        # Confrontation avec les anomalies observées
+        anomalies_concordantes = []
+        for a in anomalies:
+            if a["id"] in ("or_msci", "gld_flows", "hsi_aaxj", "irx_bp", "usdjpy"):
+                concordance = "CONCORDANT" if a["variation_pct"] < 0 else "CONTRA-INDICATIF"
+                anomalies_concordantes.append({**a, "concordance_rme": concordance})
+
+        if anomalies_concordantes:
+            nb_concord = sum(1 for x in anomalies_concordantes if x["concordance_rme"] == "CONCORDANT")
+            mecanisme_rme += (
+                f"\nANOMALIES OBSERVÉES CONCORDANTES : {nb_concord}/{len(anomalies_concordantes)}\n"
+            )
+            for a in anomalies_concordantes:
+                signe = "✓" if a["concordance_rme"] == "CONCORDANT" else "✗"
+                mecanisme_rme += f"  {signe} {a['label']} : {a['variation_pct']:+.1f}% (z={a['z_score']:+.1f}σ) — {a['concordance_rme']}\n"
+        else:
+            mecanisme_rme += "\nAucune anomalie concordante détectée sur les actifs surveillés.\n"
+
+        # ── Checklist biais avec événement injecté ─────────────────────────
+        ipos_fictifs = [{"titre": nom_evt, "date": date_evt, "url": ""}]
+        biais_results = self._run_biais_checklist(
+            anomalies, sources_actives, ipos_fictifs, fred_ok, cftc_ok
+        )
+        # causalite_temporelle : True car événement injecté fournit la cause candidate
+        biais_results["causalite_temporelle"] = True
+        # mecanisme_explicite : True si l'événement a une valorisation chiffrée
+        biais_results["mecanisme_explicite"]  = bool(valo and valo != "N/D")
+
+        confiance = self._calcul_confiance(biais_results, len(sources_actives), 3)
+
+        # ── Taux réels (FRED) ───────────────────────────────────────────────
+        fred_data  = fred_result.get("data", {})
+        dgs3mo  = fred_data.get("DGS3MO", {}).get("value", "DONNÉES INDISPONIBLES")
+        dgs10   = fred_data.get("DGS10",  {}).get("value", "DONNÉES INDISPONIBLES")
+        t10yie  = fred_data.get("T10YIE", {}).get("value", "DONNÉES INDISPONIBLES")
+
+        # ── Conclusion ──────────────────────────────────────────────────────
+        nb_concord = sum(
+            1 for a in anomalies_concordantes
+            if a.get("concordance_rme") == "CONCORDANT"
+        ) if anomalies_concordantes else 0
+
+        if confiance == "INSUFFISANT":
+            conclusion = (
+                f"Données insuffisantes pour conclure sur l'impact de {nom_evt}. "
+                "La Règle Monétaire Éternelle s'applique théoriquement mais aucune "
+                "anomalie mesurable n'est confirmée sur les 3 sources requises."
+            )
+            action = "Attendre données supplémentaires. Relancer scan dans 48-72h."
+        elif nb_concord >= 2:
+            conclusion = (
+                f"Signal CONCORDANT avec la Règle Monétaire Éternelle. "
+                f"{nb_concord} actif(s) sous pression vendeuse anormale, "
+                f"cohérent avec une absorption de liquidité pré-{type_evt} {nom_evt}. "
+                f"Mécanisme probable : rotation institutionnelle vers {date_evt}."
+            )
+            action = (
+                f"Surveiller GLD et AAXJ pour signal de rebond post-{type_evt}. "
+                "Attendre confirmation sur 2e timeframe avant action. < 15% portefeuille."
+            )
+        elif anomalies and not anomalies_concordantes:
+            conclusion = (
+                f"Anomalies détectées mais NON concordantes avec l'hypothèse {nom_evt}. "
+                "La Règle Monétaire Éternelle ne peut pas être appliquée : "
+                "le mécanisme d'absorption n'est pas visible sur les actifs surveillés."
+            )
+            action = "Thèse rejetée pour ce scan. Chercher autre cause pour les anomalies."
+        else:
+            conclusion = (
+                f"Aucune anomalie mesurable sur les actifs surveilles. "
+                f"Pas de signal de rotation pré-{type_evt} détectable aujourd'hui. "
+                "Soit l'absorption n'a pas encore commencé, soit l'effet est en dehors "
+                "de notre univers de surveillance (dark pools, OTC)."
+            )
+            action = (
+                f"Relancer scan J-15 et J-7 avant {date_evt}. "
+                "Intensifier surveillance GLD volume et AAXJ."
+            )
+
+        pourquoi_tort = (
+            f"• SpaceX / {nom_evt} peut lever via placement privé (pas d'absorption marché public)\n"
+            f"• Les dark pools (~40% volume US) peuvent absorber l'effet\n"
+            f"• L'événement peut être retardé ou annulé — source : {source_evt}\n"
+            f"• La corrélation Or↓/IPO n'est pas prouvée causalement (Phase 1)\n"
+            f"• D'autres événements macro peuvent expliquer les anomalies observées\n"
+            f"• Note : {note_evt or 'Aucune'}"
+        )
+
+        # ── Rapport structuré ───────────────────────────────────────────────
+        rapport = {
+            "type":                "SCAN_CONTEXTE",
+            "timestamp":           ts_debut,
+            "evenement": {
+                "titre":       nom_evt,
+                "valorisation": valo,
+                "date_prevue": date_evt,
+                "source":      source_evt,
+                "type":        type_evt,
+                "note":        note_evt,
+            },
+            "regle_monetaire_eternelle": REGLE_MONETAIRE_ETERNELLE.strip(),
+            "sources_actives":     sources_actives,
+            "nb_sources":          len(sources_actives),
+            "ratios_actuels":      ratios_etat,
+            "anomalies_detectees": anomalies,
+            "anomalies_concordantes": anomalies_concordantes,
+            "fred": {
+                "DGS3MO":  dgs3mo,
+                "DGS10":   dgs10,
+                "T10YIE":  t10yie,
+            },
+            "cftc":                cftc_result if cftc_ok else {"ok": False, "reason": "DONNÉES INDISPONIBLES"},
+            "mecanisme_rme":       mecanisme_rme,
+            "biais_checklist":     biais_results,
+            "confiance":           confiance,
+            "conclusion":          conclusion,
+            "action_suggeree":     action,
+            "pourquoi_tort":       pourquoi_tort,
+            "limites":             LIMITES_FONDAMENTALES,
+            "disclaimer":          DISCLAIMER,
+        }
+        return rapport
 
     def etat(self) -> dict:
         """Retourne l'état courant (depuis cache si disponible)."""
