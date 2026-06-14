@@ -1774,7 +1774,7 @@
         <td><strong>${p.ticker || '—'}</strong></td>
         <td>${pru.toFixed(2)} €</td>
         <td>${prixActuel > 0 ? prixActuel.toFixed(2) + ' €' : '<span style="color:var(--muted)">—</span>'}</td>
-        <td class="${pnlClass(pvTotal)}">${fmtPnl(pvTotal)}</td>
+        <td class="${pnlClass(pvTotal)}">${(pvTotal >= 0 ? '+' : '') + pvTotal.toFixed(2) + ' €'}</td>
         <td class="${pnlClass(pvPct)}">${pvPct.toFixed(2)}%</td>
         <td style="color:var(--muted)">${qte}</td>
       </tr>`;
