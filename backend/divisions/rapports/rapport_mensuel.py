@@ -185,7 +185,7 @@ def _generer_narrative(donnees: dict) -> str:
 DONNÉES DU MOIS :
 - NAV totale : {donnees['nav_total']:,.0f}€ | PnL : {donnees['pnl_total']:+,.0f}€ | Perf moy : {donnees['perf_pct']:+.1f}%
 - Jour de bataille J{donnees['battle_day']} | Gagnants (≥10k€) : {donnees['gagnants']}/{donnees['nb_traders']}
-- Alpha vs CAC40 : {float(donnees['alpha_cac40']):.2f}% | Alpha vs SP500 : {float(donnees['alpha_sp500']):.2f}%
+- Alpha vs CAC40 : {_fmt_alpha(donnees['alpha_cac40'])}% | Alpha vs SP500 : {_fmt_alpha(donnees['alpha_sp500'])}%
 - Top traders : {', '.join(f"TRD{t.get('id',0):02d}({t.get('pnl',0):+.0f}€)" for t in donnees['top5'][:3])}
 - Flop traders : {', '.join(f"TRD{t.get('id',0):02d}({t.get('pnl',0):+.0f}€)" for t in donnees['flop5'][:3])}
 
@@ -229,10 +229,18 @@ def _narrative_fallback(donnees: dict) -> str:
     return (
         f"Rapport mensuel {donnees['mois']} — NAV {donnees['nav_total']:,.0f}€, "
         f"PnL {donnees['pnl_total']:+,.0f}€ ({donnees['perf_pct']:+.1f}%). "
-        f"Alpha CAC40 : {float(donnees['alpha_cac40']):.2f}% | Alpha SP500 : {float(donnees['alpha_sp500']):.2f}%. "
+        f"Alpha CAC40 : {_fmt_alpha(donnees['alpha_cac40'])}% | Alpha SP500 : {_fmt_alpha(donnees['alpha_sp500'])}%. "
         f"Gagnants : {donnees['gagnants']}/{donnees['nb_traders']}. "
         f"Objectif retraite {annee_ret} : {donnees['patrimoine'].get('valeur_retraite',0):,.0f}€."
     )
+
+
+def _fmt_alpha(val) -> str:
+    """Formate un alpha (peut être None) sans lever d'exception."""
+    try:
+        return f"{float(val):.2f}"
+    except (TypeError, ValueError):
+        return "N/D"
 
 
 def _s(text: str) -> str:
@@ -350,7 +358,7 @@ def _send_telegram_resume(donnees: dict, narrative: str, chemin: str) -> None:
         msg = (
             f"📅 <b>Rapport Mensuel King Fund — {donnees['mois']}</b>\n\n"
             f"💰 NAV : <b>{donnees['nav_total']:,.0f}€</b> | PnL : <b>{donnees['pnl_total']:+,.0f}€</b> ({donnees['perf_pct']:+.1f}%)\n"
-            f"📊 Alpha CAC40 : {float(donnees['alpha_cac40']):.2f}% | SP500 : {float(donnees['alpha_sp500']):.2f}%\n"
+            f"📊 Alpha CAC40 : {_fmt_alpha(donnees['alpha_cac40'])}% | SP500 : {_fmt_alpha(donnees['alpha_sp500'])}%\n"
             f"🏆 Gagnants : {donnees['gagnants']}/{donnees['nb_traders']}\n"
             f"🔬 Alpha Lab — VALIDES : {valides}\n"
             f"🎯 Patrimoine : {donnees['patrimoine'].get('total_eur',0):,.0f}€\n\n"

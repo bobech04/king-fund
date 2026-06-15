@@ -599,6 +599,17 @@ def get_rapport_mensuel_dernier():
         return jsonify({"erreur": str(e)}), 500
 
 
+@app.route("/api/rapports/investisseur/generer", methods=["POST"])
+def post_rapport_investisseur_generer():
+    try:
+        from divisions.rapports.rapport_investisseur import generer_rapport as _gen_inv
+        chemin = _gen_inv(engine)
+        return jsonify({"status": "ok", "chemin_pdf": chemin})
+    except Exception as e:
+        logger.error("rapport investisseur: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
 @app.route("/api/rapports/mensuel/generer", methods=["POST"])
 def post_rapport_mensuel_generer():
     try:
