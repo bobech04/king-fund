@@ -51,7 +51,8 @@ def _send_telegram(message: str) -> None:
     except Exception as exc:
         logger.warning("Telegram alert failed: %s", exc)
 
-app = Flask(__name__, static_folder="../frontend", static_url_path="")
+_FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "frontend"))
+app = Flask(__name__, static_folder=_FRONTEND_DIR, static_url_path="")
 app.secret_key = SECRET_KEY
 sock = Sock(app)
 
