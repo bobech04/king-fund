@@ -346,6 +346,68 @@ def get_agent_flux_macro() -> "AgentFluxMacro":
 
 
 # ---------------------------------------------------------------------------
+# Agent Bear (Phase 2 — Avocat du diable structuré)
+# ---------------------------------------------------------------------------
+
+class _AgentBear:
+    """
+    Agent Bear — positionné en opposition systématique à la thèse Bull.
+    Prompt : 'prouve que cette thèse est fausse'.
+    Retourne position_bear, raisons_bear, biais_probable, these_alternative.
+    """
+
+    def analyser(self, these_bull: str, regime: str, confiance: str) -> dict:
+        try:
+            from config import ANTHROPIC_API_KEY
+            if not ANTHROPIC_API_KEY:
+                return {
+                    "ok": False, "raison": "ANTHROPIC_API_KEY absent",
+                    "position_bear": "—", "raisons_bear": [],
+                    "biais_probable": "—", "these_alternative": "—",
+                }
+            import anthropic
+            prompt = (
+                "Tu es un analyste macro sceptique et contradicteur structurel.\n\n"
+                f"THÈSE BULL :\n{these_bull[:500]}\n"
+                f"RÉGIME MARCHÉ : {regime}\n"
+                f"CONFIANCE : {confiance}\n\n"
+                "Prouve que cette thèse est fausse. "
+                "Donne 3 contre-arguments concrets et quantifiés. "
+                "Identifie le biais cognitif le plus probable. "
+                "Propose une thèse alternative. "
+                "Format JSON strict :\n"
+                '{"position_bear": "...", "raisons": ["...", "...", "..."], '
+                '"biais_probable": "...", "these_alternative": "..."}'
+            )
+            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+            msg = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=500,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            texte = msg.content[0].text.strip()
+            m = re.search(r'\{.*\}', texte, re.DOTALL)
+            if m:
+                data = json.loads(m.group(0))
+                return {
+                    "ok":                True,
+                    "position_bear":     data.get("position_bear", "—"),
+                    "raisons_bear":      data.get("raisons", []),
+                    "biais_probable":    data.get("biais_probable", "—"),
+                    "these_alternative": data.get("these_alternative", "—"),
+                }
+            return {
+                "ok": True, "position_bear": texte[:400], "raisons_bear": [],
+                "biais_probable": "—", "these_alternative": "—",
+            }
+        except Exception as exc:
+            return {
+                "ok": False, "raison": str(exc), "position_bear": "—",
+                "raisons_bear": [], "biais_probable": "—", "these_alternative": "—",
+            }
+
+
+# ---------------------------------------------------------------------------
 # Agent
 # ---------------------------------------------------------------------------
 
@@ -359,6 +421,7 @@ class AgentFluxMacro:
         self._cache_ttl: int     = 3600 * 4   # 4h
         self._db_path: Path | None = None
         self._init_db()
+        self._bear = _AgentBear()
         _RAPPORTS_DIR.mkdir(parents=True, exist_ok=True)
         (_RAPPORTS_DIR / "flash").mkdir(exist_ok=True)
         (_RAPPORTS_DIR / "hebdo").mkdir(exist_ok=True)
@@ -1010,6 +1073,47 @@ class AgentFluxMacro:
             return round(num / den, 4)
         except Exception:
             return None
+
+    @staticmethod
+    def _test_granger(serie_x: list[float], serie_y: list[float], maxlag: int = 5) -> dict:
+        """
+        Test de causalité de Granger : serie_x cause-t-elle serie_y ?
+        Retourne {ok, significatif, min_pvalue, lags_significatifs, maxlag, resume}.
+        Requiert statsmodels (pip install statsmodels).
+        """
+        try:
+            import numpy as np
+            from statsmodels.tsa.stattools import grangercausalitytests
+            n = min(len(serie_x), len(serie_y))
+            if n < maxlag + 3:
+                return {"ok": False, "raison": f"Série trop courte ({n} pts, min {maxlag + 3})"}
+            data = np.column_stack([serie_y[-n:], serie_x[-n:]])
+            results = grangercausalitytests(data, maxlag=maxlag, verbose=False)
+            lags_sig: list[dict] = []
+            min_p = 1.0
+            for lag, res in results.items():
+                pval = res[0]["ssr_ftest"][1]
+                min_p = min(min_p, pval)
+                if pval < 0.05:
+                    lags_sig.append({"lag": lag, "pvalue": round(pval, 4)})
+            sig = min_p < 0.05
+            resume = (
+                f"Granger X→Y : p-value min = {min_p:.4f} (lags 1-{maxlag}). "
+                f"{'SIGNIFICATIF' if sig else 'NON SIGNIFICATIF'} (α=5%). "
+                f"Lags sig. : {[l['lag'] for l in lags_sig] or 'aucun'}."
+            )
+            return {
+                "ok":                 True,
+                "significatif":       sig,
+                "min_pvalue":         round(min_p, 6),
+                "lags_significatifs": lags_sig,
+                "maxlag":             maxlag,
+                "resume":             resume,
+            }
+        except ImportError:
+            return {"ok": False, "raison": "statsmodels requis (pip install statsmodels)"}
+        except Exception as exc:
+            return {"ok": False, "raison": str(exc)}
 
     def _detect_regime_marche(self, prix_data: dict[str, Any]) -> dict[str, Any]:
         """
@@ -1778,6 +1882,12 @@ class AgentFluxMacro:
                 "section_haut_gauche": section_haut_gauche,
                 "commodites_critiques": commodites,
                 "distinction_ventes_or": DISTINCTION_VENTES_OR,
+                "_prix_raw": {
+                    "GLD_hist": prix_data.get("GLD",    {}).get("hist_30d", []),
+                    "SPY_hist": prix_data.get("SPY",    {}).get("hist_30d", []),
+                    "TLT_hist": prix_data.get("TLT",    {}).get("hist_30d", []),
+                    "GC_hist":  prix_data.get("XAUUSD", {}).get("hist_30d", []),
+                },
             }
             self._cache_ts = now
             return self._cache
@@ -2036,6 +2146,31 @@ class AgentFluxMacro:
             tag = "[BLOQUANT]" if v["blocage"] else "[avert.]"
             biais_lines += f"  {ico} {tag} {biais_id} : {v['question']}\n"
 
+        # ── Phase 2 : Granger + Bull/Bear/Arbitre ───────────────────────────
+        prix_raw = donnees.get("_prix_raw", {})
+        granger_gld_spy: dict = {}
+        granger_tlt_spy: dict = {}
+        if prix_raw:
+            gld_h = prix_raw.get("GLD_hist", [])
+            spy_h = prix_raw.get("SPY_hist", [])
+            tlt_h = prix_raw.get("TLT_hist", [])
+            if len(gld_h) >= 8 and len(spy_h) >= 8:
+                granger_gld_spy = self._test_granger(gld_h, spy_h)
+            if len(tlt_h) >= 8 and len(spy_h) >= 8:
+                granger_tlt_spy = self._test_granger(tlt_h, spy_h)
+        _g_gld = granger_gld_spy.get("resume", "statsmodels requis ou données insuffisantes")
+        _g_tlt = granger_tlt_spy.get("resume", "données insuffisantes")
+
+        regime_str     = donnees.get("regime", {}).get("regime", "NORMAL")
+        bear_result    = self._bear.analyser(conclusion, regime_str, confiance)
+        arbitre_result = self._arbitre_bull_bear(conclusion, bear_result)
+        _bear_pos  = bear_result.get("position_bear", "API non disponible")
+        _bear_rai  = "\n".join(f"  • {r}" for r in bear_result.get("raisons_bear", []))
+        _bear_bias = bear_result.get("biais_probable", "—")
+        _bear_alt  = bear_result.get("these_alternative", "—")
+        _arb_verd  = arbitre_result.get("verdict", "INCERTAIN")
+        _arb_txt   = arbitre_result.get("texte", "Arbitre non disponible")
+
         texte = (
             f"═══════════════════════════════════════════════════\n"
             f"RAPPORT FLASH — AGENT FLUX MACRO\n"
@@ -2048,10 +2183,19 @@ class AgentFluxMacro:
             f"{top_anom.get('label', 'Aucune') if top_anom else 'Aucune anomalie CRITIQUE'}\n"
             f"Valeur : {top_anom.get('valeur', '—')} | Z-score : {top_anom.get('z_score', '—')}\n"
             f"Niveau : {top_anom.get('niveau', '—')}\n\n"
-            f"── CONCLUSION ───────────────────────────────────\n"
+            f"── POSITION BULL ────────────────────────────────\n"
             f"{conclusion}\n\n"
+            f"── POSITION BEAR (avocat du diable) ─────────────\n"
+            f"{_bear_pos}\n"
+            f"{_bear_rai}\n"
+            f"  Biais : {_bear_bias} | Alt. : {_bear_alt}\n\n"
+            f"── VERDICT ARBITRE ──────────────────────────────\n"
+            f"  {_arb_verd} — {_arb_txt}\n\n"
             f"── ACTION SUGGÉRÉE ──────────────────────────────\n"
             f"{action}\n\n"
+            f"── TESTS DE GRANGER (Phase 2) ────────────────────\n"
+            f"  GLD → SPY : {_g_gld}\n"
+            f"  TLT → SPY : {_g_tlt}\n\n"
             f"── INDICATEURS LIQUIDITÉ (FRED) ─────────────────\n"
             f"  M2SL     : {liq.get('M2SL', 'DONNÉES INDISPONIBLES')} Mds$\n"
             f"  WALCL    : {liq.get('WALCL', 'DONNÉES INDISPONIBLES')} Mds$\n"
@@ -2112,12 +2256,29 @@ class AgentFluxMacro:
                 pdf.cell(W, 5, "Aucune anomalie CRITIQUE", new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
 
-            _section("CONCLUSION")
+            _section("POSITION BULL")
             pdf.multi_cell(W, 5, _p(str(conclusion)[:800]))
+            pdf.ln(2)
+
+            _section("POSITION BEAR (avocat du diable)")
+            pdf.multi_cell(W, 5, _p(str(_bear_pos)[:400]))
+            if bear_result.get("raisons_bear"):
+                for r in bear_result["raisons_bear"][:3]:
+                    pdf.multi_cell(W, 4, _p(f"• {str(r)[:100]}"))
+            pdf.multi_cell(W, 4, _p(f"Biais: {_bear_bias[:80]}"))
+            pdf.ln(2)
+
+            _section(f"VERDICT ARBITRE : {_arb_verd}")
+            pdf.multi_cell(W, 5, _p(str(_arb_txt)[:400]))
             pdf.ln(2)
 
             _section("ACTION SUGGEREE")
             pdf.multi_cell(W, 5, _p(str(action)[:400]))
+            pdf.ln(2)
+
+            _section("TESTS DE GRANGER (Phase 2)")
+            pdf.multi_cell(W, 4, _p(f"GLD -> SPY : {_g_gld[:120]}"))
+            pdf.multi_cell(W, 4, _p(f"TLT -> SPY : {_g_tlt[:120]}"))
             pdf.ln(2)
 
             _section(f"SOURCES ACTIVES ({len(sources)})")
@@ -2188,6 +2349,246 @@ class AgentFluxMacro:
         except Exception as exc:
             logger.warning("[FluxMacro] taux_reussite: %s", exc)
             return {"total": 0, "corrects": 0, "taux_pct": None, "label": "—"}
+
+    def _arbitre_bull_bear(self, these_bull: str, bear_result: dict) -> dict:
+        """Verdict arbitre impartial entre positions bull et bear."""
+        try:
+            from config import ANTHROPIC_API_KEY
+            if not ANTHROPIC_API_KEY:
+                return {"ok": False, "verdict": "INCERTAIN", "texte": "API non disponible"}
+            import anthropic
+            bear_pos    = bear_result.get("position_bear", "—")
+            raisons_str = " | ".join(bear_result.get("raisons_bear", []))
+            prompt = (
+                "Tu es un arbitre macro senior indépendant.\n\n"
+                f"POSITION BULL : {these_bull[:400]}\n"
+                f"POSITION BEAR : {bear_pos[:400]}\n"
+                f"CONTRE-ARGUMENTS BEAR : {raisons_str[:400]}\n\n"
+                "Rends un verdict impartial en 3 phrases maximum. "
+                "Commence par l'un de ces 3 verdicts exacts : BULL_CONFIRMÉ, BEAR_CONFIRMÉ, INCERTAIN. "
+                "Justifie uniquement avec des données factuelles."
+            )
+            client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+            msg = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=250,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            texte = msg.content[0].text.strip()
+            upper = texte.upper()
+            if "BULL_CONFIRM" in upper:
+                verdict_type = "BULL_CONFIRMÉ"
+            elif "BEAR_CONFIRM" in upper:
+                verdict_type = "BEAR_CONFIRMÉ"
+            else:
+                verdict_type = "INCERTAIN"
+            return {"ok": True, "verdict": verdict_type, "texte": texte}
+        except Exception as exc:
+            return {"ok": False, "verdict": "INCERTAIN", "texte": f"Erreur arbitre : {exc}"}
+
+    def _backtest_pattern(self, pattern_name: str) -> dict:
+        """
+        Backtesting historique 1990-2026 d'un pattern de flux macro via yfinance.
+
+        Patterns disponibles :
+        - "absorption_or"       : Or baisse avant absorption majeure de liquidité
+        - "crise_liquidite_tlt" : corr(TLT,SPY) > 0 sur 5j prédit baisse SPY sur 5j suivants
+        """
+        try:
+            import yfinance as yf
+            import pandas as pd
+
+            now   = datetime.now(timezone.utc)
+            start = "1990-01-01"
+
+            if pattern_name == "absorption_or":
+                events = [
+                    p for p in PRECEDENTS_IPO_ABSORPTION
+                    if p.get("effet_or") is not None and "SpaceX" not in p.get("nom", "")
+                ]
+                if not events:
+                    return {"ok": False, "raison": "Aucun précédent historique avec données complètes"}
+                n_correct = sum(1 for e in events if e["effet_or"] < 0)
+                detail = [
+                    {
+                        "nom":      e["nom"],
+                        "montant":  e["montant"],
+                        "effet_or": e["effet_or"],
+                        "confirme": e["effet_or"] < 0,
+                    }
+                    for e in events
+                ]
+                taux = round(n_correct / len(events) * 100, 1)
+                return {
+                    "ok":                True,
+                    "pattern":           pattern_name,
+                    "taux_reussite_pct": taux,
+                    "n_total":           len(events),
+                    "n_correct":         n_correct,
+                    "periode":           f"1990–{now.year}",
+                    "methode":           "Précédents historiques catalogués (PRECEDENTS_IPO_ABSORPTION)",
+                    "detail":            detail,
+                    "resume":            (
+                        f"Pattern '{pattern_name}' : {taux}% de réussite "
+                        f"sur {len(events)} précédents ({start}–{now.year})"
+                    ),
+                }
+
+            elif pattern_name == "crise_liquidite_tlt":
+                end_str = now.strftime("%Y-%m-%d")
+                raw = yf.download(
+                    ["TLT", "SPY"], start=start, end=end_str,
+                    progress=False, auto_adjust=True,
+                )
+                if raw.empty:
+                    return {"ok": False, "raison": "Données TLT/SPY indisponibles"}
+                close = raw["Close"] if "Close" in raw.columns or hasattr(raw, "columns") else raw
+                tlt_s = close["TLT"].dropna() if "TLT" in close.columns else pd.Series(dtype=float)
+                spy_s = close["SPY"].dropna() if "SPY" in close.columns else pd.Series(dtype=float)
+                if tlt_s.empty or spy_s.empty:
+                    return {"ok": False, "raison": "Colonnes TLT/SPY manquantes"}
+                df = pd.DataFrame({"TLT": tlt_s, "SPY": spy_s}).dropna()
+                df["TLT_ret"] = df["TLT"].pct_change()
+                df["SPY_ret"] = df["SPY"].pct_change()
+                df = df.dropna()
+                step      = 5
+                n_total   = 0
+                n_correct = 0
+                for i in range(step, len(df) - step):
+                    w_tlt = df["TLT_ret"].iloc[i - step:i].tolist()
+                    w_spy = df["SPY_ret"].iloc[i - step:i].tolist()
+                    corr  = self._corr_pearson(w_tlt, w_spy)
+                    if corr is not None and corr > 0:
+                        spy_now    = float(df["SPY"].iloc[i])
+                        spy_future = float(df["SPY"].iloc[i + step])
+                        n_total   += 1
+                        n_correct += int(spy_future < spy_now)
+                taux = round(n_correct / n_total * 100, 1) if n_total > 0 else None
+                return {
+                    "ok":                True,
+                    "pattern":           pattern_name,
+                    "taux_reussite_pct": taux,
+                    "n_total":           n_total,
+                    "n_correct":         n_correct,
+                    "periode":           f"{start}–{now.year}",
+                    "methode":           f"corr(TLT_ret, SPY_ret) > 0 sur {step}j → SPY baisse {step}j suivants",
+                    "detail":            [],
+                    "resume":            (
+                        f"Pattern '{pattern_name}' : {taux}% de réussite "
+                        f"sur {n_total} signaux ({start}–{now.year})"
+                        if taux is not None else "Aucun signal détecté"
+                    ),
+                }
+
+            return {
+                "ok":     False,
+                "raison": (
+                    f"Pattern '{pattern_name}' inconnu. "
+                    "Disponibles : absorption_or, crise_liquidite_tlt"
+                ),
+            }
+
+        except Exception as exc:
+            logger.warning("[FluxMacro] _backtest_pattern(%s): %s", pattern_name, exc)
+            return {"ok": False, "pattern": pattern_name, "raison": str(exc)}
+
+    def _recalibrer_seuils(self) -> dict:
+        """
+        Recalibration automatique des seuils FORT/MOYEN/FAIBLE
+        après chaque verdict_posteriori dans flux_macro_journal.
+        Taux de réussite réel < 40% → durcit les critères (+1 biais requis).
+        Taux > 70% → assouplit (-1 biais requis).
+        Stocke les résultats dans flux_macro_calibration.
+        """
+        if not self._db_path:
+            return {"ok": False, "raison": "DB non initialisée"}
+        try:
+            con = sqlite3.connect(self._db_path)
+            con.execute("""
+                CREATE TABLE IF NOT EXISTS flux_macro_calibration (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    date        TEXT NOT NULL,
+                    confiance   TEXT NOT NULL,
+                    n_total     INTEGER,
+                    n_correct   INTEGER,
+                    taux_pct    REAL,
+                    seuil_biais INTEGER,
+                    created_at  TEXT DEFAULT (datetime('now'))
+                )
+            """)
+            con.commit()
+            calibration: dict[str, dict] = {}
+            seuils_defaut = {"FORTE": 6, "MOYEN": 4, "FAIBLE": 0}
+            for niveau in ("FORTE", "MOYEN", "FAIBLE"):
+                row = con.execute(
+                    """SELECT COUNT(*),
+                              SUM(CASE WHEN verdict_posteriori = 'CORRECT' THEN 1 ELSE 0 END)
+                       FROM flux_macro_journal
+                       WHERE confiance = ? AND verdict_posteriori IS NOT NULL""",
+                    (niveau,),
+                ).fetchone()
+                n_total   = row[0] or 0
+                n_correct = row[1] or 0
+                taux      = round(n_correct / n_total * 100, 1) if n_total >= 3 else None
+                seuil_base = seuils_defaut[niveau]
+                if taux is not None:
+                    if taux < 40 and seuil_base < 8:
+                        nouveau_seuil = seuil_base + 1
+                    elif taux > 70 and seuil_base > 2:
+                        nouveau_seuil = seuil_base - 1
+                    else:
+                        nouveau_seuil = seuil_base
+                else:
+                    nouveau_seuil = seuil_base
+                calibration[niveau] = {
+                    "n_total":     n_total,
+                    "n_correct":   n_correct,
+                    "taux_pct":    taux,
+                    "seuil_biais": nouveau_seuil,
+                }
+                if n_total >= 3:
+                    con.execute(
+                        """INSERT INTO flux_macro_calibration
+                           (date, confiance, n_total, n_correct, taux_pct, seuil_biais)
+                           VALUES (?, ?, ?, ?, ?, ?)""",
+                        (
+                            datetime.now(timezone.utc).isoformat(),
+                            niveau, n_total, n_correct, taux, nouveau_seuil,
+                        ),
+                    )
+            con.commit()
+            con.close()
+            logger.info("[FluxMacro] Calibration seuils recalculée : %s", calibration)
+            return {"ok": True, "calibration": calibration}
+        except Exception as exc:
+            logger.warning("[FluxMacro] _recalibrer_seuils: %s", exc)
+            return {"ok": False, "raison": str(exc)}
+
+    def set_verdict_posteriori(self, journal_id: int, verdict: str,
+                               faux_positif: bool | None = None) -> dict:
+        """
+        Enregistre un verdict a posteriori et déclenche automatiquement
+        la recalibration des seuils FORT/MOYEN/FAIBLE.
+        verdict : 'CORRECT' | 'INCORRECT' | 'INCERTAIN'
+        """
+        if not self._db_path:
+            return {"ok": False, "raison": "DB non initialisée"}
+        try:
+            fp_val = 1 if faux_positif is True else (0 if faux_positif is False else None)
+            con = sqlite3.connect(self._db_path)
+            con.execute(
+                """UPDATE flux_macro_journal
+                   SET verdict_posteriori = ?, faux_positif = ?
+                   WHERE id = ?""",
+                (verdict, fp_val, journal_id),
+            )
+            con.commit()
+            con.close()
+            calibration = self._recalibrer_seuils()
+            return {"ok": True, "verdict_enregistre": verdict, "calibration": calibration}
+        except Exception as exc:
+            logger.warning("[FluxMacro] set_verdict_posteriori: %s", exc)
+            return {"ok": False, "raison": str(exc)}
 
     def generer_rapport_hebdo(self) -> dict:
         """
