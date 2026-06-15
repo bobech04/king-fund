@@ -2661,6 +2661,8 @@
         <td>${payoutCell}</td>
         <td class="${scoreClass}">${score}/10</td>
         <td>${fiable ? '<span style="color:#22c55e;font-weight:700">✓</span>' : '<span style="color:var(--muted)">—</span>'}</td>
+        <td style="color:var(--muted);font-size:11px">${p.ex_dividend_date || '—'}</td>
+        <td style="color:var(--muted);font-size:11px">${p.dividend_date    || '—'}</td>
       </tr>`;
     }).join('');
     $('div-table').innerHTML = `<table class="data-table">
@@ -2668,6 +2670,7 @@
         <th>Ticker</th><th>Nom</th><th>Investi</th><th>Prix</th>
         <th>Div/action</th><th>Rendement</th><th>Rev/mois</th>
         <th>Payout</th><th>Score</th><th>Fiable</th>
+        <th>Ex-div</th><th>Paiement</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;

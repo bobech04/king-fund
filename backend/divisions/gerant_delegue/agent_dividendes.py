@@ -168,6 +168,14 @@ class AgentDividendes:
 
             self._snapshot_div[ticker] = div_ann
 
+            def _ts_to_iso(ts) -> str | None:
+                if not ts:
+                    return None
+                try:
+                    return datetime.utcfromtimestamp(int(ts)).strftime("%Y-%m-%d")
+                except Exception:
+                    return None
+
             return {
                 "ticker":        ticker,
                 "nom":           nom,
@@ -182,6 +190,8 @@ class AgentDividendes:
                 "is_reit":       is_reit,
                 "scoring":       scoring,
                 "coupe_detectee": coupe_detectee,
+                "ex_dividend_date": _ts_to_iso(inf.get("exDividendDate")),
+                "dividend_date":    _ts_to_iso(inf.get("dividendDate")),
             }
         except Exception as e:
             logger.debug("[Dividendes] %s: %s", ticker, e)
