@@ -1660,6 +1660,25 @@ def get_flux_macro_taux_reussite():
         return jsonify({"erreur": str(exc)}), 500
 
 
+@app.route("/api/flux-macro/journal/<int:journal_id>/verdict", methods=["POST"])
+def post_flux_macro_verdict(journal_id: int):
+    """Enregistre manuellement un verdict a posteriori sur un signal journalisé."""
+    body = request.get_json(silent=True) or {}
+    verdict      = body.get("verdict")          # "CORRECT" | "INCORRECT"
+    faux_positif = body.get("faux_positif")     # true | false | null
+    if verdict not in ("CORRECT", "INCORRECT"):
+        return jsonify({"erreur": "verdict doit être 'CORRECT' ou 'INCORRECT'"}), 400
+    try:
+        from divisions.research.agent_flux_macro import get_agent_flux_macro
+        get_agent_flux_macro().mettre_a_jour_verdict(journal_id, verdict, faux_positif)
+        tr = get_agent_flux_macro().taux_reussite()
+        return jsonify({"status": "ok", "journal_id": journal_id,
+                        "verdict": verdict, "taux_reussite": tr})
+    except Exception as exc:
+        logger.error("flux-macro/verdict: %s", exc)
+        return jsonify({"erreur": str(exc)}), 500
+
+
 @app.route("/api/flux-macro/rapport-flash", methods=["POST"])
 def post_flux_macro_rapport_flash():
     """Génère un rapport flash immédiat (sans attendre le scheduler)."""
