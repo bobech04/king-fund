@@ -1973,6 +1973,21 @@
     $('fm-nb-sources').textContent   = data.nb_sources ?? '—';
     $('fm-nb-ipos').textContent      = ipos.length;
 
+    // ── Taux de réussite (appel asynchrone non-bloquant) ──────────────────
+    apiFetch('/flux-macro/taux-reussite', 10_000).then(tr => {
+      const el = $('fm-taux-reussite');
+      const sub = $('fm-taux-detail');
+      if (!el) return;
+      const taux = tr.taux_pct;
+      el.textContent = tr.label ?? '—';
+      el.style.color = taux === null ? 'var(--muted)' :
+                       taux >= 60    ? 'var(--green)' :
+                       taux >= 40    ? 'var(--yellow)' : '#ff4455';
+      if (sub) sub.textContent = tr.total > 0
+        ? `${tr.corrects}/${tr.total} avec verdict`
+        : 'aucun verdict encore';
+    }).catch(() => {});
+
     // Confiance coloring
     const conf = data.confiance || '—';
     const confEl = $('fm-confiance');
