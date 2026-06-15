@@ -144,6 +144,25 @@
     }
   }
 
+  async function apiPostJson(path, body, timeout = 30_000) {
+    const ctrl = new AbortController();
+    const id   = setTimeout(() => ctrl.abort(), timeout);
+    try {
+      const r = await fetch(API + path, {
+        method: 'POST',
+        signal: ctrl.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      clearTimeout(id);
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return await r.json();
+    } catch (e) {
+      clearTimeout(id);
+      throw e;
+    }
+  }
+
   // ── WebSocket ────────────────────────────────────────────
   function connectWS() {
     if (state.ws) { try { state.ws.close(); } catch (_) {} }
@@ -245,6 +264,46 @@
     renderKpis(state.stats);
     renderClassementBlackswan(state.blackswan);
     renderTraderList(state.traders, state.activeFilter);
+    renderSelectionNaturelle(state.traders);
+  }
+
+  function renderSelectionNaturelle(traders) {
+    const el = $('sn-body');
+    if (!el) return;
+    if (!traders || !traders.length) {
+      el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:8px">Aucune donnée.</div>';
+      return;
+    }
+
+    const sorted = [...traders].sort((a, b) => (b.selection_multiplier || 1) - (a.selection_multiplier || 1));
+    const top5   = sorted.slice(0, 5);
+    const bot5   = [...traders].sort((a, b) => (a.selection_multiplier || 1) - (b.selection_multiplier || 1)).slice(0, 5);
+
+    function rowHtml(t, isTop) {
+      const mult    = t.selection_multiplier ?? 1;
+      const elim    = t.eliminated === true;
+      const color   = isTop ? 'var(--green)' : 'var(--red)';
+      const badge   = elim ? ' <span style="font-size:14px">🗑️</span>' : '';
+      const multStr = `×${mult.toFixed(2)}`;
+      return `<div class="sn-row">
+        <span class="sn-rank">${isTop ? '▲' : '▼'}</span>
+        <span class="sn-name">${t.nom || t.name || '—'}${badge}</span>
+        <span class="sn-role" style="color:var(--muted)">${t.role || ''}</span>
+        <span class="sn-mult" style="color:${color};font-weight:800">${multStr}</span>
+      </div>`;
+    }
+
+    el.innerHTML = `
+      <div class="sn-cols">
+        <div class="sn-col">
+          <div class="sn-col-title" style="color:var(--green)">🏆 Top 5 Gagnants</div>
+          ${top5.map(t => rowHtml(t, true)).join('')}
+        </div>
+        <div class="sn-col">
+          <div class="sn-col-title" style="color:var(--red)">💀 Bottom 5 Perdants</div>
+          ${bot5.map(t => rowHtml(t, false)).join('')}
+        </div>
+      </div>`;
   }
 
   function renderClassementBlackswan(bs) {
@@ -1566,6 +1625,15 @@
         </button>
       </div>`;
 
+    const comiBtnHtml = score >= 7 ? `
+      <div style="padding:10px 16px;border-top:1px solid var(--border)">
+        <button class="btn" id="btn-comite-${ticker}"
+                onclick="App.soumettreComiFromSearch('${ticker}')"
+                style="width:100%;background:#7c3aed;color:#fff;font-weight:700;font-size:13px">
+          🗳️ Soumettre au Comité — score ${score.toFixed(1)} ≥ 7
+        </button>
+      </div>` : '';
+
     resultEl.innerHTML = `
       <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
         <div style="display:flex;align-items:center;gap:16px;padding:16px;background:var(--bg2);flex-wrap:wrap">
@@ -1596,9 +1664,179 @@
             </table>
           </div>
         </div>
+        ${comiBtnHtml}
         ${addBtnHtml}
       </div>`;
   }
+
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.tab === tab);
+    });
+    document.querySelectorAll('.tab-panel').forEach(s => {
+      s.classList.toggle('active', s.id === 'tab-' + tab);
+    });
+    state.activeTab = tab;
+    App.refresh(tab);
+  }
+
+  async function soumettreComiFromSearch(ticker) {
+    switchTab('vote');
+    await new Promise(r => setTimeout(r, 120));
+    const inp = document.getElementById('wz-ticker-input');
+    if (inp) { inp.value = ticker; }
+    await wzAnalyser();
+  }
+
+  // ── Wizard Vote ───────────────────────────────────────────
+  const _wz = { ticker: null, score: null, stages: [], comiteResult: null, step: 1 };
+
+  function wzSetStep(n) {
+    _wz.step = n;
+    [1, 2, 3, 4, 5].forEach(i => {
+      const p = document.getElementById('wz-p' + i);
+      if (p) p.style.display = i === n ? '' : 'none';
+      const s = document.querySelector(`.wz-step[data-s="${i}"]`);
+      if (s) s.classList.toggle('active', i === n);
+      if (s) s.classList.toggle('done',   i < n);
+    });
+  }
+
+  async function wzAnalyser() {
+    const inp    = document.getElementById('wz-ticker-input');
+    const status = document.getElementById('wz-p1-status');
+    const ticker = (inp?.value || '').trim().toUpperCase();
+    if (!ticker) { if (status) status.textContent = '⚠️ Saisir un ticker.'; return; }
+    if (status) status.innerHTML = '<div class="spinner" style="display:inline-block;width:14px;height:14px"></div> Analyse en cours…';
+    try {
+      const data = await apiGet(`/investissement/analyze?ticker=${encodeURIComponent(ticker)}`);
+      if (data.erreur) { if (status) status.textContent = '❌ ' + data.erreur; return; }
+      _wz.ticker = ticker;
+      _wz.score  = data.score ?? 0;
+      _wz.stages = data.stages || [];
+      wzStep2Render();
+      wzSetStep(2);
+      if (status) status.textContent = '';
+    } catch (e) {
+      if (status) status.textContent = '❌ Erreur réseau : ' + e.message;
+    }
+  }
+
+  function wzStep2Render() {
+    const grid  = document.getElementById('wz-criteria-grid');
+    const label = document.getElementById('wz-ticker-label');
+    const scoreEl = document.getElementById('wz-score-val');
+    if (label)   label.textContent = _wz.ticker;
+    if (scoreEl) { scoreEl.textContent = _wz.score.toFixed(1); scoreEl.style.color = _wz.score >= 7 ? 'var(--green)' : _wz.score >= 4 ? '#facc15' : 'var(--red)'; }
+    if (!grid) return;
+    const named = _wz.stages.filter(s => s.name !== 'Score final');
+    grid.innerHTML = named.map(s => {
+      const sc  = s.score ?? 0;
+      const feu = sc >= 0.3 ? '🟢' : sc <= -0.3 ? '🔴' : '🟡';
+      return `<div class="wz-crit"><span class="wz-feu">${feu}</span><span class="wz-crit-name">${s.name}</span><span class="wz-crit-sc" style="color:${sc >= 0 ? 'var(--green)' : 'var(--red)'}">${sc >= 0 ? '+' : ''}${sc.toFixed(2)}</span></div>`;
+    }).join('');
+  }
+
+  async function wzStep3Vote() {
+    const statusEl = document.getElementById('wz-vote-status');
+    const btn      = document.getElementById('wz-vote-btn');
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Vote en cours…'; }
+    if (statusEl) statusEl.textContent = 'Consultation du Comité IA (Research · CIO · Fiscaliste)…';
+
+    const grid = document.getElementById('wz-comite-grid');
+    if (grid) grid.innerHTML = ['Research', 'CIO', 'Fiscaliste'].map(m =>
+      `<div class="wz-membre"><div class="wz-membre-name">${m}</div><div class="wz-membre-vote" id="wz-vote-${m.toLowerCase()}">⏳</div></div>`
+    ).join('');
+
+    try {
+      const res = await apiPostJson('/comite-selection/voter', {
+        ticker: _wz.ticker,
+        score: _wz.score,
+        stages: _wz.stages,
+      }, 60_000);
+      _wz.comiteResult = res;
+
+      const votes = res.votes || {};
+      ['research', 'cio', 'fiscaliste'].forEach(m => {
+        const el = document.getElementById('wz-vote-' + m);
+        if (!el) return;
+        const v = votes[m] || {};
+        const fav = v.favorable !== false;
+        el.innerHTML = `<span style="color:${fav ? 'var(--green)' : 'var(--red)'}">
+          ${fav ? '✅ FAVORABLE' : '❌ DÉFAVORABLE'}
+        </span><br><span style="font-size:11px;color:var(--muted)">${(v.commentaire || '').substring(0, 80)}</span>`;
+      });
+
+      if (statusEl) statusEl.textContent = '';
+      wzStep4Render();
+      wzSetStep(4);
+    } catch (e) {
+      if (statusEl) statusEl.textContent = '❌ Erreur comité : ' + e.message;
+      if (btn) { btn.disabled = false; btn.textContent = 'Relancer les votes IA →'; }
+    }
+  }
+
+  function wzStep4Render() {
+    const el = document.getElementById('wz-verdict-body');
+    if (!el || !_wz.comiteResult) return;
+    const r   = _wz.comiteResult;
+    const ok  = r.verdict === 'APPROUVÉ' || r.favorable === true;
+    const col = ok ? 'var(--green)' : 'var(--red)';
+    const sizing = r.sizing || r.allocation || '—';
+    el.innerHTML = `
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:48px">${ok ? '✅' : '❌'}</div>
+        <div style="font-size:22px;font-weight:800;color:${col};margin-top:8px">${r.verdict || (ok ? 'APPROUVÉ' : 'REJETÉ')}</div>
+        <div style="color:var(--muted);font-size:12px;margin-top:4px">${_wz.ticker} · Score ${_wz.score.toFixed(1)}/10</div>
+      </div>
+      <div class="wz-sizing-box">
+        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase">Sizing recommandé</div>
+        <div style="font-size:20px;font-weight:700;color:var(--accent)">${typeof sizing === 'object' ? JSON.stringify(sizing) : sizing}</div>
+      </div>
+      ${r.justification ? `<div style="margin-top:12px;font-size:12px;color:var(--muted);line-height:1.6">${r.justification}</div>` : ''}`;
+  }
+
+  function wzReset() {
+    _wz.ticker = null; _wz.score = null; _wz.stages = []; _wz.comiteResult = null;
+    const inp = document.getElementById('wz-ticker-input');
+    if (inp) inp.value = '';
+    wzSetStep(1);
+    loadVoteHistorique().catch(() => {});
+  }
+
+  async function loadVoteHistorique() {
+    const el = document.getElementById('vote-historique');
+    if (!el) return;
+    try {
+      const data = await apiGet('/comite-selection/historique');
+      const list = Array.isArray(data) ? data : (data.historique || []);
+      if (!list.length) { el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:12px">Aucune décision.</div>'; return; }
+      el.innerHTML = `<div class="table-wrap"><table class="data-table">
+        <thead><tr><th>Date</th><th>Ticker</th><th>Verdict</th><th>Score</th><th>Sizing</th></tr></thead>
+        <tbody>${list.slice().reverse().slice(0, 20).map(d => {
+          const ok  = d.verdict === 'APPROUVÉ' || d.favorable === true;
+          const col = ok ? 'var(--green)' : 'var(--red)';
+          return `<tr>
+            <td style="font-size:11px;color:var(--muted)">${(d.date || '').replace('T', ' ').slice(0, 16)}</td>
+            <td style="font-weight:700">${d.ticker || '—'}</td>
+            <td style="color:${col};font-weight:700">${d.verdict || '—'}</td>
+            <td>${d.score != null ? (+d.score).toFixed(1) : '—'}</td>
+            <td style="font-size:11px">${d.sizing || d.allocation || '—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div>`;
+    } catch (e) {
+      el.innerHTML = '<div style="color:var(--red);font-size:12px;padding:12px">Erreur chargement historique.</div>';
+    }
+  }
+
+  async function loadVoteTab() {
+    loadVoteHistorique().catch(() => {});
+    const timeEl = document.getElementById('vote-time');
+    if (timeEl) timeEl.textContent = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  function wzGo(step) { wzSetStep(step); }
 
   async function addToWatchlist(ticker) {
     const btn = $('btn-add-wl-' + ticker);
@@ -2470,18 +2708,25 @@
         liquidite:      loadLiquidite,
         retraite:       loadRetraite,
         dividendes:     loadDividendes,
+        vote:           loadVoteTab,
       };
       const fn = loaders[tab];
       if (fn) fn().catch(() => {});
     },
-    forceCheck:           () => forceCheck().catch(() => {}),
-    fixDb:                () => fixDb().catch(() => {}),
-    runScreener:          () => runScreener().catch(() => {}),
-    blackswanScan:        () => blackswanScan().catch(() => {}),
-    analyzeTickerSearch:  () => analyzeTickerSearch().catch(() => {}),
-    addToWatchlist:       ticker => addToWatchlist(ticker).catch(() => {}),
-    refreshFluxMacro:     () => loadFluxMacro().catch(() => {}),
-    refreshAlphaLab:      () => loadAlphaLab().catch(() => {}),
+    forceCheck:              () => forceCheck().catch(() => {}),
+    fixDb:                   () => fixDb().catch(() => {}),
+    runScreener:             () => runScreener().catch(() => {}),
+    blackswanScan:           () => blackswanScan().catch(() => {}),
+    analyzeTickerSearch:     () => analyzeTickerSearch().catch(() => {}),
+    addToWatchlist:          ticker => addToWatchlist(ticker).catch(() => {}),
+    refreshFluxMacro:        () => loadFluxMacro().catch(() => {}),
+    refreshAlphaLab:         () => loadAlphaLab().catch(() => {}),
+    wzAnalyser:              () => wzAnalyser().catch(() => {}),
+    wzGo:                    step => wzGo(step),
+    wzStep3Vote:             () => wzStep3Vote().catch(() => {}),
+    wzReset:                 () => wzReset(),
+    loadVoteHistorique:      () => loadVoteHistorique().catch(() => {}),
+    soumettreComiFromSearch: ticker => soumettreComiFromSearch(ticker).catch(() => {}),
   };
 
   // ── Init ──────────────────────────────────────────────────

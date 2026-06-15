@@ -468,3 +468,200 @@ main { flex: 1; padding: 16px; max-width: 1200px; margin: 0 auto; width: 100%; }
   .trader-card { grid-template-columns: 30px 1fr auto; gap: 8px; }
   .composant-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* ══════════════════════════════════════════════════════════
+   Sélection Naturelle
+   ══════════════════════════════════════════════════════════ */
+.sn-card { margin-top: 12px; }
+
+.sn-cols {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 560px) {
+  .sn-cols { grid-template-columns: 1fr; }
+}
+
+.sn-col-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-bottom: 10px;
+}
+
+.sn-row {
+  display: grid;
+  grid-template-columns: 18px 1fr auto auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 13px;
+}
+.sn-row:last-child { border-bottom: none; }
+
+.sn-rank  { font-size: 11px; color: var(--muted); text-align: center; }
+.sn-name  { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sn-role  { font-size: 10px; color: var(--muted); }
+.sn-mult  { font-size: 14px; white-space: nowrap; }
+
+/* ══════════════════════════════════════════════════════════
+   Wizard Vote
+   ══════════════════════════════════════════════════════════ */
+.wz-card { padding: 0; overflow: hidden; }
+
+/* Barre de progression étapes */
+.wz-steps {
+  display: flex;
+  background: var(--bg3);
+  border-bottom: 1px solid var(--border);
+  padding: 0;
+}
+
+.wz-step {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 4px 10px;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--muted);
+  border-right: 1px solid var(--border);
+  transition: background .2s, color .2s;
+  cursor: default;
+  user-select: none;
+}
+.wz-step:last-child { border-right: none; }
+
+.wz-step span {
+  font-size: 9px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.wz-step.active {
+  background: var(--accent);
+  color: #fff;
+}
+.wz-step.active span { color: rgba(255,255,255,.8); }
+
+.wz-step.done {
+  color: var(--green);
+}
+.wz-step.done span { color: var(--green); }
+
+/* Panneaux étapes */
+.wz-panel { padding: 20px; }
+
+.wz-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+.wz-input {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 600;
+  padding: 10px 14px;
+  outline: none;
+  transition: border-color .2s;
+  font-family: inherit;
+}
+.wz-input:focus { border-color: var(--accent); }
+
+/* Grille 17 critères (feux) */
+.wz-criteria-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.wz-crit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+}
+
+.wz-feu    { font-size: 16px; flex-shrink: 0; }
+.wz-crit-name { flex: 1; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wz-crit-sc   { font-weight: 700; font-size: 11px; flex-shrink: 0; }
+
+.wz-score-bar {
+  display: flex;
+  align-items: baseline;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+/* Grille comité 3 membres */
+.wz-comite-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+@media (max-width: 480px) {
+  .wz-comite-grid { grid-template-columns: 1fr; }
+}
+
+.wz-membre {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 12px;
+  text-align: center;
+}
+
+.wz-membre-name {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+
+.wz-membre-vote {
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Sizing box */
+.wz-sizing-box {
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px 18px;
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* Confirmation finale */
+.wz-confirm-body {
+  text-align: center;
+  padding: 16px 0;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.7;
+}
