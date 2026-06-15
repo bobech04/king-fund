@@ -2164,16 +2164,10 @@ def _job_flux_macro():
 
 _scheduler.add_job(
     _job_flux_macro,
-    CronTrigger(hour=10, minute=0),   # 10h00 Europe/Paris
-    id="flux_macro_matin",
+    CronTrigger(hour="10,18", minute=0),   # 10h00 et 18h00 Europe/Paris
+    id="flux_macro_biquotidien",
     replace_existing=True,
-)
-
-_scheduler.add_job(
-    _job_flux_macro,
-    CronTrigger(hour=18, minute=0),   # 18h00 Europe/Paris
-    id="flux_macro_aprem",
-    replace_existing=True,
+    misfire_grace_time=600,
 )
 
 
