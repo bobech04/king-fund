@@ -560,6 +560,36 @@ def config_pru_position():
         return jsonify({"erreur": str(e)}), 500
 
 
+@app.route("/api/patrimoine/positions-pru/nouvelle", methods=["POST"])
+def nouvelle_pru_position():
+    from data.suivi_pru import ajouter_transaction, configurer_position
+    body = request.get_json(silent=True) or {}
+    try:
+        ticker    = body["ticker"].strip().upper()
+        quantite  = float(body["quantite"])
+        pru       = float(body["pru"])
+        date_achat = body.get("date") or None
+        frais     = float(body.get("frais") or 0)
+        objectif  = body.get("objectif")
+        stop_loss = body.get("stop_loss")
+        if quantite <= 0 or pru <= 0:
+            return jsonify({"erreur": "quantite et pru doivent être positifs"}), 400
+        note = f"frais: {frais:.2f}" if frais > 0 else ""
+        tx  = ajouter_transaction(ticker, "achat", quantite, pru,
+                                  compte="cto", note=note, date_tx=date_achat)
+        pos = configurer_position(
+            ticker,
+            objectif  = float(objectif)  if objectif  else None,
+            stop_loss = float(stop_loss) if stop_loss else None,
+        )
+        return jsonify({"status": "ok", "transaction": tx, "position": pos})
+    except (KeyError, ValueError) as e:
+        return jsonify({"erreur": str(e)}), 400
+    except Exception as e:
+        logger.error("positions-pru/nouvelle: %s", e)
+        return jsonify({"erreur": str(e)}), 500
+
+
 @app.route("/api/patrimoine/positions-pru/<ticker>", methods=["DELETE"])
 def delete_pru_position(ticker):
     from data.suivi_pru import supprimer_position
