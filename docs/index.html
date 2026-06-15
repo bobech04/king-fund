@@ -38,6 +38,7 @@
     <button class="tab-btn" data-tab="liquidite"      role="tab">🌊 Liquidité</button>
     <button class="tab-btn" data-tab="retraite"      role="tab">🎯 Retraite</button>
     <button class="tab-btn" data-tab="dividendes"    role="tab">📊 Dividendes</button>
+    <button class="tab-btn" data-tab="vote"          role="tab">🗳️ Vote</button>
   </nav>
 </header>
 
@@ -98,6 +99,14 @@
       <div style="text-align:center;padding:40px;color:var(--muted)">
         <div class="spinner"></div>
         <p style="margin-top:12px">Chargement…</p>
+      </div>
+    </div>
+
+    <!-- Sélection Naturelle -->
+    <div class="card sn-card" id="sn-card" style="margin-top:12px">
+      <div class="card-title">🧬 Sélection Naturelle — Classement Darwinien</div>
+      <div id="sn-body">
+        <div style="text-align:center;padding:24px;color:var(--muted)"><div class="spinner"></div></div>
       </div>
     </div>
   </section>
@@ -717,6 +726,23 @@
       <div id="inv-search-result" style="display:none;margin-top:16px"></div>
     </div>
 
+    <!-- Candidats Screener -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <span>🔬 7 Candidats Screener — Pipeline 17 étapes</span>
+        <button class="btn btn-sm" id="btn-screener-cand" onclick="App.runScreenerCandidats()"
+                style="background:#ffd700;color:#000;font-weight:700;white-space:nowrap">
+          ▶ Analyser les 7
+        </button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px">
+        YAR.OL · BNP.PA · SHEL.L · DBK.DE · LLOY.L · ABN.AS · 0941.HK — ajout watchlist auto si score ≥ 6
+      </div>
+      <div id="screener-cand-table">
+        <div style="color:var(--muted);font-size:12px;padding:8px">Cliquer ▶ Analyser pour lancer.</div>
+      </div>
+    </div>
+
     <!-- KPIs watchlist -->
     <div class="kpi-grid" id="inv-kpis">
       <div class="kpi"><div class="kpi-label">Actifs Analysés</div><div class="kpi-val neu" id="inv-nb">—</div><div class="kpi-sub">13 titres watchlist</div></div>
@@ -999,6 +1025,111 @@
     <div class="card">
       <div class="card-title">Watchlist dividendes (16 positions)</div>
       <div id="div-table" class="table-wrap">
+        <div style="text-align:center;padding:24px;color:var(--muted)"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════════════ 12. VOTE ══════════════════════ -->
+  <section id="tab-vote" class="tab-panel">
+    <div class="section-header">
+      <span class="section-title">🗳️ Comité de Sélection</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="section-meta" id="vote-time">—</span>
+        <button class="btn btn-sm btn-ghost" onclick="App.refresh('vote')">↻</button>
+      </div>
+    </div>
+
+    <!-- Wizard 5 étapes -->
+    <div class="wz-card card" id="wz-card">
+      <!-- Progress bar étapes -->
+      <div class="wz-steps" id="wz-steps">
+        <div class="wz-step active" data-s="1">1<span>Valeur</span></div>
+        <div class="wz-step" data-s="2">2<span>Signaux</span></div>
+        <div class="wz-step" data-s="3">3<span>Comité</span></div>
+        <div class="wz-step" data-s="4">4<span>Verdict</span></div>
+        <div class="wz-step" data-s="5">5<span>Confirmer</span></div>
+      </div>
+
+      <!-- Étape 1 — Choisir la valeur -->
+      <div class="wz-panel" id="wz-p1">
+        <div class="wz-title">Étape 1 — Choisir une valeur</div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <input id="wz-ticker-input" class="wz-input" type="text"
+                 placeholder="Ex: AAPL, TSLA, MSFT…"
+                 style="flex:1;text-transform:uppercase"
+                 oninput="this.value=this.value.toUpperCase()"
+                 onkeydown="if(event.key==='Enter')App.wzAnalyser()">
+          <button class="btn" onclick="App.wzAnalyser()"
+                  style="background:var(--accent);color:#fff;font-weight:700">
+            Analyser →
+          </button>
+        </div>
+        <div id="wz-p1-status" style="margin-top:12px;font-size:12px;color:var(--muted)"></div>
+      </div>
+
+      <!-- Étape 2 — Feux de signalisation 17 critères -->
+      <div class="wz-panel" id="wz-p2" style="display:none">
+        <div class="wz-title">Étape 2 — Feux de signalisation · <span id="wz-ticker-label"></span></div>
+        <div id="wz-criteria-grid" class="wz-criteria-grid"></div>
+        <div class="wz-score-bar">
+          <span>Score global :</span>
+          <span id="wz-score-val" style="font-size:22px;font-weight:800;margin-left:8px">—</span>
+          <span style="color:var(--muted);font-size:12px">&nbsp;/ 17</span>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+          <button class="btn btn-ghost" onclick="App.wzGo(1)">← Retour</button>
+          <button class="btn" onclick="App.wzGo(3)"
+                  style="background:var(--accent);color:#fff;font-weight:700">
+            Convoquer le Comité →
+          </button>
+        </div>
+      </div>
+
+      <!-- Étape 3 — Vote Comité 3/3 -->
+      <div class="wz-panel" id="wz-p3" style="display:none">
+        <div class="wz-title">Étape 3 — Comité 3/3 · Research · CIO · Fiscaliste</div>
+        <div id="wz-comite-grid" class="wz-comite-grid"></div>
+        <div id="wz-vote-status" style="text-align:center;margin-top:12px;font-size:12px;color:var(--muted)"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+          <button class="btn btn-ghost" onclick="App.wzGo(2)">← Retour</button>
+          <button id="wz-vote-btn" class="btn" onclick="App.wzStep3Vote()"
+                  style="background:#7c3aed;color:#fff;font-weight:700">
+            Lancer les votes IA →
+          </button>
+        </div>
+      </div>
+
+      <!-- Étape 4 — Verdict + Sizing -->
+      <div class="wz-panel" id="wz-p4" style="display:none">
+        <div class="wz-title">Étape 4 — Verdict &amp; Sizing</div>
+        <div id="wz-verdict-body"></div>
+        <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+          <button class="btn btn-ghost" onclick="App.wzGo(3)">← Retour</button>
+          <button class="btn" onclick="App.wzGo(5)"
+                  style="background:var(--green);color:#fff;font-weight:700">
+            Confirmer →
+          </button>
+        </div>
+      </div>
+
+      <!-- Étape 5 — Confirmation -->
+      <div class="wz-panel" id="wz-p5" style="display:none">
+        <div class="wz-title">Étape 5 — Décision enregistrée</div>
+        <div id="wz-confirm-body" class="wz-confirm-body"></div>
+        <div style="display:flex;gap:8px;margin-top:20px;justify-content:center">
+          <button class="btn" onclick="App.wzReset()"
+                  style="background:var(--bg3);color:var(--text)">
+            ✦ Nouvelle analyse
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Historique des décisions -->
+    <div class="card" style="margin-top:12px">
+      <div class="card-title">📋 Historique des décisions comité</div>
+      <div id="vote-historique">
         <div style="text-align:center;padding:24px;color:var(--muted)"><div class="spinner"></div></div>
       </div>
     </div>
