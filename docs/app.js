@@ -2535,14 +2535,72 @@
         <td class="${pnlClass(pvTotal)}">${(pvTotal >= 0 ? '+' : '') + pvTotal.toFixed(2) + ' €'}</td>
         <td class="${pnlClass(pvPct)}">${pvPct.toFixed(2)}%</td>
         <td style="color:var(--muted)">${qte}</td>
+        <td><button class="btn btn-sm" onclick="App.openPruTx('${p.ticker}')"
+              style="font-size:11px;padding:3px 8px;background:var(--bg3);color:var(--fg);border:1px solid var(--border)">
+          + Tx
+        </button></td>
       </tr>`;
     }).join('');
     container.innerHTML = `<div class="table-wrap"><table class="data-table">
       <thead><tr>
-        <th>Ticker</th><th>PRU</th><th>Prix live</th><th>PV/MV €</th><th>PV/MV %</th><th>Qté</th>
+        <th>Ticker</th><th>PRU</th><th>Prix live</th><th>PV/MV €</th><th>PV/MV %</th><th>Qté</th><th></th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table></div>`;
+  }
+
+  function openPruTx(ticker) {
+    const overlay = document.getElementById('pru-tx-overlay');
+    if (!overlay) return;
+    document.getElementById('pru-tx-ticker').value = ticker;
+    document.getElementById('pru-tx-ticker-label').textContent = ticker;
+    const errInit = document.getElementById('pru-tx-error');
+    errInit.textContent = '';
+    errInit.style.display = 'none';
+    document.getElementById('pru-tx-date').value = new Date().toISOString().slice(0, 10);
+    overlay.style.display = 'flex';
+  }
+
+  function closePruTx() {
+    const overlay = document.getElementById('pru-tx-overlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
+  async function submitPruTx() {
+    const ticker = document.getElementById('pru-tx-ticker').value;
+    const type   = document.getElementById('pru-tx-type').value;
+    const qte    = parseFloat(document.getElementById('pru-tx-qte').value);
+    const prix   = parseFloat(document.getElementById('pru-tx-prix').value);
+    const date   = document.getElementById('pru-tx-date').value;
+    const frais  = parseFloat(document.getElementById('pru-tx-frais').value) || 0;
+    const errEl  = document.getElementById('pru-tx-error');
+
+    if (!ticker || !type || isNaN(qte) || qte <= 0 || isNaN(prix) || prix <= 0 || !date) {
+      errEl.textContent = 'Veuillez remplir tous les champs obligatoires.';
+      errEl.style.display = 'block';
+      return;
+    }
+    errEl.textContent = '';
+    errEl.style.display = 'none';
+    const btn = document.getElementById('pru-tx-submit');
+    btn.disabled = true;
+    btn.textContent = '...';
+
+    try {
+      const note = frais > 0 ? `frais: ${frais.toFixed(2)}` : '';
+      await apiPostJson('/patrimoine/positions-pru/transaction', {
+        ticker, type, quantite: qte, prix_unitaire: prix,
+        date, compte: 'cto', note
+      });
+      closePruTx();
+      loadRetraite().catch(() => {});
+    } catch (e) {
+      errEl.textContent = e.message || "Erreur lors de l'enregistrement.";
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = 'Enregistrer';
+    }
   }
 
   async function loadDividendes() {
@@ -2603,6 +2661,8 @@
         <td>${payoutCell}</td>
         <td class="${scoreClass}">${score}/10</td>
         <td>${fiable ? '<span style="color:#22c55e;font-weight:700">✓</span>' : '<span style="color:var(--muted)">—</span>'}</td>
+        <td style="color:var(--muted);font-size:11px">${p.ex_dividend_date || '—'}</td>
+        <td style="color:var(--muted);font-size:11px">${p.dividend_date    || '—'}</td>
       </tr>`;
     }).join('');
     $('div-table').innerHTML = `<table class="data-table">
@@ -2610,6 +2670,7 @@
         <th>Ticker</th><th>Nom</th><th>Investi</th><th>Prix</th>
         <th>Div/action</th><th>Rendement</th><th>Rev/mois</th>
         <th>Payout</th><th>Score</th><th>Fiable</th>
+        <th>Ex-div</th><th>Paiement</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>`;
@@ -2794,6 +2855,9 @@
     loadVoteHistorique:      () => loadVoteHistorique().catch(() => {}),
     soumettreComiFromSearch: ticker => soumettreComiFromSearch(ticker).catch(() => {}),
     runScreenerCandidats:    () => runScreenerCandidats().catch(() => {}),
+    openPruTx:               ticker => openPruTx(ticker),
+    closePruTx:              () => closePruTx(),
+    submitPruTx:             () => submitPruTx().catch(() => {}),
   };
 
   // ── Init ──────────────────────────────────────────────────
