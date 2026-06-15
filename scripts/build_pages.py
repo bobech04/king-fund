@@ -23,18 +23,18 @@ def sync():
         src = FRONTEND / name
         dst = DOCS / name
         shutil.copy2(src, dst)
-        print(f"  ✓ {name}")
+        print(f"  OK {name}")
 
     # Copie assets/ (sauf fichiers préservés)
     for src in (FRONTEND / "assets").iterdir():
         dst = DOCS / "assets" / src.name
         shutil.copy2(src, dst)
-        print(f"  ✓ assets/{src.name}")
+        print(f"  OK assets/{src.name}")
 
     print("\nDocs mis à jour. Fichiers préservés:", ", ".join(PRESERVE))
     print("Vérifiez docs/config.js pour l'URL de votre backend.")
 
 if __name__ == "__main__":
-    print("Synchronisation frontend/ → docs/")
+    print("Synchronisation frontend/ -> docs/")
     sync()
     print("\nGitHub Pages prêt. Poussez vers GitHub et activez Pages (branch: main, folder: /docs).")
