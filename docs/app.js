@@ -2603,6 +2603,59 @@
     }
   }
 
+  function openNouvellePosition() {
+    const overlay = document.getElementById('nouv-pos-overlay');
+    if (!overlay) return;
+    ['nouv-ticker','nouv-qte','nouv-pru','nouv-frais','nouv-stop','nouv-obj'].forEach(id => {
+      document.getElementById(id).value = '';
+    });
+    document.getElementById('nouv-date').value = new Date().toISOString().slice(0, 10);
+    const errEl = document.getElementById('nouv-pos-error');
+    errEl.textContent = ''; errEl.style.display = 'none';
+    overlay.style.display = 'flex';
+    setTimeout(() => { const el = document.getElementById('nouv-ticker'); if (el) el.focus(); }, 50);
+  }
+
+  function closeNouvellePosition() {
+    const overlay = document.getElementById('nouv-pos-overlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
+  async function submitNouvellePosition() {
+    const ticker = (document.getElementById('nouv-ticker').value || '').trim().toUpperCase();
+    const qte    = parseFloat(document.getElementById('nouv-qte').value);
+    const pru    = parseFloat(document.getElementById('nouv-pru').value);
+    const date   = document.getElementById('nouv-date').value;
+    const frais  = parseFloat(document.getElementById('nouv-frais').value) || 0;
+    const stop   = document.getElementById('nouv-stop').value;
+    const obj    = document.getElementById('nouv-obj').value;
+    const errEl  = document.getElementById('nouv-pos-error');
+
+    if (!ticker || isNaN(qte) || qte <= 0 || isNaN(pru) || pru <= 0) {
+      errEl.textContent = 'Ticker, quantité et PRU sont obligatoires.';
+      errEl.style.display = 'block';
+      return;
+    }
+    errEl.textContent = ''; errEl.style.display = 'none';
+    const btn = document.getElementById('nouv-pos-submit');
+    btn.disabled = true; btn.textContent = '...';
+
+    try {
+      await apiPostJson('/patrimoine/positions-pru/nouvelle', {
+        ticker, quantite: qte, pru, date: date || undefined, frais,
+        stop_loss: stop ? parseFloat(stop) : undefined,
+        objectif:  obj  ? parseFloat(obj)  : undefined,
+      });
+      closeNouvellePosition();
+      loadRetraite().catch(() => {});
+    } catch (e) {
+      errEl.textContent = e.message || "Erreur lors de la création.";
+      errEl.style.display = 'block';
+    } finally {
+      btn.disabled = false; btn.textContent = 'Créer la position';
+    }
+  }
+
   async function loadDividendes() {
     let data;
     try {
@@ -2858,6 +2911,9 @@
     openPruTx:               ticker => openPruTx(ticker),
     closePruTx:              () => closePruTx(),
     submitPruTx:             () => submitPruTx().catch(() => {}),
+    openNouvellePosition:    () => openNouvellePosition(),
+    closeNouvellePosition:   () => closeNouvellePosition(),
+    submitNouvellePosition:  () => submitNouvellePosition().catch(() => {}),
   };
 
   // ── Init ──────────────────────────────────────────────────
