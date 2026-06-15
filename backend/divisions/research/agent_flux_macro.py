@@ -2165,17 +2165,41 @@ class AgentFluxMacro:
             logger.warning("[FluxMacro] Rapport flash sauvegarde: %s", exc)
             return {"ok": False, "chemin": "", "texte": texte, "erreur": str(exc), "format": "txt"}
 
+    def taux_reussite(self) -> dict:
+        """
+        Calcule le taux de réussite des signaux Flux Macro depuis flux_macro_journal.
+        Retourne {total, corrects, taux_pct, label}.
+        'Correct' = verdict_posteriori = 'CORRECT'.
+        """
+        if not self._db_path:
+            return {"total": 0, "corrects": 0, "taux_pct": None, "label": "—"}
+        try:
+            con = sqlite3.connect(self._db_path)
+            total = con.execute(
+                "SELECT COUNT(*) FROM flux_macro_journal WHERE verdict_posteriori IS NOT NULL"
+            ).fetchone()[0]
+            corrects = con.execute(
+                "SELECT COUNT(*) FROM flux_macro_journal WHERE verdict_posteriori = 'CORRECT'"
+            ).fetchone()[0]
+            con.close()
+            taux = round(corrects / total * 100, 1) if total > 0 else None
+            label = f"{taux}%" if taux is not None else "—"
+            return {"total": total, "corrects": corrects, "taux_pct": taux, "label": label}
+        except Exception as exc:
+            logger.warning("[FluxMacro] taux_reussite: %s", exc)
+            return {"total": 0, "corrects": 0, "taux_pct": None, "label": "—"}
+
     def generer_rapport_hebdo(self) -> dict:
         """
         Génère le rapport hebdomadaire (lundi 07:00 UTC).
         Lance d'abord un scan complet puis génère le rapport.
-        Sauvegarde dans rapports/flux_macro/hebdo/hebdo_YYYY-WNN.txt
+        Sauvegarde dans rapports/flux_macro/hebdo/hebdo_YYYY-WNN.pdf (fallback TXT).
         """
         donnees = self.analyser(forcer=True)
         now     = datetime.now(timezone.utc)
         semaine = now.strftime("W%W")
-        nom     = f"hebdo_{now.strftime('%Y')}-{semaine}.txt"
-        chemin  = _RAPPORTS_DIR / "hebdo" / nom
+        nom_base = f"hebdo_{now.strftime('%Y')}-{semaine}"
+        chemin_txt = _RAPPORTS_DIR / "hebdo" / f"{nom_base}.txt"
 
         anomalies      = donnees.get("anomalies", [])
         alertes_liq    = donnees.get("alertes_liquidite", [])
@@ -2186,6 +2210,7 @@ class AgentFluxMacro:
         sources        = donnees.get("sources_actives", [])
         liq            = donnees.get("fred_liquidite", {})
         journal_recent = self.journal(limite=7)
+        taux_info      = self.taux_reussite()
 
         faux_positifs = [j for j in journal_recent if j.get("faux_positif") == 1]
 
@@ -2195,7 +2220,8 @@ class AgentFluxMacro:
             f"Le Détective de Capitaux — {now.strftime('%Y %B')}\n"
             f"═══════════════════════════════════════════════════\n"
             f"Période : {semaine} | Généré le {now.strftime('%Y-%m-%d %H:%M UTC')}\n"
-            f"Régime marché : {regime} | Confiance : {confiance}\n\n"
+            f"Régime marché : {regime} | Confiance : {confiance}\n"
+            f"Taux de réussite signaux : {taux_info['label']} ({taux_info['corrects']}/{taux_info['total']} avec verdict)\n\n"
             f"── ANOMALIES DE LA SEMAINE ({len(anomalies)}) ─────────────────\n"
             + (("\n".join(
                 f"  [{a.get('niveau','?')}] {a.get('label','?')} — z={a.get('z_score','?')} | {a.get('variation_pct','?')}%"
@@ -2230,21 +2256,115 @@ class AgentFluxMacro:
             f"═══════════════════════════════════════════════════\n"
         )
 
+        # ── Tentative PDF (fpdf2) ────────────────────────────────────────────
+        chemin_final = chemin_txt
+        fmt = "txt"
         try:
-            chemin.write_text(texte, encoding="utf-8")
-            logger.info("[FluxMacro] Rapport hebdo sauvegardé : %s", chemin)
-            try:
-                from divisions.gerant_delegue.notifier import send
-                send(
-                    f"📊 Rapport Hebdo Flux Macro — {semaine}\n"
-                    f"Anomalies: {len(anomalies)} | Alertes liq: {len(alertes_liq)} | Régime: {regime}\n"
-                    f"Confiance: {confiance}\n"
-                    f"⚠️ {DISCLAIMER}",
-                    "info",
-                )
-            except Exception:
-                pass
-            return {"ok": True, "chemin": str(chemin), "texte": texte, "semaine": semaine}
+            from fpdf import FPDF
+
+            def _p(s: Any) -> str:
+                return str(s).encode("latin-1", errors="replace").decode("latin-1")
+
+            pdf = FPDF()
+            pdf.set_margins(left=12, top=12, right=12)
+            pdf.set_auto_page_break(auto=True, margin=15)
+            pdf.add_page()
+            W = pdf.epw
+
+            pdf.set_font("Helvetica", "B", 13)
+            pdf.cell(W, 9, "RAPPORT HEBDO - AGENT FLUX MACRO", new_x="LMARGIN", new_y="NEXT", align="C")
+            pdf.set_font("Helvetica", "", 9)
+            pdf.cell(W, 5, f"Le Detecteur de Capitaux - {now.strftime('%Y %B')} - {semaine}",
+                     new_x="LMARGIN", new_y="NEXT", align="C")
+            pdf.cell(W, 5, f"Genere le {now.strftime('%Y-%m-%d %H:%M UTC')}",
+                     new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(W, 5, _p(f"Regime : {regime}  |  Confiance : {confiance}  |  "
+                               f"Taux reussite : {taux_info['label']} ({taux_info['corrects']}/{taux_info['total']})"),
+                     new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(3)
+
+            def _section(titre: str) -> None:
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.cell(W, 7, titre, new_x="LMARGIN", new_y="NEXT")
+                pdf.set_font("Helvetica", "", 9)
+
+            _section(f"ANOMALIES DE LA SEMAINE ({len(anomalies)})")
+            if anomalies:
+                for a in anomalies:
+                    pdf.multi_cell(W, 4, _p(
+                        f"[{a.get('niveau','?')}] {a.get('label','?')} — "
+                        f"z={a.get('z_score','?')} | {a.get('variation_pct','?')}%"
+                    ))
+            else:
+                pdf.cell(W, 5, "Aucune anomalie detectee", new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(2)
+
+            _section(f"ALERTES LIQUIDITE ({len(alertes_liq)})")
+            if alertes_liq:
+                for a in alertes_liq:
+                    pdf.multi_cell(W, 4, _p(
+                        f"[{a.get('niveau','?')}] {a.get('label','?')} — "
+                        f"{a.get('valeur','?')} (seuil: {a.get('seuil','?')})"
+                    ))
+            else:
+                pdf.cell(W, 5, "Aucune alerte liquidite", new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(2)
+
+            _section("INDICATEURS LIQUIDITE MACRO (FRED)")
+            for k, label in [("M2SL","M2SL Mds$"), ("WALCL","WALCL Mds$"),
+                              ("IORB","IORB %"), ("BAMLC0A0CM","IG spread"),
+                              ("BAMLH0A0HYM2","HY spread")]:
+                pdf.cell(W, 4, _p(f"  {label}: {liq.get(k, 'N/D')}"),
+                         new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(2)
+
+            _section(f"CALENDRIER IPO SEC EDGAR ({len(ipos)} filing(s) S-1)")
+            if ipos:
+                for i in ipos[:5]:
+                    pdf.multi_cell(W, 4, _p(f"  {i.get('date','?')} — {str(i.get('titre','?'))[:90]}"))
+            else:
+                pdf.cell(W, 4, "  Aucun filing S-1 recent", new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(2)
+
+            _section("CONCLUSION")
+            pdf.multi_cell(W, 5, _p(str(conclusion)[:600]))
+            pdf.ln(2)
+
+            _section(f"SOURCES ACTIVES ({len(sources)})")
+            for s in sources[:8]:
+                pdf.multi_cell(W, 4, _p(f"- {str(s)[:110]}"))
+            pdf.ln(2)
+
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.multi_cell(W, 4, _p(f"DISCLAIMER : {DISCLAIMER}"))
+
+            chemin_pdf = _RAPPORTS_DIR / "hebdo" / f"{nom_base}.pdf"
+            pdf.output(str(chemin_pdf))
+            chemin_final = chemin_pdf
+            fmt = "pdf"
+            logger.info("[FluxMacro] Rapport hebdo PDF sauvegardé : %s", chemin_pdf)
+
+        except ImportError:
+            logger.debug("[FluxMacro] fpdf2 absent — fallback TXT pour hebdo")
         except Exception as exc:
-            logger.warning("[FluxMacro] Rapport hebdo sauvegarde: %s", exc)
-            return {"ok": False, "chemin": "", "texte": texte, "erreur": str(exc)}
+            logger.warning("[FluxMacro] Rapport hebdo PDF erreur: %s", exc)
+
+        # ── Fallback TXT (toujours écrit pour archivage) ─────────────────────
+        try:
+            chemin_txt.write_text(texte, encoding="utf-8")
+        except Exception as exc:
+            logger.warning("[FluxMacro] Rapport hebdo TXT sauvegarde: %s", exc)
+
+        try:
+            from divisions.gerant_delegue.notifier import send
+            send(
+                f"📊 Rapport Hebdo Flux Macro — {semaine}\n"
+                f"Anomalies: {len(anomalies)} | Alertes liq: {len(alertes_liq)} | Régime: {regime}\n"
+                f"Confiance: {confiance} | Taux réussite: {taux_info['label']}\n"
+                f"⚠️ {DISCLAIMER}",
+                "info",
+            )
+        except Exception:
+            pass
+        return {"ok": True, "chemin": str(chemin_final), "texte": texte,
+                "semaine": semaine, "format": fmt}
