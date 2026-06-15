@@ -13,6 +13,10 @@ gunicorn>=21.2.0
 gevent>=23.9.1
 gevent-websocket>=0.10.1
 
+# --- Serveur WSGI production (Windows) ---
+# Lancer avec : start_production.bat  (ou : waitress-serve --port=5000 app:app)
+waitress>=3.0.0
+
 # --- Planificateur ---
 apscheduler>=3.10.0
 pytz>=2024.1

@@ -1,0 +1,12 @@
+@echo off
+REM King Fund — Serveur de production Windows (Waitress)
+REM Usage : double-clic ou "start_production.bat" depuis la racine du projet
+REM Pour le dev local, utiliser : cd backend && python app.py
+
+cd /d "%~dp0backend"
+
+echo [King Fund] Demarrage serveur Waitress (production)...
+echo [King Fund] URL : http://localhost:5000
+echo [King Fund] Ctrl+C pour arreter
+
+waitress-serve --host=0.0.0.0 --port=5000 --threads=4 app:app
