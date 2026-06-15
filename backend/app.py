@@ -1638,6 +1638,17 @@ def post_flux_macro_scan_contexte():
         return jsonify({"erreur": str(exc)}), 500
 
 
+@app.route("/api/flux-macro/taux-reussite")
+def get_flux_macro_taux_reussite():
+    """Taux de réussite des signaux Flux Macro (signaux corrects / total avec verdict)."""
+    try:
+        from divisions.research.agent_flux_macro import get_agent_flux_macro
+        return jsonify(get_agent_flux_macro().taux_reussite())
+    except Exception as exc:
+        logger.error("flux-macro/taux-reussite: %s", exc)
+        return jsonify({"erreur": str(exc)}), 500
+
+
 @app.route("/api/flux-macro/rapport-flash", methods=["POST"])
 def post_flux_macro_rapport_flash():
     """Génère un rapport flash immédiat (sans attendre le scheduler)."""
