@@ -18,6 +18,7 @@ import sqlite3
 import sys
 import threading
 import time
+import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone, timedelta
@@ -375,35 +376,50 @@ class AgentFluxMacro:
                     date              TEXT NOT NULL,
                     anomalie_detectee TEXT,
                     cause_identifiee  TEXT,
+                    sources_utilisees TEXT,
                     confiance         TEXT,
                     conclusion        TEXT,
+                    action_suggeree   TEXT,
                     verdict_posteriori TEXT DEFAULT NULL,
                     faux_positif      INTEGER DEFAULT NULL,
                     sources_actives   TEXT,
                     created_at        TEXT DEFAULT (datetime('now'))
                 )
             """)
+            # Migration : ajoute les colonnes manquantes pour les DBs existantes
+            for col, typedef in [
+                ("sources_utilisees", "TEXT"),
+                ("action_suggeree",   "TEXT"),
+            ]:
+                try:
+                    con.execute(f"ALTER TABLE flux_macro_journal ADD COLUMN {col} {typedef}")
+                except Exception:
+                    pass  # colonne déjà présente
             con.commit()
             con.close()
         except Exception as exc:
             logger.warning("[FluxMacro] init_db: %s", exc)
 
     def _save_journal(self, anomalie: str, cause: str, confiance: str,
-                      conclusion: str, sources: list[str]) -> None:
+                      conclusion: str, sources: list[str],
+                      action_suggeree: str = "") -> None:
         if not self._db_path:
             return
         try:
             con = sqlite3.connect(self._db_path)
             con.execute(
                 """INSERT INTO flux_macro_journal
-                   (date, anomalie_detectee, cause_identifiee, confiance, conclusion, sources_actives)
-                   VALUES (?, ?, ?, ?, ?, ?)""",
+                   (date, anomalie_detectee, cause_identifiee, sources_utilisees,
+                    confiance, conclusion, action_suggeree, sources_actives)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
                 (
                     datetime.now(timezone.utc).isoformat(),
-                    anomalie[:500] if anomalie else None,
-                    cause[:500]    if cause    else None,
+                    anomalie[:500]        if anomalie        else None,
+                    cause[:500]           if cause           else None,
+                    json.dumps(sources),
                     confiance,
-                    conclusion[:1000] if conclusion else None,
+                    conclusion[:1000]     if conclusion      else None,
+                    action_suggeree[:500] if action_suggeree else None,
                     json.dumps(sources),
                 ),
             )
@@ -418,13 +434,15 @@ class AgentFluxMacro:
         try:
             con = sqlite3.connect(self._db_path)
             rows = con.execute(
-                "SELECT date,anomalie_detectee,cause_identifiee,confiance,conclusion,"
+                "SELECT date,anomalie_detectee,cause_identifiee,sources_utilisees,"
+                "confiance,conclusion,action_suggeree,"
                 "verdict_posteriori,faux_positif,sources_actives,created_at "
                 "FROM flux_macro_journal ORDER BY id DESC LIMIT ?",
                 (limite,),
             ).fetchall()
             con.close()
-            cols = ["date", "anomalie", "cause", "confiance", "conclusion",
+            cols = ["date", "anomalie", "cause", "sources_utilisees",
+                    "confiance", "conclusion", "action_suggeree",
                     "verdict", "faux_positif", "sources", "created_at"]
             return [dict(zip(cols, r)) for r in rows]
         except Exception as exc:
@@ -548,43 +566,266 @@ class AgentFluxMacro:
 
     def _fetch_cftc(self) -> dict[str, Any]:
         """
-        Fetch CFTC Commitments of Traders — Managed Money positions on GOLD (COMEX).
-        Source: CFTC Socrata public API (disaggregated futures-only).
+        CFTC Commitments of Traders — positions spéculatives hebdomadaires.
+        Marchés : Or/COMEX (GC=F), Pétrole WTI/NYMEX (CL=F), Yen/CME (USDJPY).
+        Source disaggregée (jun7-fc8e) : champ m_money_positions_* (Managed Money).
+        Source legacy (6dca-aqww)     : champ noncomm_positions_*  (Non-Commercial).
+        URL de référence : https://www.cftc.gov/dea/futures/deacmxsf.htm
+        Cadence : hebdomadaire — rapport publié le vendredi.
         """
+        def _one(dataset: str, market_enc: str, long_field: str, short_field: str,
+                 label: str) -> dict:
+            try:
+                url = (
+                    f"https://publicreporting.cftc.gov/resource/{dataset}.json"
+                    f"?market_and_exchange_names={market_enc}"
+                    f"&%24order=report_date_as_yyyy_mm_dd+DESC&%24limit=1"
+                )
+                req = urllib.request.Request(
+                    url,
+                    headers={"User-Agent": "king-fund-flux-macro/1.0", "Accept": "application/json"},
+                )
+                with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
+                    raw = resp.read().decode("utf-8", errors="replace")
+                rows = json.loads(raw)
+                if not rows:
+                    return {"ok": False, "reason": "DONNÉES INDISPONIBLES", "label": label}
+                r = rows[0]
+                long_  = int(r.get(long_field,  0) or 0)
+                short_ = int(r.get(short_field, 0) or 0)
+                return {
+                    "ok":          True,
+                    "label":       label,
+                    "report_date": self._sanitize(r.get("report_date_as_yyyy_mm_dd", "?"), 20),
+                    "mm_long":     long_,
+                    "mm_short":    short_,
+                    "net_mm":      long_ - short_,
+                    "freshness":   "OK",
+                }
+            except Exception as exc:
+                logger.debug("[FluxMacro] CFTC %s: %s", label, exc)
+                return {"ok": False, "reason": str(exc), "label": label}
+
+        # Disaggregated dataset — Managed Money (commodities + financials)
+        DIS, DIS_L, DIS_S = "jun7-fc8e", "m_money_positions_long_all", "m_money_positions_short_all"
+        # Legacy dataset — Non-Commercial (financial futures incl. currencies)
+        LEG, LEG_L, LEG_S = "6dca-aqww", "noncomm_positions_long_all", "noncomm_positions_short_all"
+
+        or_data  = _one(DIS, "GOLD%20-%20COMMODITY%20EXCHANGE%20INC.", DIS_L, DIS_S, "Or/COMEX")
+        # Fallback market name for gold if primary fails
+        if not or_data.get("ok"):
+            or_data = _one(DIS, "GOLD%20(COMEX)", DIS_L, DIS_S, "Or/COMEX")
+
+        wti_data = _one(
+            DIS,
+            "CRUDE%20OIL%2C%20LIGHT%20SWEET%20-%20NEW%20YORK%20MERCANTILE%20EXCHANGE",
+            DIS_L, DIS_S, "Pétrole WTI/NYMEX",
+        )
+        yen_data = _one(LEG, "JAPANESE%20YEN", LEG_L, LEG_S, "Yen/CME")
+
+        any_ok = any(d.get("ok") for d in [or_data, wti_data, yen_data])
+        report_date = next(
+            (d.get("report_date", "?") for d in [or_data, wti_data, yen_data] if d.get("ok")),
+            "?",
+        )
+
+        return {
+            "ok":          any_ok,
+            "report_date": report_date,
+            "freshness":   "OK" if any_ok else "UNAVAILABLE",
+            # Sous-positions par marché
+            "or":          or_data,
+            "petrole":     wti_data,
+            "yen":         yen_data,
+            # Rétro-compatibilité (or uniquement — champs historiques)
+            "mm_long":     or_data.get("mm_long",  0),
+            "mm_short":    or_data.get("mm_short", 0),
+            "net_mm":      or_data.get("net_mm",   0),
+        }
+
+    def _fetch_wgc(self) -> dict[str, Any]:
+        """
+        World Gold Council — réserves or banques centrales.
+        Source principale  : gold.org/goldhub/data/gold-reserves-by-country (mensuel).
+        Fallback automatique : IMF DataMapper API (RESDMA@IFS — réserves internationales).
+        CADENCE : mensuel — délai ~2 mois (rapport WGC/IMF).
+        USAGE : alimente DISTINCTION_VENTES_OR — CAS_A (ventes souveraines sous contrainte)
+                vs CAS_B (financement IPO) en croisant avec TIC Data.
+        """
+        # Données statiques top-10 (WGC Q1 2025) — fallback si API indisponible
+        # Actualiser chaque trimestre depuis gold.org/goldhub/data/gold-reserves-by-country
+        RESERVES_STATIQUES: dict[str, float] = {
+            "USA":        8133.5,
+            "Allemagne":  3351.5,
+            "Italie":     2451.8,
+            "France":     2436.9,
+            "Russie":     2335.9,
+            "Chine":      2264.3,
+            "Japon":       845.8,
+            "Inde":        840.4,
+            "Pays-Bas":    612.5,
+            "Turquie":     580.0,
+        }
+
+        # Tentative IMF DataMapper (API publique)
         try:
             url = (
-                "https://publicreporting.cftc.gov/resource/jun7-fc8e.json"
-                "?market_and_exchange_names=GOLD%20(COMEX)"
-                "&%24order=report_date_as_yyyy_mm_dd+DESC&%24limit=1"
+                "https://www.imf.org/external/datamapper/api/v1/RESDMA@IFS"
+                "/USA,DEU,ITA,FRA,RUS,CHN,JPN,IND,GBR,CHE"
             )
             req = urllib.request.Request(
                 url,
-                headers={"User-Agent": "king-fund-flux-macro/1.0", "Accept": "application/json"},
+                headers={"User-Agent": "king-fund-research@kingfund.local",
+                         "Accept": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=15) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+            imf_data = json.loads(raw)
+            values = imf_data.get("values", {}).get("RESDMA@IFS", {})
+            if values:
+                reserves_imf: dict[str, float] = {}
+                for code, series in values.items():
+                    latest = next(
+                        (v for v in reversed(list(series.values())) if v is not None),
+                        None,
+                    )
+                    if latest is not None:
+                        reserves_imf[code] = round(float(latest), 1)
+                if reserves_imf:
+                    return {
+                        "ok":                   True,
+                        "source":               "IMF DataMapper (RESDMA@IFS)",
+                        "cadence":              "mensuel",
+                        "delai_mois":           2,
+                        "reserves_imf":         reserves_imf,
+                        "top_holders_statiques": RESERVES_STATIQUES,
+                        "note":                 "Réserves internationales totales (IMF) — inclut or + devises.",
+                        "freshness":            "OK",
+                    }
+        except Exception as exc:
+            logger.debug("[FluxMacro] WGC/IMF: %s", exc)
+
+        # Fallback : données statiques WGC Q1 2025
+        return {
+            "ok":                   False,
+            "source":               "WGC — données statiques Q1 2025 (gold.org/goldhub)",
+            "cadence":              "mensuel",
+            "delai_mois":           2,
+            "top_holders_statiques": RESERVES_STATIQUES,
+            "note":                 (
+                "API WGC non accessible publiquement. Données statiques Q1 2025 — "
+                "actualiser depuis gold.org/goldhub/data/gold-reserves-by-country. "
+                "Croiser avec TIC Data pour distinguer CAS_A (vente souveraine) "
+                "vs CAS_B (financement IPO) dans DISTINCTION_VENTES_OR."
+            ),
+            "freshness":            "STATIC",
+        }
+
+    def _fetch_tic_data(self) -> dict[str, Any]:
+        """
+        TIC Data Treasury — avoirs étrangers en Treasuries US (mensuel).
+        Source : ticdata.treasury.gov — Major Foreign Holders of Treasury Securities.
+        ⚠️ DÉLAI STRUCTUREL OBLIGATOIRE 6 SEMAINES ⚠️
+           Données publiées le 3e jeudi du mois → couvrent ~6 semaines avant.
+           Ex : rapport du 15 août = données du 30 juin.
+           NE JAMAIS interpréter comme signal récent ou contemporain.
+        CADENCE : mensuel.
+        """
+        DELAI_NOTE = (
+            "DELAI STRUCTUREL 6 SEMAINES : donnees publiees le 3e jeudi du mois, "
+            "couvrant les positions de ~6 semaines auparavant. "
+            "NE PAS interpreter comme signal recent. "
+            "Source : ticdata.treasury.gov/Publish/mfhhis01.txt"
+        )
+
+        try:
+            url = "https://ticdata.treasury.gov/Publish/mfhhis01.txt"
+            req = urllib.request.Request(
+                url,
+                headers={
+                    "User-Agent": "king-fund-research@kingfund.local",
+                    "Accept":     "text/plain, */*",
+                },
             )
             with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
-                raw = resp.read().decode("utf-8", errors="replace")
+                raw = resp.read().decode("latin-1", errors="replace")
 
-            rows = json.loads(raw)
-            if not rows:
-                return {"ok": False, "reason": "DONNÉES INDISPONIBLES", "data": {}}
+            lines     = [ln.rstrip() for ln in raw.splitlines()]
+            holders: list[dict] = []
+            date_ref  = ""
 
-            r = rows[0]
-            mm_long  = int(r.get("m_money_positions_long_all",  0) or 0)
-            mm_short = int(r.get("m_money_positions_short_all", 0) or 0)
-            net_mm   = mm_long - mm_short
-            report_date = self._sanitize(r.get("report_date_as_yyyy_mm_dd", "?"), 20)
+            for line in lines:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+
+                # Extraire la référence de date (ex: "Jun 2025")
+                if not date_ref:
+                    m = re.search(
+                        r'(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)\s+(\d{4})',
+                        stripped,
+                    )
+                    if m:
+                        date_ref = m.group(0)
+                        continue
+
+                # Parser les lignes de données pays + valeur(s)
+                parts = stripped.split()
+                if len(parts) < 2:
+                    continue
+                nums: list[float] = []
+                name_parts: list[str] = []
+                for p in parts:
+                    try:
+                        nums.append(float(p.replace(",", "")))
+                    except ValueError:
+                        if not nums:
+                            name_parts.append(p)
+                if not nums or not name_parts:
+                    continue
+                country = " ".join(name_parts)
+                skip = ("Total", "Grand", "All Other", "Supranational", "Caribbean")
+                if any(s.lower() in country.lower() for s in skip):
+                    continue
+                val = nums[0]
+                if val > 0:
+                    holders.append({
+                        "pays":           self._sanitize(country, 50),
+                        "milliards_usd":  round(val, 1),
+                    })
+                if len(holders) >= 25:
+                    break
+
+            if holders:
+                holders.sort(key=lambda x: x["milliards_usd"], reverse=True)
+                total = sum(h["milliards_usd"] for h in holders)
+                return {
+                    "ok":                      True,
+                    "delai_note":              DELAI_NOTE,
+                    "cadence":                 "mensuel",
+                    "date_reference":          date_ref or "voir source",
+                    "top_holders":             holders[:15],
+                    "total_capture_mds_usd":   round(total, 1),
+                    "source":                  url,
+                    "freshness":               "STALE",
+                    "freshness_note":          "Toujours STALE par definition (delai structurel 6 semaines)",
+                }
 
             return {
-                "ok":         True,
-                "report_date": report_date,
-                "mm_long":    mm_long,
-                "mm_short":   mm_short,
-                "net_mm":     net_mm,
-                "freshness":  "OK",   # weekly data — agent runs 2x/day
+                "ok":       False,
+                "reason":   "Aucune donnee parsee depuis le fichier TIC",
+                "delai_note": DELAI_NOTE,
+                "source":   url,
             }
+
         except Exception as exc:
-            logger.debug("[FluxMacro] _fetch_cftc: %s", exc)
-            return {"ok": False, "reason": "DONNÉES INDISPONIBLES", "data": {}}
+            logger.debug("[FluxMacro] TIC Data: %s", exc)
+            return {
+                "ok":       False,
+                "reason":   str(exc),
+                "delai_note": DELAI_NOTE,
+                "source":   "https://ticdata.treasury.gov/Publish/mfhhis01.txt",
+            }
 
     def _fetch_fred_liquidite(self) -> dict[str, Any]:
         """
@@ -1327,9 +1568,28 @@ class AgentFluxMacro:
             cftc_result = self._fetch_cftc()
             cftc_ok     = cftc_result.get("ok", False)
             if cftc_ok:
+                rpt = cftc_result.get("report_date", "?")
+                or_net  = cftc_result.get("or",      {}).get("net_mm", "N/A")
+                wti_net = cftc_result.get("petrole",  {}).get("net_mm", "N/A")
+                yen_net = cftc_result.get("yen",      {}).get("net_mm", "N/A")
                 sources_actives.append(
-                    f"CFTC COT ({cftc_result.get('report_date','?')}) — "
-                    f"MM Net: {cftc_result.get('net_mm', 'N/A')} contrats"
+                    f"CFTC COT ({rpt}) — Or MM Net: {or_net} | "
+                    f"WTI MM Net: {wti_net} | JPY Spec Net: {yen_net}"
+                )
+
+            wgc_result = self._fetch_wgc()
+            wgc_ok     = wgc_result.get("ok", False)
+            if wgc_ok:
+                sources_actives.append(
+                    f"WGC reserves or banques centrales ({wgc_result.get('source','?')}) — mensuel"
+                )
+
+            tic_result = self._fetch_tic_data()
+            tic_ok     = tic_result.get("ok", False)
+            if tic_ok:
+                sources_actives.append(
+                    f"TIC Data Treasury (avoirs etrangers US Treasuries — mensuel, "
+                    f"DELAI 6 SEMAINES — {tic_result.get('date_reference','?')})"
                 )
 
             ipos = self._fetch_ipo_calendar()
@@ -1459,11 +1719,12 @@ class AgentFluxMacro:
                     f"{a['label']} z={a.get('z_score',0):+.1f}" for a in anomalies
                 ) or "Aucune"
                 self._save_journal(
-                    anomalie  = anomalies_str,
-                    cause     = mecanisme or "Non identifiée",
-                    confiance = confiance,
-                    conclusion= conclusion,
-                    sources   = sources_actives,
+                    anomalie        = anomalies_str,
+                    cause           = mecanisme or "Non identifiee",
+                    confiance       = confiance,
+                    conclusion      = conclusion,
+                    sources         = sources_actives,
+                    action_suggeree = action_suggeree,
                 )
 
             # ── Construction résultat ───────────────────────────────────────
@@ -1494,6 +1755,8 @@ class AgentFluxMacro:
                     "note":         "M2SL: masse monétaire US (Mds$) | WALCL: Fed balance sheet (Mds$) | IORB: taux repo (%) | BAMLC0A0CM: spreads IG (bps) | BAMLH0A0HYM2: spreads HY (bps)",
                 },
                 "cftc": cftc_result if cftc_ok else {"ok": False, "reason": "DONNÉES INDISPONIBLES"},
+                "wgc":               wgc_result,
+                "tic_data":          tic_result,
                 "ipos":              ipos,
                 "biais_checklist":   biais_results,
                 "confiance":         confiance,
@@ -1507,8 +1770,10 @@ class AgentFluxMacro:
                 "disclaimer":        DISCLAIMER,
                 "stale_tickers":     prix_result.get("stale", []),
                 "timeframes_verifies": timeframes,
-                "tic_data_note":      "TIC Data non chargé — délai structurel 6 semaines (source: ticdata.treasury.gov)",
-                "wgc_note":           "World Gold Council API non disponible publiquement — DONNÉES INDISPONIBLES",
+                "tic_data_note":     tic_result.get("delai_note",
+                                         "TIC Data : delai structurel 6 semaines (ticdata.treasury.gov)"),
+                "wgc_note":          wgc_result.get("note",
+                                         "WGC reserves or banques centrales (mensuel — gold.org/goldhub)"),
                 "regime":             regime_info,
                 "section_haut_gauche": section_haut_gauche,
                 "commodites_critiques": commodites,
@@ -1743,14 +2008,15 @@ class AgentFluxMacro:
 
     def generer_rapport_flash(self, anomalie: dict | None = None) -> dict:
         """
-        Génère un rapport flash texte (signal CRITIQUE ou à la demande).
-        Sauvegarde dans rapports/flux_macro/flash/flash_YYYY-MM-DD_HHMM.txt
-        Retourne {"ok": bool, "chemin": str, "texte": str}.
+        Génère un rapport flash (signal CRITIQUE ou à la demande).
+        Format : PDF (via fpdf2) avec fallback TXT si fpdf2 absent.
+        Dossier : rapports/flux_macro/flash/flash_YYYY-MM-DD_HHMM.{pdf|txt}
+        Retourne {"ok": bool, "chemin": str, "texte": str, "format": str}.
         """
-        donnees = self._cache or {}
-        now     = datetime.now(timezone.utc)
-        nom     = f"flash_{now.strftime('%Y-%m-%d_%H%M')}.txt"
-        chemin  = _RAPPORTS_DIR / "flash" / nom
+        donnees  = self._cache or {}
+        now      = datetime.now(timezone.utc)
+        nom_base = f"flash_{now.strftime('%Y-%m-%d_%H%M')}"
+        chemin   = _RAPPORTS_DIR / "flash" / f"{nom_base}.txt"  # défaut txt, réécrit si PDF
 
         anomalies  = donnees.get("anomalies", [])
         top_anom   = anomalie or (max(anomalies, key=lambda x: abs(x.get("z_score", 0))) if anomalies else {})
@@ -1805,13 +2071,99 @@ class AgentFluxMacro:
             f"═══════════════════════════════════════════════════\n"
         )
 
+        # ── Tentative PDF (fpdf2) ────────────────────────────────────────────
+        try:
+            from fpdf import FPDF  # fpdf2 >= 2.7
+
+            # Sanitise → Latin-1 (police Helvetica intégrée fpdf2)
+            def _p(s: Any) -> str:
+                return str(s).encode("latin-1", errors="replace").decode("latin-1")
+
+            pdf = FPDF()
+            pdf.set_margins(left=12, top=12, right=12)
+            pdf.set_auto_page_break(auto=True, margin=15)
+            pdf.add_page()
+            W = pdf.epw  # largeur effective (page - marges)
+
+            pdf.set_font("Helvetica", "B", 13)
+            pdf.cell(W, 9, "RAPPORT FLASH - AGENT FLUX MACRO", new_x="LMARGIN", new_y="NEXT", align="C")
+            pdf.set_font("Helvetica", "", 9)
+            pdf.cell(W, 5, "Le Detecteur de Capitaux - Division Research - King Fund",
+                     new_x="LMARGIN", new_y="NEXT", align="C")
+            pdf.cell(W, 5, f"Date : {now.strftime('%Y-%m-%d %H:%M UTC')}",
+                     new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(W, 5, _p(f"Regime : {regime}  |  Confiance : {confiance}"),
+                     new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(3)
+
+            def _section(titre: str) -> None:
+                pdf.set_font("Helvetica", "B", 10)
+                pdf.cell(W, 7, titre, new_x="LMARGIN", new_y="NEXT")
+                pdf.set_font("Helvetica", "", 9)
+
+            _section("ANOMALIE PRINCIPALE")
+            if top_anom:
+                pdf.multi_cell(W, 5, _p(
+                    f"{top_anom.get('label','Aucune')} | "
+                    f"Z={top_anom.get('z_score','?')} | "
+                    f"Niveau: {top_anom.get('niveau','?')}"
+                ))
+            else:
+                pdf.cell(W, 5, "Aucune anomalie CRITIQUE", new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(2)
+
+            _section("CONCLUSION")
+            pdf.multi_cell(W, 5, _p(str(conclusion)[:800]))
+            pdf.ln(2)
+
+            _section("ACTION SUGGEREE")
+            pdf.multi_cell(W, 5, _p(str(action)[:400]))
+            pdf.ln(2)
+
+            _section(f"SOURCES ACTIVES ({len(sources)})")
+            for s in sources[:8]:
+                pdf.multi_cell(W, 4, _p(f"- {str(s)[:110]}"))
+            pdf.ln(2)
+
+            _section("INDICATEURS LIQUIDITE (FRED)")
+            for k, label in [("M2SL","M2SL"), ("WALCL","WALCL"),
+                              ("IORB","IORB"), ("BAMLC0A0CM","IG spread"),
+                              ("BAMLH0A0HYM2","HY spread")]:
+                pdf.cell(W, 4, _p(f"  {label}: {liq.get(k, 'N/D')}"),
+                         new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(2)
+
+            _section("AUDIT ANTI-BIAIS")
+            for biais_id, v in BIAIS_CHECKLIST.items():
+                ok_flag = biais.get(biais_id, False)
+                tag = "[OK]" if ok_flag else "[KO]"
+                bloc = "[BLOQUANT]" if v["blocage"] else "[avert. ]"
+                pdf.cell(W, 4, _p(f"  {tag} {bloc} {biais_id}"),
+                         new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(2)
+
+            pdf.set_font("Helvetica", "I", 8)
+            pdf.multi_cell(W, 4, _p(f"DISCLAIMER : {DISCLAIMER}"))
+            pdf.multi_cell(W, 4, "Soumis a AGD-01 pour validation avant diffusion.")
+
+            pdf_chemin = _RAPPORTS_DIR / "flash" / f"{nom_base}.pdf"
+            pdf.output(str(pdf_chemin))
+            logger.info("[FluxMacro] Rapport flash PDF sauvegarde : %s", pdf_chemin)
+            return {"ok": True, "chemin": str(pdf_chemin), "texte": texte, "format": "pdf"}
+
+        except ImportError:
+            logger.debug("[FluxMacro] fpdf2 absent — fallback TXT")
+        except Exception as exc:
+            logger.warning("[FluxMacro] Rapport flash PDF erreur: %s", exc)
+
+        # ── Fallback TXT ─────────────────────────────────────────────────────
         try:
             chemin.write_text(texte, encoding="utf-8")
-            logger.info("[FluxMacro] Rapport flash sauvegardé : %s", chemin)
-            return {"ok": True, "chemin": str(chemin), "texte": texte}
+            logger.info("[FluxMacro] Rapport flash TXT sauvegarde : %s", chemin)
+            return {"ok": True, "chemin": str(chemin), "texte": texte, "format": "txt"}
         except Exception as exc:
             logger.warning("[FluxMacro] Rapport flash sauvegarde: %s", exc)
-            return {"ok": False, "chemin": "", "texte": texte, "erreur": str(exc)}
+            return {"ok": False, "chemin": "", "texte": texte, "erreur": str(exc), "format": "txt"}
 
     def generer_rapport_hebdo(self) -> dict:
         """
