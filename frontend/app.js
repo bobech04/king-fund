@@ -1709,7 +1709,7 @@
     if (!ticker) { if (status) status.textContent = '⚠️ Saisir un ticker.'; return; }
     if (status) status.innerHTML = '<div class="spinner" style="display:inline-block;width:14px;height:14px"></div> Analyse en cours…';
     try {
-      const data = await apiGet(`/investissement/analyze?ticker=${encodeURIComponent(ticker)}`);
+      const data = await apiFetch(`/investissement/analyze?ticker=${encodeURIComponent(ticker)}`, 90_000);
       if (data.erreur) { if (status) status.textContent = '❌ ' + data.erreur; return; }
       _wz.ticker = ticker;
       _wz.score  = data.score ?? 0;
@@ -1756,15 +1756,18 @@
       }, 60_000);
       _wz.comiteResult = res;
 
-      const votes = res.votes || {};
+      // API retourne votes comme array [{votant:"Research", vote:"OUI", motif:...}]
+      const votesArr = Array.isArray(res.votes) ? res.votes : [];
+      const votesMap = {};
+      votesArr.forEach(v => { votesMap[(v.votant || '').toLowerCase()] = v; });
       ['research', 'cio', 'fiscaliste'].forEach(m => {
         const el = document.getElementById('wz-vote-' + m);
         if (!el) return;
-        const v = votes[m] || {};
-        const fav = v.favorable !== false;
+        const v = votesMap[m] || {};
+        const fav = v.vote === 'OUI';
         el.innerHTML = `<span style="color:${fav ? 'var(--green)' : 'var(--red)'}">
           ${fav ? '✅ FAVORABLE' : '❌ DÉFAVORABLE'}
-        </span><br><span style="font-size:11px;color:var(--muted)">${(v.commentaire || '').substring(0, 80)}</span>`;
+        </span><br><span style="font-size:11px;color:var(--muted)">${(v.motif || '').substring(0, 80)}</span>`;
       });
 
       if (statusEl) statusEl.textContent = '';
@@ -1780,20 +1783,20 @@
     const el = document.getElementById('wz-verdict-body');
     if (!el || !_wz.comiteResult) return;
     const r   = _wz.comiteResult;
-    const ok  = r.verdict === 'APPROUVÉ' || r.favorable === true;
-    const col = ok ? 'var(--green)' : 'var(--red)';
-    const sizing = r.sizing || r.allocation || '—';
+    const decision = r.decision || '';
+    const ok  = decision.startsWith('BUY') || (r.nb_oui >= 2);
+    const col = ok ? 'var(--green)' : (decision === 'VETO' ? 'var(--red)' : '#facc15');
+    const votesA = Array.isArray(r.votes) ? r.votes : [];
+    const nbOui  = r.nb_oui ?? votesA.filter(v => v.vote === 'OUI').length;
+    const justif = votesA.map(v => `<b>${v.votant}</b> : ${(v.motif || '').substring(0, 70)}`).join('<br>');
+    const icon   = ok ? '✅' : (decision === 'VETO' ? '🛑' : '🔵');
     el.innerHTML = `
       <div style="text-align:center;padding:20px 0">
-        <div style="font-size:48px">${ok ? '✅' : '❌'}</div>
-        <div style="font-size:22px;font-weight:800;color:${col};margin-top:8px">${r.verdict || (ok ? 'APPROUVÉ' : 'REJETÉ')}</div>
-        <div style="color:var(--muted);font-size:12px;margin-top:4px">${_wz.ticker} · Score ${_wz.score.toFixed(1)}/10</div>
+        <div style="font-size:48px">${icon}</div>
+        <div style="font-size:22px;font-weight:800;color:${col};margin-top:8px">${decision || (ok ? 'BUY CONDITIONNEL' : 'VETO')}</div>
+        <div style="color:var(--muted);font-size:12px;margin-top:4px">${_wz.ticker} · Score ${_wz.score.toFixed(1)}/10 · ${nbOui}/3 membres OUI</div>
       </div>
-      <div class="wz-sizing-box">
-        <div style="font-size:11px;color:var(--muted);margin-bottom:4px;text-transform:uppercase">Sizing recommandé</div>
-        <div style="font-size:20px;font-weight:700;color:var(--accent)">${typeof sizing === 'object' ? JSON.stringify(sizing) : sizing}</div>
-      </div>
-      ${r.justification ? `<div style="margin-top:12px;font-size:12px;color:var(--muted);line-height:1.6">${r.justification}</div>` : ''}`;
+      ${justif ? `<div style="margin-top:12px;font-size:12px;color:var(--muted);line-height:1.8;padding:12px;background:var(--bg2);border-radius:8px">${justif}</div>` : ''}`;
   }
 
   function wzReset() {
@@ -1808,20 +1811,23 @@
     const el = document.getElementById('vote-historique');
     if (!el) return;
     try {
-      const data = await apiGet('/comite-selection/historique');
+      const data = await apiFetch('/comite-selection/historique');
       const list = Array.isArray(data) ? data : (data.historique || []);
       if (!list.length) { el.innerHTML = '<div style="color:var(--muted);font-size:12px;padding:12px">Aucune décision.</div>'; return; }
       el.innerHTML = `<div class="table-wrap"><table class="data-table">
-        <thead><tr><th>Date</th><th>Ticker</th><th>Verdict</th><th>Score</th><th>Sizing</th></tr></thead>
+        <thead><tr><th>Date</th><th>Ticker</th><th>Décision</th><th>Score</th><th>Votes</th></tr></thead>
         <tbody>${list.slice().reverse().slice(0, 20).map(d => {
-          const ok  = d.verdict === 'APPROUVÉ' || d.favorable === true;
-          const col = ok ? 'var(--green)' : 'var(--red)';
+          const dec = d.decision || d.verdict || '';
+          const ok  = dec.startsWith('BUY') || (d.nb_oui >= 2);
+          const col = ok ? 'var(--green)' : (dec === 'VETO' ? 'var(--red)' : '#facc15');
+          const ts  = d.timestamp || d.date || '';
+          const sc  = (d.donnees || {}).score ?? d.score;
           return `<tr>
-            <td style="font-size:11px;color:var(--muted)">${(d.date || '').replace('T', ' ').slice(0, 16)}</td>
+            <td style="font-size:11px;color:var(--muted)">${ts.replace('T', ' ').slice(0, 16)}</td>
             <td style="font-weight:700">${d.ticker || '—'}</td>
-            <td style="color:${col};font-weight:700">${d.verdict || '—'}</td>
-            <td>${d.score != null ? (+d.score).toFixed(1) : '—'}</td>
-            <td style="font-size:11px">${d.sizing || d.allocation || '—'}</td>
+            <td style="color:${col};font-weight:700">${dec || '—'}</td>
+            <td>${sc != null ? (+sc).toFixed(1) : '—'}</td>
+            <td style="font-size:11px">${d.nb_oui != null ? d.nb_oui + '/3' : '—'}</td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>`;
@@ -1854,6 +1860,66 @@
       if (btn) { btn.disabled = false; btn.textContent = '➕ Ajouter à la watchlist'; }
       toast(`Impossible d'ajouter ${ticker}`, 'error');
     }
+  }
+
+  // ── Screener Candidats (7 tickers prédéfinis) ───────────────
+  const _SCREENER_CAND = ['YAR.OL','BNP.PA','SHEL.L','DBK.DE','LLOY.L','ABN.AS','0941.HK'];
+
+  async function runScreenerCandidats() {
+    const tableEl = document.getElementById('screener-cand-table');
+    const btn     = document.getElementById('btn-screener-cand');
+    if (!tableEl) return;
+    if (btn) { btn.disabled = true; btn.textContent = '⏳ Analyse…'; }
+
+    tableEl.innerHTML = `<table class="data-table"><thead><tr>
+      <th>Ticker</th><th>Score /10</th><th>Signal</th><th>Statut</th><th></th>
+    </tr></thead><tbody id="screener-cand-tbody"></tbody></table>`;
+
+    const tbody = document.getElementById('screener-cand-tbody');
+
+    for (const tk of _SCREENER_CAND) {
+      const row = document.createElement('tr');
+      row.id = 'scrow-' + tk;
+      row.innerHTML = `<td style="font-weight:700">${tk}</td>
+        <td colspan="4" style="color:var(--muted);font-size:12px"><div class="spinner" style="display:inline-block;width:12px;height:12px"></div> Analyse en cours…</td>`;
+      tbody.appendChild(row);
+
+      try {
+        const d = await apiFetch(`/investissement/analyze?ticker=${encodeURIComponent(tk)}`, 90_000);
+        const score  = d.score ?? 0;
+        const signal = (d.signal || 'hold').toUpperCase();
+        const sc     = score >= 7 ? 'var(--green)' : score >= 4 ? '#facc15' : 'var(--red)';
+        const inWl   = _INV_WATCHLIST.has(tk);
+        let addedToWl = false;
+
+        // Auto-ajout watchlist si score ≥ 6
+        if (score >= 6 && !inWl) {
+          try {
+            await apiPost(`/investissement/watchlist/add?ticker=${encodeURIComponent(tk)}`, 15_000);
+            _INV_WATCHLIST.add(tk);
+            addedToWl = true;
+          } catch (_) {}
+        }
+
+        const statusHtml = d.erreur
+          ? `<td colspan="2" style="color:var(--red);font-size:11px">❌ ${d.erreur}</td>`
+          : `<td style="font-size:11px;color:var(--muted)">${addedToWl ? '<span style="color:var(--green)">✓ Ajouté watchlist</span>' : (inWl ? 'Déjà en watchlist' : (score >= 6 ? '' : 'Score < 6'))}</td>
+             <td>${(!inWl && !addedToWl && score < 6) ? '' :
+               `<button class="btn btn-sm" onclick="App.soumettreComiFromSearch('${tk}')"
+                  style="font-size:11px;background:#7c3aed;color:#fff;padding:3px 8px">Comité</button>`}</td>`;
+
+        row.innerHTML = `
+          <td style="font-weight:700">${tk}</td>
+          <td style="font-weight:800;color:${sc}">${score.toFixed(1)}</td>
+          <td><span style="color:${sc};font-weight:700">${signal}</span></td>
+          ${statusHtml}`;
+      } catch (e) {
+        row.innerHTML = `<td style="font-weight:700">${tk}</td>
+          <td colspan="4" style="color:var(--red);font-size:11px">❌ ${e.message}</td>`;
+      }
+    }
+
+    if (btn) { btn.disabled = false; btn.textContent = '↻ Relancer'; }
   }
 
   // ── Liquidité / Black Swan ────────────────────────────────
@@ -2727,6 +2793,7 @@
     wzReset:                 () => wzReset(),
     loadVoteHistorique:      () => loadVoteHistorique().catch(() => {}),
     soumettreComiFromSearch: ticker => soumettreComiFromSearch(ticker).catch(() => {}),
+    runScreenerCandidats:    () => runScreenerCandidats().catch(() => {}),
   };
 
   // ── Init ──────────────────────────────────────────────────

@@ -726,6 +726,23 @@
       <div id="inv-search-result" style="display:none;margin-top:16px"></div>
     </div>
 
+    <!-- Candidats Screener -->
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px">
+        <span>🔬 7 Candidats Screener — Pipeline 17 étapes</span>
+        <button class="btn btn-sm" id="btn-screener-cand" onclick="App.runScreenerCandidats()"
+                style="background:#ffd700;color:#000;font-weight:700;white-space:nowrap">
+          ▶ Analyser les 7
+        </button>
+      </div>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:12px">
+        YAR.OL · BNP.PA · SHEL.L · DBK.DE · LLOY.L · ABN.AS · 0941.HK — ajout watchlist auto si score ≥ 6
+      </div>
+      <div id="screener-cand-table">
+        <div style="color:var(--muted);font-size:12px;padding:8px">Cliquer ▶ Analyser pour lancer.</div>
+      </div>
+    </div>
+
     <!-- KPIs watchlist -->
     <div class="kpi-grid" id="inv-kpis">
       <div class="kpi"><div class="kpi-label">Actifs Analysés</div><div class="kpi-val neu" id="inv-nb">—</div><div class="kpi-sub">13 titres watchlist</div></div>
