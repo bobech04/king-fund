@@ -2704,7 +2704,7 @@ class AgentFluxMacro:
                     pdf.multi_cell(W, 4, _p(
                         f"[{a.get('niveau','?')}] {a.get('label','?')} — "
                         f"z={a.get('z_score','?')} | {a.get('variation_pct','?')}%"
-                    ))
+                    ), new_x="LMARGIN", new_y="NEXT")
             else:
                 pdf.cell(W, 5, "Aucune anomalie detectee", new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
@@ -2715,7 +2715,7 @@ class AgentFluxMacro:
                     pdf.multi_cell(W, 4, _p(
                         f"[{a.get('niveau','?')}] {a.get('label','?')} — "
                         f"{a.get('valeur','?')} (seuil: {a.get('seuil','?')})"
-                    ))
+                    ), new_x="LMARGIN", new_y="NEXT")
             else:
                 pdf.cell(W, 5, "Aucune alerte liquidite", new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
@@ -2731,22 +2731,32 @@ class AgentFluxMacro:
             _section(f"CALENDRIER IPO SEC EDGAR ({len(ipos)} filing(s) S-1)")
             if ipos:
                 for i in ipos[:5]:
-                    pdf.multi_cell(W, 4, _p(f"  {i.get('date','?')} — {str(i.get('titre','?'))[:90]}"))
+                    pdf.multi_cell(W, 4, _p(f"  {i.get('date','?')} — {str(i.get('titre','?'))[:90]}"),
+                                   new_x="LMARGIN", new_y="NEXT")
             else:
                 pdf.cell(W, 4, "  Aucun filing S-1 recent", new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
 
             _section("CONCLUSION")
-            pdf.multi_cell(W, 5, _p(str(conclusion)[:600]))
+            pdf.multi_cell(W, 5, _p(str(conclusion)[:600]), new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
 
             _section(f"SOURCES ACTIVES ({len(sources)})")
             for s in sources[:8]:
-                pdf.multi_cell(W, 4, _p(f"- {str(s)[:110]}"))
+                pdf.multi_cell(W, 4, _p(f"- {str(s)[:110]}"), new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(2)
+
+            _section(f"FAUX POSITIFS SEMAINE ({len(faux_positifs)})")
+            if faux_positifs:
+                for j in faux_positifs[:5]:
+                    pdf.multi_cell(W, 4, _p(f"  {str(j.get('date','?'))[:10]} — {str(j.get('anomalie','?'))[:70]}"),
+                                   new_x="LMARGIN", new_y="NEXT")
+            else:
+                pdf.cell(W, 4, "  Aucun faux positif enregistre", new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
 
             pdf.set_font("Helvetica", "I", 8)
-            pdf.multi_cell(W, 4, _p(f"DISCLAIMER : {DISCLAIMER}"))
+            pdf.multi_cell(W, 4, _p(f"DISCLAIMER : {DISCLAIMER}"), new_x="LMARGIN", new_y="NEXT")
 
             chemin_pdf = _RAPPORTS_DIR / "hebdo" / f"{nom_base}.pdf"
             pdf.output(str(chemin_pdf))
