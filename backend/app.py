@@ -1690,6 +1690,18 @@ def get_flux_macro_taux_reussite():
         return jsonify({"erreur": str(exc)}), 500
 
 
+@app.route("/api/macro-eu")
+def get_macro_eu():
+    """Indicateurs Macro EU (Eurostat) — PIB/HICP/chômage/balance commerciale UE27."""
+    force = request.args.get("force") == "1"
+    try:
+        from divisions.research.agent_flux_macro import get_agent_flux_macro
+        return jsonify(get_agent_flux_macro().macro_eu(forcer=force))
+    except Exception as exc:
+        logger.error("macro-eu: %s", exc)
+        return jsonify({"erreur": str(exc)}), 500
+
+
 @app.route("/api/flux-macro/journal/<int:journal_id>/verdict", methods=["POST"])
 def post_flux_macro_verdict(journal_id: int):
     """Enregistre manuellement un verdict a posteriori sur un signal journalisé."""

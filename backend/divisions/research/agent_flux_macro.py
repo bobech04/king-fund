@@ -274,6 +274,18 @@ _FETCH_TIMEOUT = 30  # seconds for all external requests
 _RAPPORTS_DIR = Path(__file__).resolve().parents[4] / "rapports" / "flux_macro"
 
 # ---------------------------------------------------------------------------
+# EUROSTAT — API publique gratuite, sans clé
+# https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data/
+# Seuils d'alerte : PIB (croissance a/a) < 0% | HICP (inflation a/a) > 4%
+# ---------------------------------------------------------------------------
+
+_EUROSTAT_BASE = "https://ec.europa.eu/eurostat/api/dissemination/statistics/1.0/data"
+_EUROSTAT_GEO  = "EU27_2020"
+
+_EUROSTAT_SEUIL_PIB_PCT  = 0.0   # alerte si croissance PIB a/a < 0%
+_EUROSTAT_SEUIL_HICP_PCT = 4.0   # alerte si inflation HICP a/a > 4%
+
+# ---------------------------------------------------------------------------
 # RÈGLE MONÉTAIRE ÉTERNELLE
 # Source : Université de l'Épargne / Howell / Gavekal / BIS
 # Principe fondateur de la méthode de cet agent.
@@ -425,6 +437,10 @@ class AgentFluxMacro:
         _RAPPORTS_DIR.mkdir(parents=True, exist_ok=True)
         (_RAPPORTS_DIR / "flash").mkdir(exist_ok=True)
         (_RAPPORTS_DIR / "hebdo").mkdir(exist_ok=True)
+        # Cache Macro EU (Eurostat) — données mensuelles/trimestrielles, TTL long
+        self._cache_macro_eu: dict | None = None
+        self._cache_macro_eu_ts: float    = 0.0
+        self._cache_macro_eu_ttl: int     = 3600 * 6   # 6h
 
     # ── DB ──────────────────────────────────────────────────────────────────
 
@@ -2358,6 +2374,117 @@ class AgentFluxMacro:
         except Exception as exc:
             logger.warning("[FluxMacro] taux_reussite: %s", exc)
             return {"total": 0, "corrects": 0, "taux_pct": None, "label": "—"}
+
+    # ── Macro EU (Eurostat — gratuit, sans clé) ──────────────────────────────
+
+    @staticmethod
+    def _fetch_eurostat_dataset(dataset: str, params: dict[str, str]) -> dict[str, Any]:
+        """
+        Appelle l'API JSON-stat Eurostat et retourne la dernière valeur disponible.
+        Retourne {ok, valeur, periode, freshness} — ne lève jamais d'exception
+        (timeout/erreur réseau → ok=False, freshness=UNAVAILABLE).
+        """
+        try:
+            qs  = "&".join(f"{k}={v}" for k, v in params.items())
+            url = f"{_EUROSTAT_BASE}/{dataset}?format=JSON&lang=EN&{qs}"
+            req = urllib.request.Request(
+                url, headers={"User-Agent": "king-fund-flux-macro/1.0", "Accept": "application/json"},
+            )
+            with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT) as resp:
+                raw = resp.read().decode("utf-8", errors="replace")
+            data = json.loads(raw)
+            values: dict[str, float] = data.get("value", {})
+            if not values:
+                return {"ok": False, "reason": "DONNÉES INDISPONIBLES", "freshness": "UNAVAILABLE"}
+            # JSON-stat : la clé index la plus élevée correspond à la période la plus récente
+            # (les dimensions précédant 'time' ont toutes une taille de 1 dans nos requêtes filtrées).
+            last_idx = max(int(k) for k in values.keys())
+            periodes = list(data.get("dimension", {}).get("time", {}).get("category", {}).get("index", {}).keys())
+            periode  = periodes[-1] if periodes else "?"
+            return {
+                "ok":        True,
+                "valeur":    round(float(values[str(last_idx)]), 2),
+                "periode":   periode,
+                "freshness": "OK",
+            }
+        except Exception as exc:
+            logger.debug("[FluxMacro] Eurostat %s: %s", dataset, exc)
+            return {"ok": False, "reason": str(exc), "freshness": "UNAVAILABLE"}
+
+    def _fetch_eurostat(self) -> dict[str, Any]:
+        """
+        Indicateurs macro Zone Euro/UE27 via Eurostat (API publique, sans clé) :
+          - PIB UE27 trimestriel, croissance a/a (namq_10_gdp, unit=CLV_PCH_SM)
+          - HICP UE27 mensuel — variation m/m demandée (prc_hicp_mmor) + variation
+            a/a (prc_hicp_manr) utilisée pour le seuil d'alerte (4% a/a a du sens,
+            4% m/m n'arriverait quasi jamais hors hyperinflation)
+          - Taux de chômage UE27 mensuel (une_rt_m, unit=PC_ACT)
+          - Balance commerciale UE27 mensuelle (extra-UE27, ext_st_eu27_2020sitc —
+            le code 'ext_lt_mainind' demandé n'existe plus dans le catalogue
+            Eurostat actuel ; remplacé par l'équivalent mensuel disponible)
+        Chaque sous-indicateur est indépendant : l'échec d'un seul ne bloque pas
+        les autres (même philosophie que CFTC/WGC/TIC).
+        """
+        pib = self._fetch_eurostat_dataset("namq_10_gdp", {
+            "geo": _EUROSTAT_GEO, "unit": "CLV_PCH_SM", "na_item": "B1GQ", "s_adj": "SCA",
+        })
+        hicp_mensuel = self._fetch_eurostat_dataset("prc_hicp_mmor", {
+            "geo": _EUROSTAT_GEO, "coicop": "CP00", "unit": "RCH_M",
+        })
+        hicp_annuel = self._fetch_eurostat_dataset("prc_hicp_manr", {
+            "geo": _EUROSTAT_GEO, "coicop": "CP00", "unit": "RCH_A",
+        })
+        chomage = self._fetch_eurostat_dataset("une_rt_m", {
+            "geo": _EUROSTAT_GEO, "s_adj": "SA", "age": "TOTAL", "sex": "T", "unit": "PC_ACT",
+        })
+        balance = self._fetch_eurostat_dataset("ext_st_eu27_2020sitc", {
+            "geo": _EUROSTAT_GEO, "sitc06": "TOTAL", "partner": "EXT_EU27_2020",
+            "stk_flow": "BAL_RT", "indic_et": "TRD_VAL",
+        })
+
+        alertes: list[dict] = []
+        if pib.get("ok") and pib["valeur"] < _EUROSTAT_SEUIL_PIB_PCT:
+            alertes.append({
+                "niveau": "CRITIQUE", "label": "PIB UE27 en contraction",
+                "valeur": f"{pib['valeur']}%", "seuil": f"< {_EUROSTAT_SEUIL_PIB_PCT}%",
+                "periode": pib["periode"],
+            })
+        if hicp_annuel.get("ok") and hicp_annuel["valeur"] > _EUROSTAT_SEUIL_HICP_PCT:
+            alertes.append({
+                "niveau": "CRITIQUE", "label": "Inflation HICP UE27 élevée",
+                "valeur": f"{hicp_annuel['valeur']}%", "seuil": f"> {_EUROSTAT_SEUIL_HICP_PCT}%",
+                "periode": hicp_annuel["periode"],
+            })
+
+        nb_ok = sum(1 for d in (pib, hicp_mensuel, hicp_annuel, chomage, balance) if d.get("ok"))
+        return {
+            "ok":                  nb_ok > 0,
+            "geo":                 _EUROSTAT_GEO,
+            "pib_eu":              pib,
+            "hicp_mensuel":        hicp_mensuel,
+            "hicp_annuel":         hicp_annuel,
+            "chomage_eu":          chomage,
+            "balance_commerciale": balance,
+            "alertes":             alertes,
+            "nb_indicateurs_ok":   nb_ok,
+            "timestamp":           datetime.now(timezone.utc).isoformat(),
+        }
+
+    def macro_eu(self, forcer: bool = False) -> dict:
+        """
+        Section 'Macro EU' (onglet Intelligence) — PIB/HICP/chômage/balance
+        commerciale UE27 via Eurostat. Cache 6h (données mensuelles/trimestrielles,
+        pas besoin de rafraîchir plus souvent).
+        """
+        now = time.time()
+        with self._lock:
+            if (not forcer and self._cache_macro_eu is not None
+                    and (now - self._cache_macro_eu_ts) < self._cache_macro_eu_ttl):
+                return self._cache_macro_eu
+            result = self._fetch_eurostat()
+            self._cache_macro_eu    = result
+            self._cache_macro_eu_ts = now
+            return result
 
     def _arbitre_bull_bear(self, these_bull: str, bear_result: dict) -> dict:
         """Verdict arbitre impartial entre positions bull et bear."""
