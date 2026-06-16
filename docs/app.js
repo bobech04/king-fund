@@ -2174,9 +2174,10 @@
       state.intelligence = data;
       renderIntelligence(data);
     }
-    // Charger Flux Macro et Alpha Lab en parallèle (non bloquant)
+    // Charger Flux Macro, Alpha Lab et Macro EU en parallèle (non bloquant)
     loadFluxMacro().catch(() => {});
     loadAlphaLab().catch(() => {});
+    loadMacroEU().catch(() => {});
   }
 
   function renderIntelligence(data) {
@@ -2480,6 +2481,59 @@
       } else {
         alertesLiqEl.innerHTML = '';
       }
+    }
+  }
+
+  async function loadMacroEU() {
+    let data;
+    try {
+      data = await apiFetch('/macro-eu', 30_000);
+    } catch (e) {
+      $('fm-macro-eu').innerHTML = '<span style="color:var(--muted);font-size:12px;padding:16px;display:block">Erreur chargement Macro EU.</span>';
+      return;
+    }
+    renderMacroEU(data);
+  }
+
+  function renderMacroEU(data) {
+    const el = $('fm-macro-eu');
+    if (!el) return;
+    const timeEl = $('fm-macro-eu-time');
+    if (timeEl) timeEl.textContent = data && data.timestamp ? 'Mis à jour ' + timeAgo(data.timestamp) : '—';
+    if (!data || !data.ok) {
+      el.innerHTML = '<span style="color:var(--muted);font-size:12px">DONNÉES INDISPONIBLES — Eurostat inaccessible</span>';
+      $('fm-macro-eu-alertes').innerHTML = '';
+      return;
+    }
+    const ITEMS = [
+      { key: 'pib_eu', label: 'PIB UE27 (croissance a/a)', fmt: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%', warn: v => v < 0 },
+      { key: 'hicp_mensuel', label: 'HICP UE27 (m/m)', fmt: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%', warn: () => false },
+      { key: 'hicp_annuel', label: 'HICP UE27 (a/a — inflation)', fmt: v => (v >= 0 ? '+' : '') + v.toFixed(1) + '%', warn: v => v > 4.0 },
+      { key: 'chomage_eu', label: 'Taux de chômage UE27', fmt: v => v.toFixed(1) + '%', warn: () => false },
+      { key: 'balance_commerciale', label: 'Balance commerciale UE27 (extra-UE, M€)', fmt: v => v.toLocaleString('fr-FR', {maximumFractionDigits: 0}) + ' M€', warn: v => v < 0 },
+    ];
+    el.innerHTML = ITEMS.map(item => {
+      const d = data[item.key] || {};
+      const alerte = d.ok && typeof d.valeur === 'number' ? item.warn(d.valeur) : false;
+      const display = d.ok
+        ? item.fmt(d.valeur) + (d.periode ? ` <span style="color:var(--muted);font-size:9px">(${d.periode})</span>` : '')
+        : '<span style="color:var(--muted)">DONNÉES INDISPONIBLES</span>';
+      return `<div style="display:flex;align-items:center;gap:10px;padding:7px 10px;background:var(--bg3);border-radius:6px;border-left:3px solid ${alerte ? '#ff4455' : 'var(--border)'}">
+        <span style="font-size:13px">${alerte ? '🔴' : '🇪🇺'}</span>
+        <div style="flex:1;font-size:12px;color:var(--muted)">${item.label}</div>
+        <div style="font-size:13px;font-weight:700;color:${alerte ? '#ff4455' : 'var(--fg)'}">${display}</div>
+      </div>`;
+    }).join('');
+
+    const alertesEl = $('fm-macro-eu-alertes');
+    if (alertesEl) {
+      const alertes = data.alertes || [];
+      alertesEl.innerHTML = alertes.length ? alertes.map(a =>
+        `<div style="border-left:3px solid #c0392b;padding:8px 12px;margin-bottom:6px;background:var(--bg2);border-radius:0 6px 6px 0;font-size:12px">
+          <span style="background:#c0392b;color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px;margin-right:8px">${a.niveau}</span>
+          <b>${a.label}</b> — ${a.valeur} (seuil: ${a.seuil}, ${a.periode})
+        </div>`
+      ).join('') : '';
     }
   }
 
@@ -2901,6 +2955,7 @@
     addToWatchlist:          ticker => addToWatchlist(ticker).catch(() => {}),
     refreshFluxMacro:        () => loadFluxMacro().catch(() => {}),
     refreshAlphaLab:         () => loadAlphaLab().catch(() => {}),
+    refreshMacroEU:          () => loadMacroEU().catch(() => {}),
     wzAnalyser:              () => wzAnalyser().catch(() => {}),
     wzGo:                    step => wzGo(step),
     wzStep3Vote:             () => wzStep3Vote().catch(() => {}),

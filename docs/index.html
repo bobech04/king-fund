@@ -622,6 +622,21 @@
       <div id="fm-alertes-liquidite" style="margin-top:10px"></div>
     </div>
 
+    <!-- Macro EU (Eurostat) -->
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <div class="card-title" style="margin-bottom:0">🇪🇺 Macro EU — Eurostat (PIB · HICP · Chômage · Balance commerciale)</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <span class="section-meta" id="fm-macro-eu-time">—</span>
+          <button class="btn btn-sm btn-ghost" onclick="App.refreshMacroEU()">↻</button>
+        </div>
+      </div>
+      <div id="fm-macro-eu" style="display:grid;gap:8px;padding:4px 0">
+        <div style="color:var(--muted);font-size:12px">Chargement…</div>
+      </div>
+      <div id="fm-macro-eu-alertes" style="margin-top:10px"></div>
+    </div>
+
     <!-- Conclusion + disclaimer -->
     <div class="card">
       <div class="card-title">🎯 Conclusion Flux Macro</div>
