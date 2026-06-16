@@ -1095,7 +1095,7 @@ class AgentFluxMacro:
                 pval = res[0]["ssr_ftest"][1]
                 min_p = min(min_p, pval)
                 if pval < 0.05:
-                    lags_sig.append({"lag": lag, "pvalue": round(pval, 4)})
+                    lags_sig.append({"lag": int(lag), "pvalue": round(pval, 4)})
             sig = min_p < 0.05
             resume = (
                 f"Granger X→Y : p-value min = {min_p:.4f} (lags 1-{maxlag}). "
@@ -2251,39 +2251,39 @@ class AgentFluxMacro:
                     f"{top_anom.get('label','Aucune')} | "
                     f"Z={top_anom.get('z_score','?')} | "
                     f"Niveau: {top_anom.get('niveau','?')}"
-                ))
+                ), new_x="LMARGIN", new_y="NEXT")
             else:
                 pdf.cell(W, 5, "Aucune anomalie CRITIQUE", new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
 
             _section("POSITION BULL")
-            pdf.multi_cell(W, 5, _p(str(conclusion)[:800]))
+            pdf.multi_cell(W, 5, _p(str(conclusion)[:800]), new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
 
             _section("POSITION BEAR (avocat du diable)")
-            pdf.multi_cell(W, 5, _p(str(_bear_pos)[:400]))
+            pdf.multi_cell(W, 5, _p(str(_bear_pos)[:400]), new_x="LMARGIN", new_y="NEXT")
             if bear_result.get("raisons_bear"):
                 for r in bear_result["raisons_bear"][:3]:
-                    pdf.multi_cell(W, 4, _p(f"• {str(r)[:100]}"))
-            pdf.multi_cell(W, 4, _p(f"Biais: {_bear_bias[:80]}"))
+                    pdf.multi_cell(W, 4, _p(f"• {str(r)[:100]}"), new_x="LMARGIN", new_y="NEXT")
+            pdf.multi_cell(W, 4, _p(f"Biais: {_bear_bias[:80]}"), new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
 
             _section(f"VERDICT ARBITRE : {_arb_verd}")
-            pdf.multi_cell(W, 5, _p(str(_arb_txt)[:400]))
+            pdf.multi_cell(W, 5, _p(str(_arb_txt)[:400]), new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
 
             _section("ACTION SUGGEREE")
-            pdf.multi_cell(W, 5, _p(str(action)[:400]))
+            pdf.multi_cell(W, 5, _p(str(action)[:400]), new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
 
             _section("TESTS DE GRANGER (Phase 2)")
-            pdf.multi_cell(W, 4, _p(f"GLD -> SPY : {_g_gld[:120]}"))
-            pdf.multi_cell(W, 4, _p(f"TLT -> SPY : {_g_tlt[:120]}"))
+            pdf.multi_cell(W, 4, _p(f"GLD -> SPY : {_g_gld[:120]}"), new_x="LMARGIN", new_y="NEXT")
+            pdf.multi_cell(W, 4, _p(f"TLT -> SPY : {_g_tlt[:120]}"), new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
 
             _section(f"SOURCES ACTIVES ({len(sources)})")
             for s in sources[:8]:
-                pdf.multi_cell(W, 4, _p(f"- {str(s)[:110]}"))
+                pdf.multi_cell(W, 4, _p(f"- {str(s)[:110]}"), new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
 
             _section("INDICATEURS LIQUIDITE (FRED)")
@@ -2303,9 +2303,18 @@ class AgentFluxMacro:
                          new_x="LMARGIN", new_y="NEXT")
             pdf.ln(2)
 
+            _section("POURQUOI J'AI TORT (biais narratif)")
+            pdf.multi_cell(W, 5, _p(str(tort)[:400]), new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(2)
+
+            _section("LIMITES FONDAMENTALES")
+            for l in LIMITES_FONDAMENTALES:
+                pdf.multi_cell(W, 4, _p(f"- {str(l)[:110]}"), new_x="LMARGIN", new_y="NEXT")
+            pdf.ln(2)
+
             pdf.set_font("Helvetica", "I", 8)
-            pdf.multi_cell(W, 4, _p(f"DISCLAIMER : {DISCLAIMER}"))
-            pdf.multi_cell(W, 4, "Soumis a AGD-01 pour validation avant diffusion.")
+            pdf.multi_cell(W, 4, _p(f"DISCLAIMER : {DISCLAIMER}"), new_x="LMARGIN", new_y="NEXT")
+            pdf.multi_cell(W, 4, "Soumis a AGD-01 pour validation avant diffusion.", new_x="LMARGIN", new_y="NEXT")
 
             pdf_chemin = _RAPPORTS_DIR / "flash" / f"{nom_base}.pdf"
             pdf.output(str(pdf_chemin))
