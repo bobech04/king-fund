@@ -2215,7 +2215,7 @@ _scheduler.add_job(
 )
 
 
-# ── Agent Flux Macro — 2×/jour : 10h00 et 18h00 Europe/Paris
+# ── Agent Flux Macro — 2×/jour : 10h00 et 18h00 UTC (job unique, vérifié non-dupliqué)
 
 def _job_flux_macro():
     logger.info("[SCHEDULER] Agent Flux Macro — analyse flux de capitaux")
@@ -2236,7 +2236,7 @@ def _job_flux_macro():
 
 _scheduler.add_job(
     _job_flux_macro,
-    CronTrigger(hour="10,18", minute=0),   # 10h00 et 18h00 Europe/Paris
+    CronTrigger(hour="10,18", minute=0, timezone=pytz.utc),   # 10h00 et 18h00 UTC (fixe, indépendant du DST Paris)
     id="flux_macro_biquotidien",
     replace_existing=True,
     misfire_grace_time=600,
