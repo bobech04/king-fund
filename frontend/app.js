@@ -2498,6 +2498,8 @@
   function renderMacroEU(data) {
     const el = $('fm-macro-eu');
     if (!el) return;
+    const timeEl = $('fm-macro-eu-time');
+    if (timeEl) timeEl.textContent = data && data.timestamp ? 'Mis à jour ' + timeAgo(data.timestamp) : '—';
     if (!data || !data.ok) {
       el.innerHTML = '<span style="color:var(--muted);font-size:12px">DONNÉES INDISPONIBLES — Eurostat inaccessible</span>';
       $('fm-macro-eu-alertes').innerHTML = '';
