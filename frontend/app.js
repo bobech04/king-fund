@@ -1384,6 +1384,8 @@
   function renderWatchlist(data, theses) {
     theses = theses || {};
     const list  = data.watchlist || [];
+    // Synchronise _INV_WATCHLIST avec les tickers réellement en base
+    list.forEach(a => { if (a.ticker) _INV_WATCHLIST.add(a.ticker); });
     // Accepte signal direct (BUY/HOLD/SELL) ou recommandation texte (ACHAT/SURVEILLER/VENTE)
     const signalOf = a => a.signal || _recoToSignal(a.recommandation);
     const nbBuy  = list.filter(a => signalOf(a) === 'BUY').length;
