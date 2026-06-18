@@ -62,15 +62,17 @@ Contexte portefeuille Zoubida :
   - Objectif retraite 56 ans (2041), 500 000€ cible
   - DZD épargne 17 000€ — rapatriement partiel prévu
 
-Donne ton vote fiscal en JSON strict (une seule valeur par champ, pas d'objet imbriqué) :
+Réponds UNIQUEMENT avec ce JSON strict — remplace les valeurs par les tiennes :
 {{
   "vote": "OUI",
-  "motif": "raison fiscale principale (max 60 mots)",
+  "motif": "raison fiscale principale en une phrase (max 60 mots)",
   "impact_flat_tax_annuel": 12.5,
-  "conditions": ["condition 1 si applicable"],
+  "conditions": [],
   "cerfa_3916_requis": false,
   "risque_double_imposition": false
-}}"""
+}}
+Règles : vote = "OUI" si fiscalement acceptable, "NON" si risque fiscal majeur.
+Ne pas inclure d'autre texte que ce JSON."""
 
 _SYSTEM_CIO = """\
 Tu es le CIO du King Fund.
@@ -96,14 +98,17 @@ Données titre :
   Secteur : {secteur}
   Pays : {pays}
 
-Donne ton vote CIO en JSON :
+Réponds UNIQUEMENT avec ce JSON strict — remplace les valeurs par les tiennes :
 {{
-  "vote": "OUI" | "NON" | "ABSTENTION",
-  "motif": "raison macro principale (max 60 mots)",
-  "alignement_macro": 0.0-1.0,
-  "conditions": ["condition 1 si applicable", ...],
-  "horizon_recommande": "court_terme" | "moyen_terme" | "long_terme"
-}}"""
+  "vote": "OUI",
+  "motif": "raison macro principale en une phrase (max 60 mots)",
+  "alignement_macro": 0.75,
+  "conditions": [],
+  "horizon_recommande": "moyen_terme"
+}}
+Règles : vote = "OUI" si alignement macro favorable, "NON" si risque macro élevé, "ABSTENTION" si incertitude.
+alignement_macro = float entre 0.0 et 1.0. horizon_recommande = "court_terme", "moyen_terme" ou "long_terme".
+Ne pas inclure d'autre texte que ce JSON."""
 
 
 class ComiteSelection:
@@ -204,6 +209,12 @@ class ComiteSelection:
             sys_enrichi = enrichir_systeme(system)
         except Exception:
             sys_enrichi = system
+        logger.info(
+            "[Comite] Appel Claude — model=claude-sonnet-4-6 max_tokens=%d "
+            "system_len=%d prompt_len=%d",
+            max_tokens, len(sys_enrichi), len(prompt),
+        )
+        raw = ""
         try:
             msg = self._client.messages.create(
                 model      = "claude-sonnet-4-6",
@@ -214,11 +225,16 @@ class ComiteSelection:
             raw = msg.content[0].text.strip()
             return self._parse_json_claude(raw)
         except json.JSONDecodeError as e:
-            logger.warning("[Comite] JSON invalide (Claude): %s | raw=%r", e, raw[:200] if 'raw' in dir() else "")
+            logger.error("[Comite] JSON invalide: %s | raw=%r", e, raw[:300])
             return {"vote": "ABSTENTION", "motif": "Réponse non parseable", "conditions": []}
         except Exception as e:
-            logger.warning("[Comite] Claude erreur: %s", e)
-            return {"vote": "ABSTENTION", "motif": f"Erreur Claude: {e}", "conditions": []}
+            err_body = getattr(e, "body", None) or getattr(e, "response", None)
+            status   = getattr(e, "status_code", None)
+            logger.error(
+                "[Comite] Claude API %s (status=%s): %s | body=%s",
+                type(e).__name__, status, e, err_body,
+            )
+            return {"vote": "ABSTENTION", "motif": f"Erreur Claude {type(e).__name__}: {e}", "conditions": []}
 
     # ------------------------------------------------------------------
     # Vote Research (pipeline + rapport)
@@ -504,6 +520,22 @@ class ComiteSelection:
                 ))
         except Exception as e:
             logger.debug("[Comite] Persistance SQLite decisions_agd: %s", e)
+
+    def test_avec_ticker(self, ticker: str = "PBR") -> dict:
+        """Test rapide du comité avec données minimales — utile pour diagnostiquer la 400."""
+        logger.info("[Comite] test_avec_ticker(%s) — démarrage", ticker)
+        try:
+            result = self.voter(ticker, {
+                "score": 7.5, "score_final": 7.5,
+                "nom": ticker, "pays": "International",
+                "signal": "BUY", "secteur": "Energy",
+                "montant_envisage": 200,
+            })
+            logger.info("[Comite] test_avec_ticker(%s) → %s", ticker, result.get("decision"))
+            return result
+        except Exception as e:
+            logger.error("[Comite] test_avec_ticker ERREUR: %s", e)
+            return {"erreur": str(e)}
 
     def historique(self, n: int = 20) -> list[dict]:
         with self._lock:

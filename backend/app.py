@@ -1801,6 +1801,17 @@ def get_comite_historique():
         return jsonify({"erreur": str(e)}), 500
 
 
+@app.route("/api/comite-selection/test")
+def get_comite_test():
+    """Test rapide du comité Claude avec un ticker réel (défaut PBR)."""
+    ticker = request.args.get("ticker", "PBR").strip().upper()
+    try:
+        from divisions.gerant_delegue import get_comite_selection
+        return jsonify(get_comite_selection().test_avec_ticker(ticker))
+    except Exception as e:
+        return jsonify({"erreur": str(e)}), 500
+
+
 @app.route("/api/comite-selection/decisions-agd")
 def get_decisions_agd():
     try:
