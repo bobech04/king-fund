@@ -8,6 +8,15 @@
       "note": "",
       "pru": 46.29,
       "quantite": 1.0
+    },
+    "TTE.PA": {
+      "ticker": "TTE.PA",
+      "nom": "TotalEnergies SE",
+      "objectif": 85.0,
+      "stop_loss": 65.0,
+      "note": "frais: 1.00 | achat 15/06/2026",
+      "pru": 72.96,
+      "quantite": 1.0
     }
   },
   "transactions": [
@@ -58,6 +67,30 @@
       "pv_realisee": null,
       "compte": "cto",
       "note": ""
+    },
+    {
+      "id": "fe171f7d",
+      "ticker": "TEST",
+      "date": "2026-06-15",
+      "type": "achat",
+      "quantite": 5.0,
+      "prix_unitaire": 100.0,
+      "pru_reference": 0.0,
+      "pv_realisee": null,
+      "compte": "cto",
+      "note": "frais: 1.50"
+    },
+    {
+      "id": "22de66a6",
+      "ticker": "TTE.PA",
+      "date": "2026-06-15",
+      "type": "achat",
+      "quantite": 1.0,
+      "prix_unitaire": 72.96,
+      "pru_reference": 0.0,
+      "pv_realisee": null,
+      "compte": "cto",
+      "note": "frais: 1.00"
     }
   ],
   "alertes_envoyees": {}

@@ -2530,10 +2530,10 @@
     }
   }
 
-  async function loadMacroEU() {
+  async function loadMacroEU(force = false) {
     let data;
     try {
-      data = await apiFetch('/macro-eu', 30_000);
+      data = await apiFetch('/macro-eu' + (force ? '?force=1' : ''), 30_000);
     } catch (e) {
       $('fm-macro-eu').innerHTML = '<span style="color:var(--muted);font-size:12px;padding:16px;display:block">Erreur chargement Macro EU.</span>';
       return;
@@ -2628,8 +2628,33 @@
       const pvUnit     = prixActuel - pru;
       const pvTotal    = pvUnit * qte;
       const pvPct      = pru > 0 ? (pvUnit / pru * 100) : 0;
+      const nom        = p.nom && p.nom !== p.ticker ? ` <span style="font-size:10px;color:var(--muted)">${p.nom}</span>` : '';
+
+      // Jauge stop/objectif
+      const stop = p.stop_loss;
+      const obj  = p.objectif;
+      let gaugeHtml = '';
+      if (stop && obj && obj > stop) {
+        const range  = obj - stop;
+        const pct    = Math.max(0, Math.min(100, ((prixActuel > 0 ? prixActuel : pru) - stop) / range * 100));
+        const pruPct = Math.max(0, Math.min(100, (pru - stop) / range * 100));
+        const barCol = pct < 30 ? '#f87171' : pct < 70 ? '#fcd34d' : '#4ade80';
+        gaugeHtml = `
+          <tr><td colspan="7" style="padding:4px 10px 10px">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px;display:flex;justify-content:space-between">
+              <span>🛑 Stop ${stop.toFixed(2)}€</span>
+              <span style="color:var(--muted)">PRU ${pru.toFixed(2)}€${prixActuel > 0 ? ' · Live ' + prixActuel.toFixed(2) + '€' : ''}</span>
+              <span>🎯 Obj ${obj.toFixed(2)}€</span>
+            </div>
+            <div style="position:relative;background:var(--bg3);border-radius:4px;height:7px;overflow:hidden">
+              <div style="position:absolute;left:0;top:0;height:100%;width:${pct}%;background:${barCol};border-radius:4px;transition:width .4s"></div>
+              <div style="position:absolute;left:${pruPct}%;top:-1px;height:9px;width:2px;background:#60a5fa;border-radius:1px" title="PRU ${pru.toFixed(2)}€"></div>
+            </div>
+          </td></tr>`;
+      }
+
       return `<tr>
-        <td><strong>${p.ticker || '—'}</strong></td>
+        <td><strong>${p.ticker || '—'}</strong>${nom}</td>
         <td>${pru.toFixed(2)} €</td>
         <td>${prixActuel > 0 ? prixActuel.toFixed(2) + ' €' : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="${pnlClass(pvTotal)}">${(pvTotal >= 0 ? '+' : '') + pvTotal.toFixed(2) + ' €'}</td>
@@ -2639,7 +2664,7 @@
               style="font-size:11px;padding:3px 8px;background:var(--bg3);color:var(--fg);border:1px solid var(--border)">
           + Tx
         </button></td>
-      </tr>`;
+      </tr>${gaugeHtml}`;
     }).join('');
     container.innerHTML = `<div class="table-wrap"><table class="data-table">
       <thead><tr>
@@ -3001,7 +3026,7 @@
     addToWatchlist:          ticker => addToWatchlist(ticker).catch(() => {}),
     refreshFluxMacro:        () => loadFluxMacro().catch(() => {}),
     refreshAlphaLab:         () => loadAlphaLab().catch(() => {}),
-    refreshMacroEU:          () => loadMacroEU().catch(() => {}),
+    refreshMacroEU:          (force) => loadMacroEU(force).catch(() => {}),
     wzAnalyser:              () => wzAnalyser().catch(() => {}),
     wzGo:                    step => wzGo(step),
     wzStep3Vote:             () => wzStep3Vote().catch(() => {}),
