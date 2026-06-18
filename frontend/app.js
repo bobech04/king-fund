@@ -1700,6 +1700,42 @@
       if (s) s.classList.toggle('active', i === n);
       if (s) s.classList.toggle('done',   i < n);
     });
+    if (n === 5) wzStep5Render();
+  }
+
+  function wzStep5Render() {
+    const el = document.getElementById('wz-confirm-body');
+    if (!el) return;
+    if (!_wz.comiteResult) {
+      el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Aucune décision en cours.</div>';
+      return;
+    }
+    const r   = _wz.comiteResult;
+    const ok  = r.decision?.startsWith('BUY') || r.nb_oui >= 2;
+    const col = ok ? 'var(--green)' : (r.decision === 'VETO' ? 'var(--red)' : '#facc15');
+    const icon = ok ? '🎉' : (r.decision === 'VETO' ? '🛑' : '📋');
+    const votes = Array.isArray(r.votes) ? r.votes : [];
+    const votesSummary = votes.map(v => {
+      const fav = v.vote === 'OUI';
+      return `<span style="color:${fav ? 'var(--green)' : 'var(--red)'}">
+        ${fav ? '✅' : '❌'} ${v.votant}</span>`;
+    }).join(' &nbsp; ');
+    el.innerHTML = `
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:44px">${icon}</div>
+        <div style="font-size:20px;font-weight:800;color:${col};margin-top:8px">
+          ${r.decision || '—'}
+        </div>
+        <div style="color:var(--fg);font-size:13px;margin-top:8px">
+          <strong>${_wz.ticker || '—'}</strong> ·
+          Score <strong>${(_wz.score || 0).toFixed(1)}/10</strong> ·
+          <strong>${r.nb_oui ?? 0}/3 OUI</strong>
+        </div>
+        ${votesSummary ? `<div style="margin-top:10px;font-size:12px">${votesSummary}</div>` : ''}
+        <div style="margin-top:12px;font-size:11px;color:var(--muted)">
+          Décision persistée SQLite · Telegram envoyé
+        </div>
+      </div>`;
   }
 
   async function wzAnalyser() {
