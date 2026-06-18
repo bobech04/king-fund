@@ -1689,7 +1689,7 @@
   }
 
   // ── Wizard Vote ───────────────────────────────────────────
-  const _wz = { ticker: null, score: null, stages: [], comiteResult: null, step: 1 };
+  const _wz = { ticker: null, score: null, stages: [], comiteResult: null, step: 1, meta: {} };
 
   function wzSetStep(n) {
     _wz.step = n;
@@ -1750,6 +1750,13 @@
       _wz.ticker = ticker;
       _wz.score  = data.score ?? 0;
       _wz.stages = data.stages || [];
+      _wz.meta   = {
+        signal:  data.signal  || 'N/A',
+        nom:     data.symbol  || data.nom || ticker,
+        secteur: data.secteur || data.sector || 'N/A',
+        pays:    data.pays    || data.country || 'N/A',
+        score_final: data.score ?? 0,
+      };
       wzStep2Render();
       wzSetStep(2);
       if (status) status.textContent = '';
@@ -1787,8 +1794,9 @@
     try {
       const res = await apiPostJson('/comite-selection/voter', {
         ticker: _wz.ticker,
-        score: _wz.score,
+        score:  _wz.score,
         stages: _wz.stages,
+        ..._wz.meta,
       }, 60_000);
       _wz.comiteResult = res;
 
@@ -1836,7 +1844,7 @@
   }
 
   function wzReset() {
-    _wz.ticker = null; _wz.score = null; _wz.stages = []; _wz.comiteResult = null;
+    _wz.ticker = null; _wz.score = null; _wz.stages = []; _wz.comiteResult = null; _wz.meta = {};
     const inp = document.getElementById('wz-ticker-input');
     if (inp) inp.value = '';
     wzSetStep(1);
