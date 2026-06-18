@@ -31,10 +31,11 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 SOURCES = [
-    {"nom": "Bruno Bertez",       "url": "https://brunobertez.com/feed/",                      "priorite": 1},
-    {"nom": "Ray Dalio",          "url": "https://raydalio.substack.com/feed",                 "priorite": 2},
-    {"nom": "CrossBorderCapital", "url": "https://crossbordercapital.com/feed/",               "priorite": 2},
-    {"nom": "InflationGuy",       "url": "https://inflationguy.blog/feed/",                    "priorite": 2},
+    {"nom": "Bruno Bertez",       "url": "https://brunobertez.com/feed/",                                "priorite": 1},
+    {"nom": "Fed FOMC",           "url": "https://www.federalreserve.gov/feeds/press_all.xml",           "priorite": 1},
+    {"nom": "Ray Dalio",          "url": "https://raydalio.substack.com/feed",                           "priorite": 2},
+    {"nom": "CrossBorderCapital", "url": "https://crossbordercapital.com/feed/",                         "priorite": 2},
+    {"nom": "InflationGuy",       "url": "https://inflationguy.blog/feed/",                              "priorite": 2},
 ]
 
 # ---------------------------------------------------------------------------
@@ -61,6 +62,13 @@ _THEMES: dict[str, list[str]] = {
                      "masse monétaire", "repo", "fed balance", "bce bilan",
                      "quantitative easing", "qe", "qt", "tightening", "easing",
                      "howell", "global liquidity", "cross-border capital"],
+    "Fed/taux":     ["fed", "fomc", "warsh", "federal reserve", "rate hike",
+                     "rate cut", "hawkish", "dovish", "forward guidance",
+                     "policy statement", "dot plot", "interest rate",
+                     "taux directeur", "fed funds", "monetary policy"],
+    "volatilité":   ["volatilité", "volatility", "vix", "vvix", "options",
+                     "implied vol", "vol regime", "vol spike", "uncertainty",
+                     "dispersion"],
 }
 
 _CRITIQUE_KW = [
@@ -180,6 +188,16 @@ def _init_db(db_path: Path) -> None:
 # Agent principal
 # ---------------------------------------------------------------------------
 
+_ARTICLE_WARSH = {
+    "titre":    "Fed Warsh supprime forward guidance — nouvelle ère de volatilité",
+    "source":   "Fed/Warsh",
+    "url":      "",
+    "publie_a": "2026-06-17",
+    "themes":   ["Fed/taux", "taux", "volatilité", "or", "actifs réels"],
+    "niveau":   "CRITIQUE",
+}
+
+
 class AgentVeilleStrategique:
     def __init__(self) -> None:
         self._lock      = threading.Lock()
@@ -187,11 +205,45 @@ class AgentVeilleStrategique:
         self._cache_ts: float = 0.0
         self._alertes_envoyees: set[str] = set()
         self._db_init   = False
+        # Insertion bootstrap article Warsh (idempotente via UNIQUE fp)
+        try:
+            self._ensure_db()
+            self.inserer_article_warsh()
+        except Exception as _e:
+            logger.debug("[VeilleStrat] bootstrap Warsh: %s", _e)
 
     def _ensure_db(self) -> None:
         if not self._db_init:
             _init_db(DB_PATH)
             self._db_init = True
+
+    def inserer_article_warsh(self) -> bool:
+        """Insère l'article Warsh CRITIQUE dans SQLite (une seule fois) et envoie l'alerte Telegram."""
+        art    = _ARTICLE_WARSH
+        fp_val = _fp(art["titre"], art["url"])
+        try:
+            conn = sqlite3.connect(str(DB_PATH))
+            conn.execute(
+                "INSERT OR IGNORE INTO veille_strategique "
+                "(fp, source, titre, url, publie_a, themes, niveau, created_at) "
+                "VALUES (?,?,?,?,?,?,?,?)",
+                (fp_val, art["source"], art["titre"], art["url"],
+                 art["publie_a"],
+                 json.dumps(art["themes"], ensure_ascii=False),
+                 art["niveau"],
+                 datetime.now(timezone.utc).isoformat()),
+            )
+            inserted = conn.execute("SELECT changes()").fetchone()[0] > 0
+            conn.commit()
+            conn.close()
+            if inserted:
+                logger.info("[VeilleStrat] Article Warsh inséré (CRITIQUE) — alerte Telegram")
+                self._alerter({**art, "fp": fp_val})
+                return True
+            return False
+        except Exception as exc:
+            logger.warning("[VeilleStrat] inserer_article_warsh: %s", exc)
+            return False
 
     # ------------------------------------------------------------------
 
