@@ -193,7 +193,7 @@ _ARTICLE_WARSH = {
     "source":   "Fed/Warsh",
     "url":      "",
     "publie_a": "2026-06-17",
-    "themes":   ["Fed/taux", "taux", "volatilité", "or", "actifs réels"],
+    "themes":   ["Fed", "taux", "volatilité", "or", "actifs réels"],
     "niveau":   "CRITIQUE",
 }
 
