@@ -234,6 +234,17 @@ FRED_SERIES = ["DGS3MO", "DGS10", "T10YIE"]
 # Indicateurs de liquidité macro (nécessitent historique pour calcul variation)
 FRED_SERIES_LIQUIDITE = ["M2SL", "WALCL", "IORB", "BAMLC0A0CM", "BAMLH0A0HYM2"]
 
+# Jeff Snider Eurodollar — SOFR/repo/funding stress
+# SOFR  : Secured Overnight Financing Rate (FRBNY via FRED)
+# EFFR  : Effective Federal Funds Rate (Fed via FRED)
+# RRPONTSYD : Overnight Reverse Repo operations outstanding (Mds$)
+FRED_SERIES_SOFR = ["SOFR", "EFFR", "RRPONTSYD"]
+SOFR_SEUILS = {
+    "spread_alerte_bps":  50.0,   # SOFR - EFFR > 50 bps → alerte funding stress
+    "spread_critique_bps": 100.0, # SOFR - EFFR > 100 bps → CRITIQUE
+    "rrpon_bas_bn":        50.0,  # RRPONTSYD < 50 Mds$ → potential stress
+}
+
 # Seuils d'alerte liquidité (spec)
 # Note FRED units : BAMLC0A0CM et BAMLH0A0HYM2 sont en % (pas bps)
 # → 150 bps = 1.50% | 500 bps = 5.00%
@@ -941,6 +952,112 @@ class AgentFluxMacro:
         except Exception as exc:
             logger.warning("[FluxMacro] _fetch_fred_liquidite: %s", exc)
             return {"ok": False, "reason": str(exc), "data": {}}
+
+    def _fetch_fred_sofr(self) -> dict[str, Any]:
+        """
+        Jeff Snider Eurodollar — SOFR / EFFR / RRPONTSYD via FRED.
+        SOFR spread = SOFR - EFFR (en %) → alerte si > 50 bps (0.50%)
+        RRPONTSYD = overnight reverse repos outstanding (Mds$)
+        """
+        result: dict[str, Any] = {}
+        try:
+            from config import FRED_API_KEY
+            if not FRED_API_KEY:
+                return {"ok": False, "reason": "FRED_API_KEY absent", "data": {}}
+            from fredapi import Fred
+            fred = Fred(api_key=FRED_API_KEY)
+            for series_id in FRED_SERIES_SOFR:
+                try:
+                    s = fred.get_series_latest_release(series_id)
+                    s_clean = s.dropna()
+                    if s_clean.empty:
+                        result[series_id] = {"value": None, "freshness": "UNAVAILABLE", "hist": []}
+                        continue
+                    val  = float(s_clean.iloc[-1])
+                    hist = [float(x) for x in s_clean.tail(10).tolist()]
+                    result[series_id] = {"value": val, "freshness": "OK", "hist": hist}
+                except Exception as exc:
+                    logger.debug("[FluxMacro] FRED SOFR %s: %s", series_id, exc)
+                    result[series_id] = {"value": None, "freshness": "UNAVAILABLE", "hist": []}
+            return {"ok": True, "data": result}
+        except Exception as exc:
+            logger.warning("[FluxMacro] _fetch_fred_sofr: %s", exc)
+            return {"ok": False, "reason": str(exc), "data": {}}
+
+    def _check_sofr_stress(self, sofr_data: dict, prix_data: dict[str, Any]) -> list[dict]:
+        """
+        Jeff Snider Eurodollar — détecte le dollar funding stress.
+        Indicateurs :
+          1. SOFR spread vs EFFR > 50 bps
+          2. RRPONTSYD très bas (< 50 Mds$)
+          3. FX swap basis approx : USD/JPY + USD/KRW hausse simultanée
+        """
+        alertes: list[dict] = []
+        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+
+        sofr_val  = sofr_data.get("SOFR",     {}).get("value")
+        effr_val  = sofr_data.get("EFFR",     {}).get("value")
+        rrpon_val = sofr_data.get("RRPONTSYD",{}).get("value")
+
+        # 1. SOFR spread vs EFFR
+        if sofr_val is not None and effr_val is not None:
+            spread_pct = sofr_val - effr_val
+            spread_bps = spread_pct * 100.0
+            if abs(spread_bps) >= SOFR_SEUILS["spread_alerte_bps"]:
+                niveau = "CRITIQUE" if abs(spread_bps) >= SOFR_SEUILS["spread_critique_bps"] else "IMPORTANT"
+                alertes.append({
+                    "id":          "sofr_spread",
+                    "label":       f"SOFR spread vs EFFR — {spread_bps:+.1f} bps",
+                    "valeur":      f"SOFR={sofr_val:.3f}% | EFFR={effr_val:.3f}% | spread={spread_bps:+.1f} bps",
+                    "niveau":      niveau,
+                    "seuil_label": f"seuil {SOFR_SEUILS['spread_alerte_bps']:.0f} bps (funding stress Snider)",
+                    "timestamp":   now_str,
+                })
+
+        # 2. RRPONTSYD très bas → stress potentiel
+        if rrpon_val is not None:
+            rrpon_bn = rrpon_val / 1000.0  # FRED units = millions → Mds
+            if rrpon_bn < SOFR_SEUILS["rrpon_bas_bn"]:
+                alertes.append({
+                    "id":          "rrpon_bas",
+                    "label":       f"Reverse Repo Fed très bas — {rrpon_bn:.0f} Mds$",
+                    "valeur":      f"{rrpon_bn:.1f} Mds$ (< {SOFR_SEUILS['rrpon_bas_bn']:.0f} Mds$)",
+                    "niveau":      "IMPORTANT",
+                    "seuil_label": "liquidité excédentaire quasi nulle — stress repo potentiel",
+                    "timestamp":   now_str,
+                })
+
+        # 3. FX swap basis approx : USD/JPY + USD/KRW hausse simultanée
+        jpy  = prix_data.get("USDJPY", {})
+        krw  = prix_data.get("USDKRW", {})
+        jpy_h = jpy.get("hist_30d") or []
+        krw_h = krw.get("hist_30d") or []
+        jpy_p = jpy.get("price")
+        krw_p = krw.get("price")
+
+        if jpy_p and len(jpy_h) >= 2 and jpy_h[-2]:
+            jpy_var = (jpy_p - jpy_h[-2]) / jpy_h[-2] * 100
+        else:
+            jpy_var = None
+
+        if krw_p and len(krw_h) >= 2 and krw_h[-2]:
+            krw_var = (krw_p - krw_h[-2]) / krw_h[-2] * 100
+        else:
+            krw_var = None
+
+        if jpy_var is not None and krw_var is not None:
+            fx_basis_approx = (jpy_var + krw_var) / 2.0
+            if fx_basis_approx > 1.5:
+                alertes.append({
+                    "id":          "fx_basis_approx",
+                    "label":       "Dollar funding stress — USD/JPY + USD/KRW hausse simultanée",
+                    "valeur":      f"USD/JPY {jpy_var:+.2f}% | USD/KRW {krw_var:+.2f}% | basis approx {fx_basis_approx:+.2f}%",
+                    "niveau":      "CRITIQUE" if fx_basis_approx > 2.5 else "IMPORTANT",
+                    "seuil_label": "hausse simultanée USD/JPY + USD/KRW → pression dollar funding offshore",
+                    "timestamp":   now_str,
+                })
+
+        return alertes
 
     def _check_liquidite_seuils(self, fred_liq_data: dict) -> list[dict]:
         """Vérifie les seuils d'alerte sur les indicateurs de liquidité macro."""
@@ -1776,10 +1893,21 @@ class AgentFluxMacro:
                 sources_actives.append("FRED API liquidité (M2SL, WALCL, IORB, BAMLC0A0CM, BAMLH0A0HYM2)")
             alertes_liquidite = self._check_liquidite_seuils(fred_liq_data) if fred_liq_ok else []
 
+            # SOFR / EFFR / RRPONTSYD — Jeff Snider Eurodollar
+            sofr_result = self._fetch_fred_sofr()
+            sofr_ok     = sofr_result.get("ok", False)
+            sofr_data_raw = sofr_result.get("data", {})
+            if sofr_ok:
+                sources_actives.append("FRED API SOFR (SOFR, EFFR, RRPONTSYD — Snider Eurodollar)")
+
             # ── Étape 1 : DÉTECTER anomalies ───────────────────────────────
             prix_data   = prix_result.get("data", {})
             anomalies   = self._detect_anomalies(prix_data) if prix_result.get("ok") else []
             ratios_etat = self._compute_ratios_etat(prix_data) if prix_result.get("ok") else []
+            alertes_sofr = (
+                self._check_sofr_stress(sofr_data_raw, prix_data)
+                if sofr_ok or prix_result.get("ok") else []
+            )
             regime_info = self._detect_regime_marche(prix_data) if prix_result.get("ok") else {
                 "regime": "NORMAL", "signaux": [], "probabilites": {},
                 "corr_tlt_spy_5j": None, "ratio_tlt_spy": None,
@@ -1905,6 +2033,7 @@ class AgentFluxMacro:
                 "nb_sources":        len(sources_actives),
                 "anomalies":         anomalies,
                 "alertes_liquidite": alertes_liquidite,
+                "alertes_sofr":      alertes_sofr,
                 "ratios":            ratios_etat,
                 "fred": {
                     "DGS3MO":  fred_data.get("DGS3MO",  {}).get("value", "DONNÉES INDISPONIBLES"),
@@ -1919,6 +2048,22 @@ class AgentFluxMacro:
                     "BAMLH0A0HYM2": _liq_val("BAMLH0A0HYM2"),
                     "ok":           fred_liq_ok,
                     "note":         "M2SL: masse monétaire US (Mds$) | WALCL: Fed balance sheet (Mds$) | IORB: taux repo (%) | BAMLC0A0CM: spreads IG (bps) | BAMLH0A0HYM2: spreads HY (bps)",
+                },
+                "sofr_stress": {
+                    "ok":       sofr_ok,
+                    "SOFR":     sofr_data_raw.get("SOFR",     {}).get("value"),
+                    "EFFR":     sofr_data_raw.get("EFFR",     {}).get("value"),
+                    "RRPONTSYD": sofr_data_raw.get("RRPONTSYD",{}).get("value"),
+                    "spread_bps": (
+                        round((sofr_data_raw.get("SOFR",{}).get("value",0) or 0) -
+                              (sofr_data_raw.get("EFFR",{}).get("value",0) or 0), 3) * 100
+                        if sofr_data_raw.get("SOFR",{}).get("value") is not None
+                           and sofr_data_raw.get("EFFR",{}).get("value") is not None
+                        else None
+                    ),
+                    "alertes":  alertes_sofr,
+                    "seuils":   SOFR_SEUILS,
+                    "note":     "Jeff Snider Eurodollar — SOFR/EFFR spread (seuil 50 bps) | RRPONTSYD reverse repo Fed (Mds$) | FX swap basis approx USD/JPY + USD/KRW",
                 },
                 "cftc": cftc_result if cftc_ok else {"ok": False, "reason": "DONNÉES INDISPONIBLES"},
                 "wgc":               wgc_result,

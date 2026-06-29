@@ -2415,6 +2415,51 @@
       (action ? `<div style="font-size:12px;color:var(--accent);margin-bottom:8px">📈 ${action}</div>` : '') +
       (tort ? `<details style="margin-top:8px"><summary style="font-size:11px;color:var(--muted);cursor:pointer">⚖️ Pourquoi j'ai tort (biais narratif)</summary><pre style="font-size:11px;color:var(--muted);margin-top:6px;white-space:pre-wrap">${tort}</pre></details>` : '');
 
+    // ── Jeff Snider SOFR / Repo / Funding Stress ─────────────────────────────
+    const sofr = data.sofr_stress || {};
+    const sofrEl = $('fm-sofr');
+    const sofrAlertesEl = $('fm-sofr-alertes');
+    if (sofrEl) {
+      const sofrVal  = sofr.SOFR  != null ? sofr.SOFR.toFixed(3)  + '%' : '—';
+      const effrVal  = sofr.EFFR  != null ? sofr.EFFR.toFixed(3)  + '%' : '—';
+      const rrponVal = sofr.RRPONTSYD != null
+        ? (sofr.RRPONTSYD / 1000).toFixed(0) + ' Mds$' : '—';
+      const spreadBps = sofr.spread_bps != null ? sofr.spread_bps.toFixed(1) + ' bps' : '—';
+      const spreadColor = sofr.spread_bps != null
+        ? (Math.abs(sofr.spread_bps) > 100 ? '#ff4455' : Math.abs(sofr.spread_bps) > 50 ? '#ffd700' : 'var(--green)')
+        : 'var(--muted)';
+      const SOFR_ITEMS = [
+        { label: 'SOFR (Secured Overnight)',  val: sofrVal,   detail: 'FRBNY via FRED',           warn: false },
+        { label: 'EFFR (Fed Funds effectif)',  val: effrVal,   detail: 'Effective Fed Funds Rate',  warn: false },
+        { label: 'SOFR–EFFR spread',           val: spreadBps, detail: 'Alerte si > 50 bps',        warn: sofr.spread_bps != null && Math.abs(sofr.spread_bps) >= 50 },
+        { label: 'Reverse Repo Fed (RRPON)',   val: rrponVal,  detail: 'Alerte si < 50 Mds$',       warn: sofr.RRPONTSYD != null && sofr.RRPONTSYD / 1000 < 50 },
+      ];
+      sofrEl.innerHTML = SOFR_ITEMS.map(it =>
+        `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border-radius:6px;border-left:3px solid ${it.warn ? '#ff4455' : 'var(--muted)'}">
+          <span style="font-size:14px">${it.warn ? '🔴' : '🟢'}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:600;color:var(--fg)">${it.label}</div>
+            <div style="font-size:11px;color:var(--muted)">${it.detail}</div>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:${it.warn ? '#ff4455' : it.label.includes('spread') ? spreadColor : 'var(--fg)'};white-space:nowrap">${it.val}</div>
+        </div>`
+      ).join('');
+    }
+    if (sofrAlertesEl) {
+      const sofrAlertes = sofr.alertes || [];
+      sofrAlertesEl.innerHTML = sofrAlertes.length ? sofrAlertes.map(a => {
+        const c = a.niveau === 'CRITIQUE' ? '#c0392b' : '#e67e22';
+        return `<div style="border-left:3px solid ${c};padding:8px 12px;margin-bottom:6px;background:var(--bg2);border-radius:0 6px 6px 0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+            <span style="background:${c};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">${a.niveau}</span>
+            <span style="font-size:12px;font-weight:600;color:var(--fg)">${a.label}</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted)">${a.valeur || ''}</div>
+          ${a.seuil_label ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">⚠️ ${a.seuil_label}</div>` : ''}
+        </div>`;
+      }).join('') : '<div style="font-size:11px;color:var(--green);padding:6px 0">✅ Aucun stress SOFR/repo détecté</div>';
+    }
+
     if (data.disclaimer) {
       $('fm-disclaimer').textContent = data.disclaimer;
     }
