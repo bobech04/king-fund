@@ -1384,6 +1384,8 @@
   function renderWatchlist(data, theses) {
     theses = theses || {};
     const list  = data.watchlist || [];
+    // Synchronise _INV_WATCHLIST avec les tickers réellement en base
+    list.forEach(a => { if (a.ticker) _INV_WATCHLIST.add(a.ticker); });
     // Accepte signal direct (BUY/HOLD/SELL) ou recommandation texte (ACHAT/SURVEILLER/VENTE)
     const signalOf = a => a.signal || _recoToSignal(a.recommandation);
     const nbBuy  = list.filter(a => signalOf(a) === 'BUY').length;
@@ -1689,7 +1691,7 @@
   }
 
   // ── Wizard Vote ───────────────────────────────────────────
-  const _wz = { ticker: null, score: null, stages: [], comiteResult: null, step: 1 };
+  const _wz = { ticker: null, score: null, stages: [], comiteResult: null, step: 1, meta: {} };
 
   function wzSetStep(n) {
     _wz.step = n;
@@ -1700,6 +1702,42 @@
       if (s) s.classList.toggle('active', i === n);
       if (s) s.classList.toggle('done',   i < n);
     });
+    if (n === 5) wzStep5Render();
+  }
+
+  function wzStep5Render() {
+    const el = document.getElementById('wz-confirm-body');
+    if (!el) return;
+    if (!_wz.comiteResult) {
+      el.innerHTML = '<div style="text-align:center;padding:20px;color:var(--muted)">Aucune décision en cours.</div>';
+      return;
+    }
+    const r   = _wz.comiteResult;
+    const ok  = r.decision?.startsWith('BUY') || r.nb_oui >= 2;
+    const col = ok ? 'var(--green)' : (r.decision === 'VETO' ? 'var(--red)' : '#facc15');
+    const icon = ok ? '🎉' : (r.decision === 'VETO' ? '🛑' : '📋');
+    const votes = Array.isArray(r.votes) ? r.votes : [];
+    const votesSummary = votes.map(v => {
+      const fav = v.vote === 'OUI';
+      return `<span style="color:${fav ? 'var(--green)' : 'var(--red)'}">
+        ${fav ? '✅' : '❌'} ${v.votant}</span>`;
+    }).join(' &nbsp; ');
+    el.innerHTML = `
+      <div style="text-align:center;padding:20px 0">
+        <div style="font-size:44px">${icon}</div>
+        <div style="font-size:20px;font-weight:800;color:${col};margin-top:8px">
+          ${r.decision || '—'}
+        </div>
+        <div style="color:var(--fg);font-size:13px;margin-top:8px">
+          <strong>${_wz.ticker || '—'}</strong> ·
+          Score <strong>${(_wz.score || 0).toFixed(1)}/10</strong> ·
+          <strong>${r.nb_oui ?? 0}/3 OUI</strong>
+        </div>
+        ${votesSummary ? `<div style="margin-top:10px;font-size:12px">${votesSummary}</div>` : ''}
+        <div style="margin-top:12px;font-size:11px;color:var(--muted)">
+          Décision persistée SQLite · Telegram envoyé
+        </div>
+      </div>`;
   }
 
   async function wzAnalyser() {
@@ -1714,6 +1752,13 @@
       _wz.ticker = ticker;
       _wz.score  = data.score ?? 0;
       _wz.stages = data.stages || [];
+      _wz.meta   = {
+        signal:  data.signal  || 'N/A',
+        nom:     data.symbol  || data.nom || ticker,
+        secteur: data.secteur || data.sector || 'N/A',
+        pays:    data.pays    || data.country || 'N/A',
+        score_final: data.score ?? 0,
+      };
       wzStep2Render();
       wzSetStep(2);
       if (status) status.textContent = '';
@@ -1751,8 +1796,9 @@
     try {
       const res = await apiPostJson('/comite-selection/voter', {
         ticker: _wz.ticker,
-        score: _wz.score,
+        score:  _wz.score,
         stages: _wz.stages,
+        ..._wz.meta,
       }, 60_000);
       _wz.comiteResult = res;
 
@@ -1800,7 +1846,7 @@
   }
 
   function wzReset() {
-    _wz.ticker = null; _wz.score = null; _wz.stages = []; _wz.comiteResult = null;
+    _wz.ticker = null; _wz.score = null; _wz.stages = []; _wz.comiteResult = null; _wz.meta = {};
     const inp = document.getElementById('wz-ticker-input');
     if (inp) inp.value = '';
     wzSetStep(1);
@@ -2369,6 +2415,51 @@
       (action ? `<div style="font-size:12px;color:var(--accent);margin-bottom:8px">📈 ${action}</div>` : '') +
       (tort ? `<details style="margin-top:8px"><summary style="font-size:11px;color:var(--muted);cursor:pointer">⚖️ Pourquoi j'ai tort (biais narratif)</summary><pre style="font-size:11px;color:var(--muted);margin-top:6px;white-space:pre-wrap">${tort}</pre></details>` : '');
 
+    // ── Jeff Snider SOFR / Repo / Funding Stress ─────────────────────────────
+    const sofr = data.sofr_stress || {};
+    const sofrEl = $('fm-sofr');
+    const sofrAlertesEl = $('fm-sofr-alertes');
+    if (sofrEl) {
+      const sofrVal  = sofr.SOFR  != null ? sofr.SOFR.toFixed(3)  + '%' : '—';
+      const effrVal  = sofr.EFFR  != null ? sofr.EFFR.toFixed(3)  + '%' : '—';
+      const rrponVal = sofr.RRPONTSYD != null
+        ? (sofr.RRPONTSYD / 1000).toFixed(0) + ' Mds$' : '—';
+      const spreadBps = sofr.spread_bps != null ? sofr.spread_bps.toFixed(1) + ' bps' : '—';
+      const spreadColor = sofr.spread_bps != null
+        ? (Math.abs(sofr.spread_bps) > 100 ? '#ff4455' : Math.abs(sofr.spread_bps) > 50 ? '#ffd700' : 'var(--green)')
+        : 'var(--muted)';
+      const SOFR_ITEMS = [
+        { label: 'SOFR (Secured Overnight)',  val: sofrVal,   detail: 'FRBNY via FRED',           warn: false },
+        { label: 'EFFR (Fed Funds effectif)',  val: effrVal,   detail: 'Effective Fed Funds Rate',  warn: false },
+        { label: 'SOFR–EFFR spread',           val: spreadBps, detail: 'Alerte si > 50 bps',        warn: sofr.spread_bps != null && Math.abs(sofr.spread_bps) >= 50 },
+        { label: 'Reverse Repo Fed (RRPON)',   val: rrponVal,  detail: 'Alerte si < 50 Mds$',       warn: sofr.RRPONTSYD != null && sofr.RRPONTSYD / 1000 < 50 },
+      ];
+      sofrEl.innerHTML = SOFR_ITEMS.map(it =>
+        `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--bg3);border-radius:6px;border-left:3px solid ${it.warn ? '#ff4455' : 'var(--muted)'}">
+          <span style="font-size:14px">${it.warn ? '🔴' : '🟢'}</span>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:12px;font-weight:600;color:var(--fg)">${it.label}</div>
+            <div style="font-size:11px;color:var(--muted)">${it.detail}</div>
+          </div>
+          <div style="font-size:13px;font-weight:700;color:${it.warn ? '#ff4455' : it.label.includes('spread') ? spreadColor : 'var(--fg)'};white-space:nowrap">${it.val}</div>
+        </div>`
+      ).join('');
+    }
+    if (sofrAlertesEl) {
+      const sofrAlertes = sofr.alertes || [];
+      sofrAlertesEl.innerHTML = sofrAlertes.length ? sofrAlertes.map(a => {
+        const c = a.niveau === 'CRITIQUE' ? '#c0392b' : '#e67e22';
+        return `<div style="border-left:3px solid ${c};padding:8px 12px;margin-bottom:6px;background:var(--bg2);border-radius:0 6px 6px 0">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:2px">
+            <span style="background:${c};color:#fff;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">${a.niveau}</span>
+            <span style="font-size:12px;font-weight:600;color:var(--fg)">${a.label}</span>
+          </div>
+          <div style="font-size:11px;color:var(--muted)">${a.valeur || ''}</div>
+          ${a.seuil_label ? `<div style="font-size:10px;color:var(--muted);margin-top:2px">⚠️ ${a.seuil_label}</div>` : ''}
+        </div>`;
+      }).join('') : '<div style="font-size:11px;color:var(--green);padding:6px 0">✅ Aucun stress SOFR/repo détecté</div>';
+    }
+
     if (data.disclaimer) {
       $('fm-disclaimer').textContent = data.disclaimer;
     }
@@ -2484,10 +2575,10 @@
     }
   }
 
-  async function loadMacroEU() {
+  async function loadMacroEU(force = false) {
     let data;
     try {
-      data = await apiFetch('/macro-eu', 30_000);
+      data = await apiFetch('/macro-eu' + (force ? '?force=1' : ''), 30_000);
     } catch (e) {
       $('fm-macro-eu').innerHTML = '<span style="color:var(--muted);font-size:12px;padding:16px;display:block">Erreur chargement Macro EU.</span>';
       return;
@@ -2582,8 +2673,33 @@
       const pvUnit     = prixActuel - pru;
       const pvTotal    = pvUnit * qte;
       const pvPct      = pru > 0 ? (pvUnit / pru * 100) : 0;
+      const nom        = p.nom && p.nom !== p.ticker ? ` <span style="font-size:10px;color:var(--muted)">${p.nom}</span>` : '';
+
+      // Jauge stop/objectif
+      const stop = p.stop_loss;
+      const obj  = p.objectif;
+      let gaugeHtml = '';
+      if (stop && obj && obj > stop) {
+        const range  = obj - stop;
+        const pct    = Math.max(0, Math.min(100, ((prixActuel > 0 ? prixActuel : pru) - stop) / range * 100));
+        const pruPct = Math.max(0, Math.min(100, (pru - stop) / range * 100));
+        const barCol = pct < 30 ? '#f87171' : pct < 70 ? '#fcd34d' : '#4ade80';
+        gaugeHtml = `
+          <tr><td colspan="7" style="padding:4px 10px 10px">
+            <div style="font-size:10px;color:var(--muted);margin-bottom:3px;display:flex;justify-content:space-between">
+              <span>🛑 Stop ${stop.toFixed(2)}€</span>
+              <span style="color:var(--muted)">PRU ${pru.toFixed(2)}€${prixActuel > 0 ? ' · Live ' + prixActuel.toFixed(2) + '€' : ''}</span>
+              <span>🎯 Obj ${obj.toFixed(2)}€</span>
+            </div>
+            <div style="position:relative;background:var(--bg3);border-radius:4px;height:7px;overflow:hidden">
+              <div style="position:absolute;left:0;top:0;height:100%;width:${pct}%;background:${barCol};border-radius:4px;transition:width .4s"></div>
+              <div style="position:absolute;left:${pruPct}%;top:-1px;height:9px;width:2px;background:#60a5fa;border-radius:1px" title="PRU ${pru.toFixed(2)}€"></div>
+            </div>
+          </td></tr>`;
+      }
+
       return `<tr>
-        <td><strong>${p.ticker || '—'}</strong></td>
+        <td><strong>${p.ticker || '—'}</strong>${nom}</td>
         <td>${pru.toFixed(2)} €</td>
         <td>${prixActuel > 0 ? prixActuel.toFixed(2) + ' €' : '<span style="color:var(--muted)">—</span>'}</td>
         <td class="${pnlClass(pvTotal)}">${(pvTotal >= 0 ? '+' : '') + pvTotal.toFixed(2) + ' €'}</td>
@@ -2593,7 +2709,7 @@
               style="font-size:11px;padding:3px 8px;background:var(--bg3);color:var(--fg);border:1px solid var(--border)">
           + Tx
         </button></td>
-      </tr>`;
+      </tr>${gaugeHtml}`;
     }).join('');
     container.innerHTML = `<div class="table-wrap"><table class="data-table">
       <thead><tr>
@@ -2955,7 +3071,7 @@
     addToWatchlist:          ticker => addToWatchlist(ticker).catch(() => {}),
     refreshFluxMacro:        () => loadFluxMacro().catch(() => {}),
     refreshAlphaLab:         () => loadAlphaLab().catch(() => {}),
-    refreshMacroEU:          () => loadMacroEU().catch(() => {}),
+    refreshMacroEU:          (force) => loadMacroEU(force).catch(() => {}),
     wzAnalyser:              () => wzAnalyser().catch(() => {}),
     wzGo:                    step => wzGo(step),
     wzStep3Vote:             () => wzStep3Vote().catch(() => {}),
