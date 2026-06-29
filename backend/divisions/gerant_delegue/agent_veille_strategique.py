@@ -206,6 +206,15 @@ _ARTICLE_GRANTHAM = {
     "niveau":   "IMPORTANT",
 }
 
+_ARTICLE_BLOODBATH = {
+    "titre":    "Bloodbath asiatique — KOSPI -8.2%, Nikkei -2.8%, Taiwan -3.5%",
+    "source":   "Marchés",
+    "url":      "",
+    "publie_a": "2026-06-19",
+    "themes":   ["Asie", "liquidité", "contagion", "tech"],
+    "niveau":   "CRITIQUE",
+}
+
 
 class AgentVeilleStrategique:
     def __init__(self) -> None:
@@ -224,6 +233,10 @@ class AgentVeilleStrategique:
             self.inserer_article_grantham()
         except Exception as _e:
             logger.debug("[VeilleStrat] bootstrap Grantham: %s", _e)
+        try:
+            self.inserer_article_bloodbath()
+        except Exception as _e:
+            logger.debug("[VeilleStrat] bootstrap Bloodbath: %s", _e)
 
     def _ensure_db(self) -> None:
         if not self._db_init:
@@ -265,6 +278,10 @@ class AgentVeilleStrategique:
     def inserer_article_grantham(self) -> bool:
         """Insère l'article Grantham IMPORTANT dans SQLite (une seule fois)."""
         return self._inserer_article_statique(_ARTICLE_GRANTHAM)
+
+    def inserer_article_bloodbath(self) -> bool:
+        """Insère l'article Bloodbath asiatique CRITIQUE dans SQLite (une seule fois)."""
+        return self._inserer_article_statique(_ARTICLE_BLOODBATH)
 
     # ------------------------------------------------------------------
 

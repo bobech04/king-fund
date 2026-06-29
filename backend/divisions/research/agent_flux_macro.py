@@ -221,6 +221,12 @@ TICKERS_YF: dict[str, str] = {
     "COPX":   "COPX",        # Global X Copper Miners ETF — cuivre = signal croissance réelle vs financière
     "UNG":    "UNG",         # United States Natural Gas Fund — signal énergie/inflation
     "QQQ":   "QQQ",          # Invesco QQQ Trust (Nasdaq 100 ETF) — tech vs large cap
+    # ── Indices asiatiques (surveillance bloodbath / contagion) ──────────────
+    "KOSPI":  "^KS11",       # KOSPI — Corée du Sud
+    "NIKKEI": "^N225",       # Nikkei 225 — Japon
+    "TAIWAN": "^TWII",       # Taiwan Weighted Index
+    # ── FX funding stress (Jeff Snider Eurodollar) ──────────────────────────
+    "USDKRW": "USDKRW=X",   # USD/KRW — proxy dollar funding stress EM
 }
 
 FRED_SERIES = ["DGS3MO", "DGS10", "T10YIE"]
@@ -1389,6 +1395,35 @@ class AgentFluxMacro:
                 })
             _check_series("irx_series", "Taux US 3 mois", irx["hist_30d"], val_now)
 
+        # ── Indices asiatiques — alerte si variation 24h < -5% ──────────────
+        ASIAN_INDICES = [
+            ("KOSPI",  "KOSPI (Corée du Sud)"),
+            ("NIKKEI", "Nikkei 225 (Japon)"),
+            ("TAIWAN", "Taiwan Weighted Index"),
+        ]
+        for idx_key, idx_label in ASIAN_INDICES:
+            idx = d.get(idx_key, {})
+            idx_price = idx.get("price")
+            idx_hist  = idx.get("hist_30d") or []
+            if idx_price and len(idx_hist) >= 2 and idx_hist[-2]:
+                var_24h = (idx_price - idx_hist[-2]) / idx_hist[-2] * 100
+                if var_24h < -5.0:
+                    anomalies.append({
+                        "id":            f"asian_{idx_key.lower()}",
+                        "label":         f"{idx_label} — chute > 5% en 24h",
+                        "timestamp":     now_str,
+                        "valeur":        round(idx_price, 2),
+                        "z_score":       0.0,
+                        "variation_pct": round(var_24h, 2),
+                        "seuil_label":   f"variation {var_24h:+.2f}% (seuil -5% / 24h)",
+                        "niveau":        "CRITIQUE" if var_24h < -7.0 else "IMPORTANT",
+                    })
+                elif abs(var_24h) > 2.0:
+                    _check_series(
+                        f"asian_{idx_key.lower()}_series",
+                        idx_label, idx_hist, idx_price,
+                    )
+
         return anomalies
 
     def _compute_ratios_etat(self, prix_data: dict[str, Any]) -> list[dict]:
@@ -1447,6 +1482,17 @@ class AgentFluxMacro:
                  "Volume proxy — sorties > 500M$ = alerte", gld.get("freshness","?"))
         else:
             _add("gld_flows", "Flux GLD", "DONNÉES INDISPONIBLES", False)
+
+        # ── Indices asiatiques ───────────────────────────────────────────────
+        for idx_key, idx_label_short in [("KOSPI", "KOSPI"), ("NIKKEI", "Nikkei 225"), ("TAIWAN", "Taiwan")]:
+            idx = d.get(idx_key, {})
+            if idx.get("price") and idx.get("hist_30d") and len(idx["hist_30d"]) >= 2 and idx["hist_30d"][-2]:
+                var = (idx["price"] - idx["hist_30d"][-2]) / idx["hist_30d"][-2] * 100
+                _add(f"asian_{idx_key.lower()}", idx_label_short,
+                     round(idx["price"], 2), var < -5.0,
+                     f"{var:+.2f}% (24h) — alerte si < -5%", idx.get("freshness","?"))
+            else:
+                _add(f"asian_{idx_key.lower()}", idx_label_short, "DONNÉES INDISPONIBLES", False)
 
         return ratios
 
