@@ -197,6 +197,15 @@ _ARTICLE_WARSH = {
     "niveau":   "CRITIQUE",
 }
 
+_ARTICLE_GRANTHAM = {
+    "titre":    "Grantham — stomach cry signal aux sommets boursiers",
+    "source":   "Bruno Bertez / Jeremy Grantham",
+    "url":      "https://brunobertez.com/2026/06/23/jeremy-grantham-un-enieme-signal-dalerte-aux-sommets-boursiers/",
+    "publie_a": "2026-06-23",
+    "themes":   ["bulle", "breadth", "valorisation", "mean reversion"],
+    "niveau":   "IMPORTANT",
+}
+
 
 class AgentVeilleStrategique:
     def __init__(self) -> None:
@@ -205,21 +214,24 @@ class AgentVeilleStrategique:
         self._cache_ts: float = 0.0
         self._alertes_envoyees: set[str] = set()
         self._db_init   = False
-        # Insertion bootstrap article Warsh (idempotente via UNIQUE fp)
+        # Insertions bootstrap (idempotentes via UNIQUE fp)
         try:
             self._ensure_db()
             self.inserer_article_warsh()
         except Exception as _e:
             logger.debug("[VeilleStrat] bootstrap Warsh: %s", _e)
+        try:
+            self.inserer_article_grantham()
+        except Exception as _e:
+            logger.debug("[VeilleStrat] bootstrap Grantham: %s", _e)
 
     def _ensure_db(self) -> None:
         if not self._db_init:
             _init_db(DB_PATH)
             self._db_init = True
 
-    def inserer_article_warsh(self) -> bool:
-        """Insère l'article Warsh CRITIQUE dans SQLite (une seule fois) et envoie l'alerte Telegram."""
-        art    = _ARTICLE_WARSH
+    def _inserer_article_statique(self, art: dict) -> bool:
+        """Insère un article statique dans SQLite (idempotent via UNIQUE fp)."""
         fp_val = _fp(art["titre"], art["url"])
         try:
             conn = sqlite3.connect(str(DB_PATH))
@@ -237,13 +249,22 @@ class AgentVeilleStrategique:
             conn.commit()
             conn.close()
             if inserted:
-                logger.info("[VeilleStrat] Article Warsh inséré (CRITIQUE) — alerte Telegram")
-                self._alerter({**art, "fp": fp_val})
-                return True
-            return False
+                logger.info("[VeilleStrat] Article '%s' inséré (%s) — alerte Telegram si CRITIQUE",
+                            art["titre"][:60], art["niveau"])
+                if art["niveau"] == "CRITIQUE":
+                    self._alerter({**art, "fp": fp_val})
+            return inserted
         except Exception as exc:
-            logger.warning("[VeilleStrat] inserer_article_warsh: %s", exc)
+            logger.warning("[VeilleStrat] _inserer_article_statique '%s': %s", art.get("titre", "?")[:40], exc)
             return False
+
+    def inserer_article_warsh(self) -> bool:
+        """Insère l'article Warsh CRITIQUE dans SQLite (une seule fois)."""
+        return self._inserer_article_statique(_ARTICLE_WARSH)
+
+    def inserer_article_grantham(self) -> bool:
+        """Insère l'article Grantham IMPORTANT dans SQLite (une seule fois)."""
+        return self._inserer_article_statique(_ARTICLE_GRANTHAM)
 
     # ------------------------------------------------------------------
 
