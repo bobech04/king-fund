@@ -26,7 +26,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -201,7 +201,13 @@ class ComiteSelection:
             return json.loads(match.group(0))
         raise json.JSONDecodeError("Aucun JSON trouvé", raw, 0)
 
-    def _claude(self, system: str, prompt: str, max_tokens: int = 300) -> dict:
+    @staticmethod
+    def _sv(val: Any) -> str:
+        """Sérialise val en str et échappe { / } pour que .format() ne plante pas."""
+        s = str(val) if val is not None else "N/A"
+        return s.replace("{", "(").replace("}", ")")
+
+    def _claude(self, system: str, prompt: str, max_tokens: int = 400) -> dict:
         if self._client is None:
             return {"vote": "ABSTENTION", "motif": "Agent indisponible", "conditions": []}
         try:
@@ -219,7 +225,7 @@ class ComiteSelection:
             msg = self._client.messages.create(
                 model      = "claude-sonnet-4-6",
                 max_tokens = max_tokens,
-                system     = sys_enrichi,
+                system     = sys_enrichi or system,
                 messages   = [{"role": "user", "content": prompt}],
             )
             raw = msg.content[0].text.strip()
@@ -228,13 +234,14 @@ class ComiteSelection:
             logger.error("[Comite] JSON invalide: %s | raw=%r", e, raw[:300])
             return {"vote": "ABSTENTION", "motif": "Réponse non parseable", "conditions": []}
         except Exception as e:
-            err_body = getattr(e, "body", None) or getattr(e, "response", None)
             status   = getattr(e, "status_code", None)
+            err_body = getattr(e, "body",        None)
+            err_msg  = getattr(e, "message",     str(e))
             logger.error(
-                "[Comite] Claude API %s (status=%s): %s | body=%s",
-                type(e).__name__, status, e, err_body,
+                "[Comite] Claude API %s (status=%s): %s | body=%s | prompt_len=%d",
+                type(e).__name__, status, err_msg, err_body, len(prompt),
             )
-            return {"vote": "ABSTENTION", "motif": f"Erreur Claude {type(e).__name__}: {e}", "conditions": []}
+            return {"vote": "ABSTENTION", "motif": f"Erreur Claude {type(e).__name__} (HTTP {status}): {err_msg}", "conditions": []}
 
     # ------------------------------------------------------------------
     # Vote Research (pipeline + rapport)
@@ -349,22 +356,33 @@ class ComiteSelection:
         except Exception:
             pass
 
-        prompt = _PROMPT_CIO.format(
-            ticker         = ticker,
-            nom            = donnees.get("nom", ticker),
-            howell_regime  = howell_regime,
-            vix            = vix,
-            dxy            = dxy,
-            bertez_regime  = bertez_regime,
-            cio_allocation = cio_allocation,
-            dspx_regime    = dspx_regime,
-            score          = donnees.get("score_final", "N/A"),
-            signal         = donnees.get("signal", "N/A"),
-            secteur        = donnees.get("secteur", "N/A"),
-            pays           = donnees.get("pays", "N/A"),
-        )
+        try:
+            prompt = _PROMPT_CIO.format(
+                ticker         = self._sv(ticker),
+                nom            = self._sv(donnees.get("nom", ticker)),
+                howell_regime  = self._sv(howell_regime),
+                vix            = self._sv(vix),
+                dxy            = self._sv(dxy),
+                bertez_regime  = self._sv(bertez_regime),
+                cio_allocation = self._sv(cio_allocation),
+                dspx_regime    = self._sv(dspx_regime),
+                score          = self._sv(donnees.get("score_final", "N/A")),
+                signal         = self._sv(donnees.get("signal", "N/A")),
+                secteur        = self._sv(donnees.get("secteur", "N/A")),
+                pays           = self._sv(donnees.get("pays", "N/A")),
+            )
+        except Exception as fmt_err:
+            logger.error("[Comite] CIO format() échoué: %s", fmt_err)
+            prompt = (
+                f"Tu es CIO King Fund. Analyse {self._sv(ticker)} ({self._sv(donnees.get('nom', ticker))}).\n"
+                f"Contexte macro : Howell={self._sv(howell_regime)}, VIX={self._sv(vix)}, "
+                f"Bertez={self._sv(bertez_regime)}, CIO={self._sv(cio_allocation)}.\n"
+                f"Score pipeline : {self._sv(donnees.get('score_final', 'N/A'))}/10, "
+                f"Signal : {self._sv(donnees.get('signal', 'N/A'))}.\n"
+                'Réponds UNIQUEMENT: {"vote":"OUI","motif":"...","alignement_macro":0.5,"conditions":[],"horizon_recommande":"moyen_terme"}'
+            )
 
-        result = self._claude(_SYSTEM_CIO, prompt, max_tokens=500)
+        result = self._claude(_SYSTEM_CIO, prompt, max_tokens=600)
         return {"votant": "CIO", **result}
 
     # ------------------------------------------------------------------
@@ -372,16 +390,29 @@ class ComiteSelection:
     # ------------------------------------------------------------------
 
     def _vote_fiscaliste(self, ticker: str, donnees: dict) -> dict:
-        prompt = _PROMPT_FISCALISTE.format(
-            ticker      = ticker,
-            nom         = donnees.get("nom", ticker),
-            montant     = donnees.get("montant_envisage", 200),
-            div_yield   = f"{(donnees.get('dividende') or 0) * 100:.1f}" if donnees.get("dividende") else "N/A",
-            pv_estimee  = donnees.get("pv_estimee_3ans_pct", "N/A"),
-            pays        = donnees.get("pays", "France"),
-            score       = donnees.get("score_final", "N/A"),
+        div_yield_val = (
+            f"{(donnees.get('dividende') or 0) * 100:.1f}"
+            if donnees.get("dividende") else "N/A"
         )
-        result = self._claude(_SYSTEM_FISCALISTE, prompt, max_tokens=500)
+        try:
+            prompt = _PROMPT_FISCALISTE.format(
+                ticker      = self._sv(ticker),
+                nom         = self._sv(donnees.get("nom", ticker)),
+                montant     = self._sv(donnees.get("montant_envisage", 200)),
+                div_yield   = self._sv(div_yield_val),
+                pv_estimee  = self._sv(donnees.get("pv_estimee_3ans_pct", "N/A")),
+                pays        = self._sv(donnees.get("pays", "France")),
+                score       = self._sv(donnees.get("score_final", "N/A")),
+            )
+        except Exception as fmt_err:
+            logger.error("[Comite] Fiscaliste format() échoué: %s", fmt_err)
+            prompt = (
+                f"Tu es Fiscaliste King Fund. Analyse {self._sv(ticker)} ({self._sv(donnees.get('nom', ticker))}).\n"
+                f"Montant : {self._sv(donnees.get('montant_envisage', 200))} €, "
+                f"Dividende : {self._sv(div_yield_val)}%, Pays : {self._sv(donnees.get('pays', 'France'))}.\n"
+                'Réponds UNIQUEMENT: {"vote":"OUI","motif":"...","impact_flat_tax_annuel":12.5,"conditions":[],"cerfa_3916_requis":false,"risque_double_imposition":false}'
+            )
+        result = self._claude(_SYSTEM_FISCALISTE, prompt, max_tokens=600)
         return {"votant": "Fiscaliste", **result}
 
     # ------------------------------------------------------------------
