@@ -1,0 +1,42 @@
+[
+  {
+    "ticker": "TEL.OL",
+    "nom": "Telenor",
+    "seuil_bas": 140.0,
+    "seuil_haut": 152.0,
+    "devise": "NOK",
+    "note": "Zone d'achat 140–152 NOK"
+  },
+  {
+    "ticker": "DNB.OL",
+    "nom": "DNB Bank",
+    "seuil_bas": null,
+    "seuil_haut": 280.0,
+    "devise": "NOK",
+    "note": "Achat sous 280 NOK"
+  },
+  {
+    "ticker": "SAN.PA",
+    "nom": "Sanofi",
+    "seuil_bas": 72.0,
+    "seuil_haut": 74.0,
+    "devise": "EUR",
+    "note": "Zone d'achat 72–74 €"
+  },
+  {
+    "ticker": "ENGI.PA",
+    "nom": "Engie",
+    "seuil_bas": 27.0,
+    "seuil_haut": 28.0,
+    "devise": "EUR",
+    "note": "Zone d'achat 27–28 €"
+  },
+  {
+    "ticker": "O",
+    "nom": "Realty Income",
+    "seuil_bas": null,
+    "seuil_haut": 50.0,
+    "devise": "USD",
+    "note": "Achat sous 50 USD"
+  }
+]

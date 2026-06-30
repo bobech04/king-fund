@@ -17,7 +17,8 @@ from .pipeline import InvestmentPipeline
 logger = logging.getLogger(__name__)
 
 CACHE_TTL  = 3_600  # 1 h
-_EXTRA_PATH = Path(__file__).parent.parent.parent.parent / "data" / "watchlist_extra.json"
+_EXTRA_PATH   = Path(__file__).parent.parent.parent.parent / "data" / "watchlist_extra.json"
+_SEUILS_PATH  = Path(__file__).parent.parent.parent.parent / "data" / "seuils_achat.json"
 
 # Tickers non éligibles PEA (CTO uniquement)
 # SHEL.L : Shell a transféré son siège social unique au UK en 2022 (post-Brexit) →
@@ -35,7 +36,21 @@ WATCHLIST: list[dict[str, str]] = [
     {"ticker": "BIPC",    "nom": "Brookfield Infrastructure", "bourse": "NYSE"},
     {"ticker": "ADC",     "nom": "Agree Realty",              "bourse": "NYSE"},
     {"ticker": "TTE.PA",  "nom": "TotalEnergies",            "bourse": "Euronext Paris"},
+    {"ticker": "ENGI.PA", "nom": "Engie",                    "bourse": "Euronext Paris"},
 ]
+
+
+def _charger_seuils_achat() -> dict[str, dict]:
+    """Retourne un dict {ticker: seuil_info} depuis seuils_achat.json."""
+    try:
+        if _SEUILS_PATH.exists():
+            return {s["ticker"]: s for s in json.loads(_SEUILS_PATH.read_text("utf-8"))}
+    except Exception:
+        pass
+    return {}
+
+
+_SEUILS_ACHAT: dict[str, dict] = _charger_seuils_achat()
 
 
 # Charge les tickers ajoutés dynamiquement (persistance JSON)
@@ -115,6 +130,25 @@ class WatchlistManager:
             target = _safe(info.get("targetMeanPrice"))
             marge  = ((target - prix) / prix) if (prix and target and prix > 0) else None
 
+            # Seuil d'achat personnalisé
+            seuil_info   = _SEUILS_ACHAT.get(ticker)
+            seuil_label  = None
+            ecart_seuil  = None
+            dans_zone    = None
+            if seuil_info and prix is not None:
+                sh = seuil_info.get("seuil_haut")
+                sb = seuil_info.get("seuil_bas")
+                devise = seuil_info.get("devise", "")
+                symbole = {"EUR": "€", "USD": "$", "NOK": "NOK"}.get(devise, devise)
+                if sb is not None:
+                    seuil_label = f"Zone {sb}–{sh} {symbole}"
+                    dans_zone   = sb <= prix <= sh if sh else prix <= sh  # type: ignore[operator]
+                    ecart_seuil = round(prix - sb, 2) if sb else None
+                elif sh is not None:
+                    seuil_label = f"< {sh} {symbole}"
+                    dans_zone   = prix < sh
+                    ecart_seuil = round(prix - sh, 2)
+
             return {
                 "ticker":         ticker,
                 "nom":            item["nom"],
@@ -123,6 +157,7 @@ class WatchlistManager:
                 "score":          analysis["score"],
                 "signal":         analysis["signal"].upper(),   # BUY | HOLD | SELL
                 "stages":         analysis["stages"],
+                "rsi_macd":       analysis.get("rsi_macd"),
                 "prix_actuel":    prix,
                 "target_price":   target,
                 "marge_securite": round(marge, 4) if marge is not None else None,
@@ -132,6 +167,13 @@ class WatchlistManager:
                 "secteur":        info.get("sector"),
                 "beta":           _safe(info.get("beta")),
                 "timestamp":      ts,
+                # Seuil d'achat
+                "seuil_achat":    seuil_info.get("seuil_haut") if seuil_info else None,
+                "seuil_bas":      seuil_info.get("seuil_bas")  if seuil_info else None,
+                "seuil_devise":   seuil_info.get("devise")      if seuil_info else None,
+                "seuil_label":    seuil_label,
+                "ecart_seuil":    ecart_seuil,
+                "dans_zone_achat": dans_zone,
             }
         except Exception as e:
             logger.warning("Watchlist %s erreur: %s", ticker, e)

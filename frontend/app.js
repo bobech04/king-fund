@@ -1402,7 +1402,7 @@
     tbl.innerHTML = `<thead><tr>
       <th>Ticker</th><th>Nom</th><th>Bourse</th>
       <th>Score /10</th><th>Marge Sécu.</th><th>Signal</th>
-      <th>Prix</th><th>Prix Cible</th><th>WACC</th><th>PER</th><th>PBR</th>
+      <th>Prix</th><th>Seuil Achat</th><th>Écart</th><th>Prix Cible</th><th>WACC</th><th>PER</th><th>PBR</th>
       <th style="min-width:220px">Thèse d'investissement</th>
     </tr></thead>`;
     const tbody = document.createElement('tbody');
@@ -1444,6 +1444,17 @@
       const peaBadge = a.pea_eligible === false
         ? '<span title="Non éligible PEA depuis 2022 — CTO uniquement" style="font-size:9px;font-weight:700;background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;padding:1px 5px;border-radius:3px;margin-left:4px;white-space:nowrap">CTO</span>'
         : '';
+
+      // Seuil d'achat
+      const seuilDev = a.seuil_devise ? ({EUR:'€', USD:'$', NOK:' NOK'}[a.seuil_devise] || a.seuil_devise) : '';
+      const seuilTxt = a.seuil_label ? a.seuil_label : '—';
+      const seuilCls = a.dans_zone_achat === true ? 'pos' : a.dans_zone_achat === false ? 'neu' : '';
+      const seuilBadge = a.dans_zone_achat === true
+        ? '<span style="font-size:9px;background:#14532d;color:#4ade80;padding:1px 4px;border-radius:3px;margin-left:4px">🎯</span>' : '';
+      const ecartTxt = a.ecart_seuil != null
+        ? `<span style="color:${a.ecart_seuil > 0 ? 'var(--red)' : 'var(--green)'}">${a.ecart_seuil > 0 ? '+' : ''}${a.ecart_seuil.toFixed(2)}${seuilDev}</span>`
+        : '—';
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><strong>${a.ticker}</strong>${peaBadge}</td>
@@ -1453,6 +1464,8 @@
         <td class="${margeCls}"><strong>${margeFmt}</strong></td>
         <td><span style="${sigStyle}">${signal}</span></td>
         <td>${a.prix_actuel != null ? a.prix_actuel.toLocaleString('fr-FR', {maximumFractionDigits:2}) : '—'}</td>
+        <td class="${seuilCls}" style="font-size:11px;white-space:nowrap">${seuilTxt}${seuilBadge}</td>
+        <td style="font-size:11px">${ecartTxt}</td>
         <td class="${prixCibleCls}">${prixCible != null ? prixCible.toLocaleString('fr-FR', {maximumFractionDigits:2}) : '—'}</td>
         <td style="font-size:11px">${a.wacc_damodaran != null ? (a.wacc_damodaran*100).toFixed(1)+'%' : '—'}</td>
         <td>${a.per != null ? a.per.toFixed(1) : '—'}</td>
