@@ -137,14 +137,17 @@ class AgentActualites:
                 try:
                     news = yf.Ticker(ticker).news or []
                     for n in news[:5]:
+                        ts = n.get("providerPublishTime") or 0
+                        if ts > 86400:  # timestamp valide (> 02/01/1970)
+                            pub = datetime.fromtimestamp(ts, tz=timezone.utc).isoformat()
+                        else:
+                            pub = datetime.now(timezone.utc).isoformat()
                         articles.append({
                             "titre":       n.get("title", ""),
                             "description": n.get("summary", ""),
                             "url":         n.get("link", ""),
                             "source":      "Yahoo Finance",
-                            "publie_a":    datetime.fromtimestamp(
-                                n.get("providerPublishTime", 0), tz=timezone.utc
-                            ).isoformat(),
+                            "publie_a":    pub,
                         })
                 except Exception:
                     pass
