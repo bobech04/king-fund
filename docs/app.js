@@ -1402,7 +1402,7 @@
     tbl.innerHTML = `<thead><tr>
       <th>Ticker</th><th>Nom</th><th>Bourse</th>
       <th>Score /10</th><th>Marge Sécu.</th><th>Signal</th>
-      <th>Prix</th><th>Prix Cible</th><th>WACC</th><th>PER</th><th>PBR</th>
+      <th>Prix</th><th>Seuil Achat</th><th>Écart</th><th>Prix Cible</th><th>WACC</th><th>PER</th><th>PBR</th>
       <th style="min-width:220px">Thèse d'investissement</th>
     </tr></thead>`;
     const tbody = document.createElement('tbody');
@@ -1441,15 +1441,32 @@
         ? `<span title="${these.replace(/"/g, '&quot;')}" style="font-size:11px;color:var(--muted);cursor:help">${theseShort}</span>`
         : '<span style="color:var(--muted);font-size:10px">—</span>';
 
+      const peaTitle = a.pays ? `Pays : ${a.pays}` : 'Éligibilité détectée automatiquement via pays yfinance';
+      const peaBadge = a.pea_eligible === false
+        ? `<span title="CTO uniquement — ${peaTitle}" style="font-size:9px;font-weight:700;background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;padding:1px 5px;border-radius:3px;margin-left:4px;white-space:nowrap">CTO</span>`
+        : `<span title="Éligible PEA — ${peaTitle}" style="font-size:9px;font-weight:700;background:#14532d22;color:#4ade80;border:1px solid #4ade8055;padding:1px 5px;border-radius:3px;margin-left:4px;white-space:nowrap">PEA</span>`;
+
+      // Seuil d'achat
+      const seuilDev = a.seuil_devise ? ({EUR:'€', USD:'$', NOK:' NOK'}[a.seuil_devise] || a.seuil_devise) : '';
+      const seuilTxt = a.seuil_label ? a.seuil_label : '—';
+      const seuilCls = a.dans_zone_achat === true ? 'pos' : a.dans_zone_achat === false ? 'neu' : '';
+      const seuilBadge = a.dans_zone_achat === true
+        ? '<span style="font-size:9px;background:#14532d;color:#4ade80;padding:1px 4px;border-radius:3px;margin-left:4px">🎯</span>' : '';
+      const ecartTxt = a.ecart_seuil != null
+        ? `<span style="color:${a.ecart_seuil > 0 ? 'var(--red)' : 'var(--green)'}">${a.ecart_seuil > 0 ? '+' : ''}${a.ecart_seuil.toFixed(2)}${seuilDev}</span>`
+        : '—';
+
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${a.ticker}</strong></td>
+        <td><strong>${a.ticker}</strong>${peaBadge}</td>
         <td style="font-size:11px">${a.nom}</td>
         <td style="font-size:10px;color:var(--muted)">${a.bourse}</td>
         <td class="${scoreCls}"><strong>${score10}</strong></td>
         <td class="${margeCls}"><strong>${margeFmt}</strong></td>
         <td><span style="${sigStyle}">${signal}</span></td>
         <td>${a.prix_actuel != null ? a.prix_actuel.toLocaleString('fr-FR', {maximumFractionDigits:2}) : '—'}</td>
+        <td class="${seuilCls}" style="font-size:11px;white-space:nowrap">${seuilTxt}${seuilBadge}</td>
+        <td style="font-size:11px">${ecartTxt}</td>
         <td class="${prixCibleCls}">${prixCible != null ? prixCible.toLocaleString('fr-FR', {maximumFractionDigits:2}) : '—'}</td>
         <td style="font-size:11px">${a.wacc_damodaran != null ? (a.wacc_damodaran*100).toFixed(1)+'%' : '—'}</td>
         <td>${a.per != null ? a.per.toFixed(1) : '—'}</td>
@@ -1618,6 +1635,27 @@
       </tr>`;
     }).join('');
 
+    // Bloc RSI/MACD
+    const rm = data.rsi_macd || {};
+    const rmSigColor = rm.signal === 'ENTREE_OPTIMALE' ? '#4ade80'
+      : rm.signal === 'SURACHAT' ? '#f87171'
+      : rm.signal === 'PARTIEL'  ? '#facc15' : 'var(--muted)';
+    const rmSigLabel = rm.signal === 'ENTREE_OPTIMALE' ? '🎯 Entrée optimale'
+      : rm.signal === 'SURACHAT' ? '🔴 Surachat — attendre'
+      : rm.signal === 'PARTIEL'  ? '🟡 Signal partiel'
+      : rm.signal === 'NORMAL'   ? '⚪ Pas de signal fort' : '—';
+    const rsiColor = rm.rsi != null ? (rm.rsi < 40 ? '#4ade80' : rm.rsi > 70 ? '#f87171' : 'var(--fg)') : 'var(--muted)';
+    const macdColor = rm.macd_histogram != null ? (rm.macd_histogram < 0 ? '#4ade80' : '#f87171') : 'var(--muted)';
+    const rsiMacdHtml = rm.rsi != null ? `
+      <div style="padding:10px 16px;background:var(--bg3);border-top:1px solid var(--border);display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">RSI(14) + MACD(12,26,9)</div>
+        <div style="display:flex;gap:16px;align-items:center">
+          <span style="font-size:13px">RSI : <strong style="color:${rsiColor}">${rm.rsi}</strong></span>
+          <span style="font-size:13px">Histo MACD : <strong style="color:${macdColor}">${rm.macd_histogram > 0 ? '+' : ''}${rm.macd_histogram}</strong></span>
+          <span style="font-size:12px;font-weight:700;color:${rmSigColor}">${rmSigLabel}</span>
+        </div>
+      </div>` : '';
+
     const addBtnHtml = inWl ? '' : `
       <div style="padding:12px 16px;border-top:1px solid var(--border)">
         <button class="btn btn-sm" id="btn-add-wl-${ticker}"
@@ -1636,12 +1674,13 @@
         </button>
       </div>` : '';
 
+    const nbCriteres = stages.filter(s => s.name !== 'Score final').length;
     resultEl.innerHTML = `
       <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
         <div style="display:flex;align-items:center;gap:16px;padding:16px;background:var(--bg2);flex-wrap:wrap">
           <div>
             <div style="font-size:20px;font-weight:700;color:var(--fg)">${data.symbol || ticker}</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:2px">Pipeline 17 critères · Graham · Buffett · Damodaran</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Pipeline ${nbCriteres} critères · Graham · Buffett · Damodaran · RSI/MACD</div>
           </div>
           <div style="margin-left:auto;display:flex;gap:20px;align-items:center">
             <div style="text-align:center">
@@ -1654,8 +1693,9 @@
         <div style="padding:6px 16px;background:var(--bg3);font-size:10px;color:var(--muted);border-top:1px solid var(--border)">
           <span style="color:${statutColor}">●</span> ${disc}
         </div>
+        ${rsiMacdHtml}
         <div style="padding:16px">
-          <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.07em">17 Critères détaillés</div>
+          <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.07em">${nbCriteres} Critères détaillés</div>
           <div style="overflow-x:auto">
             <table class="data-table" style="font-size:12px">
               <thead><tr>
@@ -1864,16 +1904,20 @@
         <thead><tr><th>Date</th><th>Ticker</th><th>Décision</th><th>Score</th><th>Votes</th></tr></thead>
         <tbody>${list.slice().reverse().slice(0, 20).map(d => {
           const dec = d.decision || d.verdict || '';
-          const ok  = dec.startsWith('BUY') || (d.nb_oui >= 2);
-          const col = ok ? 'var(--green)' : (dec === 'VETO' ? 'var(--red)' : '#facc15');
+          const invalide = (d.statut || '').startsWith('INVALIDE');
+          const ok  = !invalide && (dec.startsWith('BUY') || (d.nb_oui >= 2));
+          const col = invalide ? 'var(--muted)' : (ok ? 'var(--green)' : (dec === 'VETO' ? 'var(--red)' : '#facc15'));
           const ts  = d.timestamp || d.date || '';
           const sc  = (d.donnees || {}).score ?? d.score;
-          return `<tr>
+          const badgeInvalide = invalide
+            ? `<span class="badge-invalide" title="${(d.statut || '').replace(/"/g, '&quot;')}">⚠ test</span>`
+            : '';
+          return `<tr class="${invalide ? 'decision-invalide' : ''}">
             <td style="font-size:11px;color:var(--muted)">${ts.replace('T', ' ').slice(0, 16)}</td>
-            <td style="font-weight:700">${d.ticker || '—'}</td>
-            <td style="color:${col};font-weight:700">${dec || '—'}</td>
+            <td style="font-weight:700">${d.ticker || '—'}${badgeInvalide}</td>
+            <td style="color:${col};font-weight:700">${invalide ? 'INVALIDE' : (dec || '—')}</td>
             <td>${sc != null ? (+sc).toFixed(1) : '—'}</td>
-            <td style="font-size:11px">${d.nb_oui != null ? d.nb_oui + '/3' : '—'}</td>
+            <td style="font-size:11px">${invalide ? '<span style="font-size:10px;color:var(--muted)">score fictif</span>' : (d.nb_oui != null ? d.nb_oui + '/3' : '—')}</td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>`;

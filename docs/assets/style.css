@@ -293,6 +293,9 @@ main { flex: 1; padding: 16px; max-width: 1200px; margin: 0 auto; width: 100%; }
 }
 .data-table tr:last-child td { border-bottom: none; }
 .data-table tr:hover td { background: var(--bg3); }
+.decision-invalide td { opacity: 0.42; text-decoration: line-through; color: var(--muted) !important; }
+.decision-invalide:hover td { background: transparent; }
+.badge-invalide { font-size: 10px; font-weight: 700; color: var(--red); text-decoration: none; vertical-align: middle; margin-left: 4px; }
 
 /* ── Scheduler ──────────────────────────────────────────── */
 .job-status {
