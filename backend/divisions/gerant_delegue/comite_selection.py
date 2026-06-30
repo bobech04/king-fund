@@ -171,6 +171,7 @@ class ComiteSelection:
                 # Migration statut : colonne VALIDE/INVALIDE + marquage décisions de test
                 if "statut" not in existing:
                     con.execute("ALTER TABLE decisions_agd ADD COLUMN statut TEXT DEFAULT 'VALIDE'")
+                    con.commit()   # DDL nécessite un commit explicite avant le UPDATE
                     _TICKERS_TEST = ('BNP.PA', 'DBK.DE', 'LLOY.L', 'ABN.AS', '0941.HK', 'YAR.OL')
                     placeholders = ','.join('?' * len(_TICKERS_TEST))
                     con.execute(
