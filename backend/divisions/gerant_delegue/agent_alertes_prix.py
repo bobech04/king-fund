@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Dossier de persistance anti-spam
 _ETAT_FILE    = Path(__file__).resolve().parents[2] / "data" / "alertes_prix_etat.json"
-_SEUILS_ACHAT = Path(__file__).resolve().parents[2] / "data" / "seuils_achat.json"
+_SEUILS_ACHAT = Path(__file__).resolve().parents[3] / "data" / "seuils_achat.json"
 
 SEUILS: list[dict[str, Any]] = [
     {"ticker": "VPK.AS", "nom": "Vopak",             "seuil": 44.0,  "devise": "EUR", "type": "SOUS"},
