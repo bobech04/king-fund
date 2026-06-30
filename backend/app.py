@@ -276,7 +276,7 @@ def run_investissement_screener():
 @app.route("/api/investissement/analyze")
 def api_investissement_analyze():
     """
-    Analyse 17 étapes via pipeline réel obligatoire.
+    Analyse 21 étapes via pipeline réel obligatoire.
     RÈGLE : toute donnée (prix, P/E, market cap…) vient de yfinance — jamais de mémoire Claude.
     Retourne un disclaimer horodaté + statut fraîcheur dans _garde_fou.
     """

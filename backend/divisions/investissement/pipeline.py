@@ -337,25 +337,124 @@ class InvestmentPipeline:
             return {}
 
     # ------------------------------------------------------------------
-    # Étape 18 — Agrégation : score final sur 10
+    # Étapes 18–21 — 4 agents investisseurs légendaires
+    # ------------------------------------------------------------------
+
+    def _s18_druckenmiller(self, info: dict) -> float:
+        """Étape 18 — Druckenmiller : macro/asymétrie (momentum + catalyseurs macro)
+        Momentum 52 semaines + bêta asymétrique + catalyseurs analystes.
+        Un setup Druckenmiller = momentum fort + faible risque de perte.
+        """
+        chg52w      = _safe(info.get("52WeekChange"), default=0.0)
+        beta        = _safe(info.get("beta"), default=1.0)
+        target_upside = 0.0
+        current  = _safe(info.get("currentPrice"))
+        target   = _safe(info.get("targetMeanPrice"))
+        if current and target and current > 0:
+            target_upside = (target - current) / current
+
+        # Momentum positif = bon signe pour Druckenmiller
+        s_mom  = _clamp(chg52w / 0.30)          # +30 % YTD = score max
+        # Bêta modéré (0.8–1.2 = idéal, pas trop volatil)
+        s_beta = _clamp(1.0 - abs(beta - 1.0))
+        # Asymétrie upside/downside (cible analyste > prix = catalyseur)
+        s_cat  = _clamp(target_upside / 0.20)   # 20 % upside = score max
+        return _clamp((s_mom * 0.40 + s_beta * 0.20 + s_cat * 0.40))
+
+    def _s19_phil_fisher(self, info: dict) -> float:
+        """Étape 19 — Phil Fisher : croissance qualitative (marges, R&D, management)
+        Marge opérationnelle élevée + croissance revenus + ROE élevé.
+        """
+        op_margin = _safe(info.get("operatingMargins"))
+        rev_growth = _safe(info.get("revenueGrowth"), default=0.0)
+        roe        = _safe(info.get("returnOnEquity"))
+        gross_margin = _safe(info.get("grossMargins"))
+
+        # Marge op > 20 % = excellent business (Fisher aime les marges élevées)
+        s_op  = _clamp(op_margin / 0.20) if op_margin else 0.0
+        # Croissance revenus > 15 % = forte croissance
+        s_rev = _clamp(rev_growth / 0.15)
+        # ROE > 20 % = excellent management
+        s_roe = _clamp(roe / 0.20) if roe else 0.0
+        # Marge brute > 40 % = moat + pricing power
+        s_gm  = _clamp((gross_margin - 0.30) / 0.20) if gross_margin else 0.0
+
+        return _clamp((s_op * 0.30 + s_rev * 0.25 + s_roe * 0.25 + s_gm * 0.20))
+
+    def _s20_bill_ackman(self, info: dict) -> float:
+        """Étape 20 — Bill Ackman : conviction activiste (concentration, catalyseur de valeur)
+        FCF yield élevé + discount sur valeur intrinsèque + business simple prévisible.
+        """
+        fcf  = _safe(info.get("freeCashflow"))
+        mcap = _safe(info.get("marketCap"), default=1.0)
+        current = _safe(info.get("currentPrice"))
+        target  = _safe(info.get("targetMeanPrice"))
+        pb      = _safe(info.get("priceToBook"), default=1.0)
+        short   = _safe(info.get("shortPercentOfFloat"), default=0.0)
+
+        # FCF yield > 5 % = business générateur de cash (Ackman adore ça)
+        fcf_yield = fcf / mcap if (fcf and mcap > 0) else 0.0
+        s_fcf = _clamp(fcf_yield / 0.05)
+        # Discount valeur → cible analyste (catalyseur de déblocage)
+        s_cat = _clamp((target - current) / current / 0.25) if (current and target and current > 0) else 0.0
+        # Faible short interest = pas de problème fondamental caché
+        s_short = _clamp(1.0 - short / 0.10)
+        # P/B raisonnable (Ackman évite les titres trop chers)
+        s_pb = _clamp((3.0 - pb) / 3.0) if pb > 0 else 0.0
+
+        return _clamp((s_fcf * 0.35 + s_cat * 0.30 + s_short * 0.15 + s_pb * 0.20))
+
+    def _s21_jhunjhunwala(self, info: dict) -> float:
+        """Étape 21 — Jhunjhunwala : marchés émergents (croissance pays, démographie)
+        Adaptée aux actions listées à l'international : croissance revenus élevée,
+        PEG bas, et secteurs bénéficiant des tendances démographiques.
+        """
+        rev_growth   = _safe(info.get("revenueGrowth"),   default=0.0)
+        earn_growth  = _safe(info.get("earningsGrowth"),  default=0.0)
+        pe           = _safe(info.get("trailingPE"),      default=25.0)
+        sector       = info.get("sector", "")
+
+        # Secteurs favoris Jhunjhunwala : Conso, Tech, Finance, Santé, Industrie
+        _JJ_SECTORS = {"Consumer Cyclical", "Consumer Defensive", "Technology",
+                       "Financial Services", "Healthcare", "Industrials"}
+        s_sector = 0.5 if sector in _JJ_SECTORS else 0.0
+
+        # Croissance bénéfices > 20 % = momentum fort
+        s_earn = _clamp(earn_growth / 0.20)
+        # Croissance revenus > 15 %
+        s_rev  = _clamp(rev_growth / 0.15)
+        # PEG < 1 (Jhunjhunwala achète la croissance à prix raisonnable)
+        if earn_growth > 0 and pe > 0:
+            peg    = pe / (earn_growth * 100)
+            s_peg  = _clamp(1.5 - peg)      # PEG < 1 → score positif, > 1.5 → négatif
+        else:
+            s_peg  = 0.0
+
+        return _clamp((s_earn * 0.30 + s_rev * 0.20 + s_peg * 0.30 + s_sector * 0.20))
+
+    # ------------------------------------------------------------------
+    # Étape 22 — Agrégation : score final sur 10
     # ------------------------------------------------------------------
 
     def _s18_score_final(self, stage_scores: list[float]) -> float:
-        """Étape 18 — Score final sur 10 (17 étapes : 16 fondamentaux/macro + 1 RSI/MACD).
+        """Étape 22 — Score final sur 10 (21 étapes : 16 Graham/Buffett + 1 RSI/MACD + 4 investors).
         Pondérations :
-          Fondamentaux 1–10 : poids 0.55  (55 %)
-          Macro/Risque 11–16 : poids 0.35  (35 %)
-          Technique RSI/MACD 17 : poids 0.10  (10 %)
+          Fondamentaux 1–10  : 50 %
+          Macro/Risque 11–16 : 30 %
+          Technique RSI/MACD : 10 %
+          Investors 18–21    : 10 %
         """
         fundamental = stage_scores[:10]    # étapes 1–10
         macro_risk  = stage_scores[10:16]  # étapes 11–16
         technique   = stage_scores[16:17]  # étape 17 RSI+MACD
+        investors   = stage_scores[17:21]  # étapes 18–21 Druckenmiller/Fisher/Ackman/Jhunjhunwala
 
         avg_fund = sum(fundamental) / len(fundamental) if fundamental else 0.0
         avg_mac  = sum(macro_risk)  / len(macro_risk)  if macro_risk  else 0.0
         avg_tech = sum(technique)   / len(technique)   if technique   else 0.0
+        avg_inv  = sum(investors)   / len(investors)   if investors   else 0.0
 
-        composite = avg_fund * 0.55 + avg_mac * 0.35 + avg_tech * 0.10
+        composite = avg_fund * 0.50 + avg_mac * 0.30 + avg_tech * 0.10 + avg_inv * 0.10
         return round((composite + 1.0) * 5.0, 2)       # mapping [-1,+1] → [0,10]
 
     # ------------------------------------------------------------------
@@ -364,12 +463,13 @@ class InvestmentPipeline:
 
     def analyze(self, symbol: str, prices: dict | None = None) -> dict:
         """
-        Analyse complète du ticker en 17 étapes (16 fondamentaux/macro + 1 RSI/MACD).
+        Analyse complète du ticker en 21 étapes.
+        16 Graham-Buffett-Damodaran + 1 RSI/MACD + 4 investors (Druckenmiller, Fisher, Ackman, Jhunjhunwala).
 
         Retourne :
             score      — float 0–10
             signal     — "buy" | "hold" | "sell"
-            stages     — liste de 18 dicts {name, score}
+            stages     — liste de 22 dicts {name, score}
             rsi_macd   — {rsi, macd_line, macd_histogram, signal}
         """
         if prices is None:
@@ -412,6 +512,10 @@ class InvestmentPipeline:
             ("Thèse Klarman",         self._s15_these_klarman),
             ("Plan sortie Marks",     self._s16_plan_sortie_marks),
             ("RSI + MACD",            _rsi_macd_stage),
+            ("Druckenmiller Momentum",self._s18_druckenmiller),
+            ("Phil Fisher Croissance",self._s19_phil_fisher),
+            ("Bill Ackman Conviction", self._s20_bill_ackman),
+            ("Jhunjhunwala Émergents", self._s21_jhunjhunwala),
         ]
 
         raw_scores: list[float] = []
