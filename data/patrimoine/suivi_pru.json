@@ -17,6 +17,15 @@
       "note": "frais: 1.00 | achat 15/06/2026",
       "pru": 72.96,
       "quantite": 1.0
+    },
+    "DCAM.PA": {
+      "ticker": "DCAM.PA",
+      "nom": "Amundi PEA Monde MSCI World",
+      "objectif": 55.0,
+      "stop_loss": null,
+      "note": "",
+      "pru": 6.1775,
+      "quantite": 8.0
     }
   },
   "transactions": [
@@ -91,6 +100,18 @@
       "pv_realisee": null,
       "compte": "cto",
       "note": "frais: 1.00"
+    },
+    {
+      "id": "751b4a6f",
+      "ticker": "DCAM.PA",
+      "date": "2026-06-30",
+      "type": "achat",
+      "quantite": 8.0,
+      "prix_unitaire": 6.1775,
+      "pru_reference": 0.0,
+      "pv_realisee": null,
+      "compte": "cto",
+      "note": ""
     }
   ],
   "alertes_envoyees": {}
