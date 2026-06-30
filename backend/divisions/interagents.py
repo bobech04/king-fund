@@ -61,6 +61,11 @@ _TRADERS_GROUPE_C: list[str] = [
 
 _ALL_TRADERS: list[str] = [f"TRD{i:03d}" for i in range(1, 31)]
 
+# Division Banque Centrale : traders 04, 07, 17, 23, 29
+_TRADERS_BANQUE_CENTRALE: list[str] = [
+    "TRD004", "TRD007", "TRD017", "TRD023", "TRD029",
+]
+
 # ── Seuils ────────────────────────────────────────────────────────────────────
 
 _CB_SEUIL_INFO    = 0.30   # |sentiment| ≥ → publie info
@@ -125,7 +130,7 @@ class CBPublisher:
                         "orientation": orientation,
                     },
                     entite=code,
-                    traders_cibles=_TRADERS_GROUPE_B,
+                    traders_cibles=_TRADERS_BANQUE_CENTRALE,
                 ))
                 published += 1
             except Exception as e:
