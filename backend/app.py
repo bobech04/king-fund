@@ -2341,9 +2341,26 @@ for sig in (getattr(signal, "SIGTERM", None), getattr(signal, "SIGBREAK", None))
 # Entry point
 # ------------------------------------------------------------------
 
+def _startup_flux_macro():
+    """Lance le flux macro immédiatement au démarrage si aucune donnée en cache."""
+    try:
+        from divisions.research.agent_flux_macro import get_agent_flux_macro
+        agent = get_agent_flux_macro()
+        if agent.etat().get("timestamp") is None:
+            logger.info("[STARTUP] Flux Macro — aucune donnée en cache, scan immédiat")
+            _job_flux_macro()
+        else:
+            logger.info("[STARTUP] Flux Macro — données en cache présentes, skip scan")
+    except Exception as exc:
+        logger.warning("[STARTUP] Flux Macro scan initial: %s", exc)
+
+
 if __name__ == "__main__":
     _scheduler.start()
     logger.info("[SCHEDULER] APScheduler démarré — job rapport_investisseur lundi 09:00")
+
+    # Scan immédiat au démarrage si pas encore de données
+    threading.Thread(target=_startup_flux_macro, daemon=True, name="startup-flux-macro").start()
 
     engine.set_tick_callback(_broadcast)
     engine_thread = threading.Thread(target=engine.run, daemon=True)
