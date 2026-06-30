@@ -1441,9 +1441,12 @@
         ? `<span title="${these.replace(/"/g, '&quot;')}" style="font-size:11px;color:var(--muted);cursor:help">${theseShort}</span>`
         : '<span style="color:var(--muted);font-size:10px">—</span>';
 
+      const peaBadge = a.pea_eligible === false
+        ? '<span title="Non éligible PEA depuis 2022 — CTO uniquement" style="font-size:9px;font-weight:700;background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;padding:1px 5px;border-radius:3px;margin-left:4px;white-space:nowrap">CTO</span>'
+        : '';
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td><strong>${a.ticker}</strong></td>
+        <td><strong>${a.ticker}</strong>${peaBadge}</td>
         <td style="font-size:11px">${a.nom}</td>
         <td style="font-size:10px;color:var(--muted)">${a.bourse}</td>
         <td class="${scoreCls}"><strong>${score10}</strong></td>

@@ -19,6 +19,11 @@ logger = logging.getLogger(__name__)
 CACHE_TTL  = 3_600  # 1 h
 _EXTRA_PATH = Path(__file__).parent.parent.parent.parent / "data" / "watchlist_extra.json"
 
+# Tickers non éligibles PEA (CTO uniquement)
+# SHEL.L : Shell a transféré son siège social unique au UK en 2022 (post-Brexit) →
+#           plus coté sur Euronext Amsterdam, uniquement LSE → exclusion PEA confirmée.
+_PEA_INELIGIBLE: frozenset[str] = frozenset({"SHEL.L"})
+
 WATCHLIST: list[dict[str, str]] = [
     {"ticker": "VPK.AS",  "nom": "Vopak",                   "bourse": "Euronext Amsterdam"},
     {"ticker": "GTT.PA",  "nom": "GTT",                      "bourse": "Euronext Paris"},
@@ -114,6 +119,7 @@ class WatchlistManager:
                 "ticker":         ticker,
                 "nom":            item["nom"],
                 "bourse":         item["bourse"],
+                "pea_eligible":   ticker not in _PEA_INELIGIBLE,
                 "score":          analysis["score"],
                 "signal":         analysis["signal"].upper(),   # BUY | HOLD | SELL
                 "stages":         analysis["stages"],
@@ -130,11 +136,12 @@ class WatchlistManager:
         except Exception as e:
             logger.warning("Watchlist %s erreur: %s", ticker, e)
             return {
-                "ticker":    ticker,
-                "nom":       item["nom"],
-                "bourse":    item["bourse"],
-                "erreur":    str(e),
-                "timestamp": ts,
+                "ticker":       ticker,
+                "nom":          item["nom"],
+                "bourse":       item["bourse"],
+                "pea_eligible": ticker not in _PEA_INELIGIBLE,
+                "erreur":       str(e),
+                "timestamp":    ts,
             }
 
 
