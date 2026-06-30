@@ -2355,12 +2355,31 @@ def _startup_flux_macro():
         logger.warning("[STARTUP] Flux Macro scan initial: %s", exc)
 
 
+def _startup_screener_mondial():
+    """Lance le screener mondial immédiatement si aucun scan depuis >20h (TTL cache)."""
+    try:
+        import time
+        from divisions.research.agent_screener_mondial import get_screener_mondial
+        screener = get_screener_mondial()
+        ts_run = screener.get_ts_run()
+        age_h = (time.time() - screener._ts_cache) / 3600 if screener._ts_cache else 999
+        if ts_run is None or age_h > 20:
+            logger.info("[STARTUP] Screener Mondial — scan initial (derniere exec: %s)",
+                        ts_run.isoformat() if ts_run else "jamais")
+            _job_screener_mondial()
+        else:
+            logger.info("[STARTUP] Screener Mondial — donnees recentes (age=%.1fh), skip", age_h)
+    except Exception as exc:
+        logger.warning("[STARTUP] Screener Mondial scan initial: %s", exc)
+
+
 if __name__ == "__main__":
     _scheduler.start()
     logger.info("[SCHEDULER] APScheduler démarré — job rapport_investisseur lundi 09:00")
 
-    # Scan immédiat au démarrage si pas encore de données
+    # Scans immédiats au démarrage si pas encore de données
     threading.Thread(target=_startup_flux_macro, daemon=True, name="startup-flux-macro").start()
+    threading.Thread(target=_startup_screener_mondial, daemon=True, name="startup-screener").start()
 
     engine.set_tick_callback(_broadcast)
     engine_thread = threading.Thread(target=engine.run, daemon=True)
