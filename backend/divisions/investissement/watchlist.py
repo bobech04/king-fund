@@ -20,10 +20,77 @@ CACHE_TTL  = 3_600  # 1 h
 _EXTRA_PATH   = Path(__file__).parent.parent.parent.parent / "data" / "watchlist_extra.json"
 _SEUILS_PATH  = Path(__file__).parent.parent.parent.parent / "data" / "seuils_achat.json"
 
-# Tickers non éligibles PEA (CTO uniquement)
-# SHEL.L : Shell a transféré son siège social unique au UK en 2022 (post-Brexit) →
-#           plus coté sur Euronext Amsterdam, uniquement LSE → exclusion PEA confirmée.
-_PEA_INELIGIBLE: frozenset[str] = frozenset({"SHEL.L"})
+# ── Éligibilité PEA automatique ─────────────────────────────────────────────────
+#
+# Règle : les titres dont le siège social est dans l'UE ou l'EEE (Espace Économique
+# Européen = UE + Norvège + Islande + Liechtenstein) sont éligibles au PEA.
+# Le Royaume-Uni est EXCLU depuis le Brexit (2021).
+#
+# Source yfinance : info["country"] — code ISO 3166-1 alpha-2 (FR, DE, NO, US…)
+# Cas particuliers connus → table de surcharge manuelle _PEA_MANUAL_OVERRIDE.
+
+_EU_EEA_COUNTRIES: frozenset[str] = frozenset({
+    # Union Européenne
+    "AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "ES", "FI",
+    "FR", "GR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MT",
+    "NL", "PL", "PT", "RO", "SE", "SI", "SK",
+    # EEE hors UE
+    "NO", "IS", "LI",
+})
+
+# Surcharges manuelles : True = PEA, False = CTO
+# Prennent le dessus sur la détection automatique via yfinance.
+_PEA_MANUAL_OVERRIDE: dict[str, bool] = {
+    "SHEL.L": False,   # Shell → UK depuis 2022, exclusion PEA confirmée
+    "BIPC":   False,   # Brookfield Infrastructure Partners → Canada (TSX)
+    "XYL":    False,   # Xylem → USA
+    "O":      False,   # Realty Income → USA
+    "JNJ":    False,   # Johnson & Johnson → USA
+    "VZ":     False,   # Verizon → USA
+    "ADC":    False,   # Agree Realty → USA
+    "WPM":    False,   # Wheaton → Canada
+    "UEC":    False,   # Uranium Energy → USA
+    "RY":     False,   # Royal Bank → Canada
+    "MAIN":   False,   # Main Street → USA
+    "MRK":    False,   # Merck → USA
+    "MSFT":   False,   # Microsoft → USA
+    "NTR":    False,   # Nutrien → Canada
+    "MOS":    False,   # Mosaic → USA
+    "TPL":    False,   # Texas Pacific → USA
+    "KB":     False,   # KB Financial → Korea
+    "PBR":    False,   # Petrobras → Brazil
+    "PG":     False,   # P&G → USA
+    "KO":     False,   # Coca-Cola → USA
+    "NEE":    False,   # NextEra → USA
+    "WMS":    False,   # Advanced Drainage → USA
+    "0857.HK": False,  # PetroChina → China
+    "0941.HK": False,  # China Mobile → China
+    # Oslo Børs (Norvège = EEE) → PEA
+    "TEL.OL": True,
+    "DNB.OL": True,
+    "YAR.OL": True,
+}
+
+# Tickers historiquement non-éligibles (conservé pour compatibilité)
+_PEA_INELIGIBLE: frozenset[str] = frozenset(
+    t for t, eligible in _PEA_MANUAL_OVERRIDE.items() if not eligible
+)
+
+
+def _pea_eligible(ticker: str, info: dict) -> bool:
+    """Détermine l'éligibilité PEA du ticker.
+    Priorité : surcharge manuelle > pays yfinance.
+    """
+    if ticker in _PEA_MANUAL_OVERRIDE:
+        return _PEA_MANUAL_OVERRIDE[ticker]
+    country = (info.get("country") or "").upper()
+    if country:
+        return country in _EU_EEA_COUNTRIES
+    # Heuristique sur la bourse si pays absent
+    bourse_lower = (info.get("exchange") or "").lower()
+    if any(x in bourse_lower for x in ("paris", "amsterdam", "frankfurt", "oslo", "milan", "madrid")):
+        return True
+    return False
 
 WATCHLIST: list[dict[str, str]] = [
     {"ticker": "VPK.AS",  "nom": "Vopak",                   "bourse": "Euronext Amsterdam"},
@@ -149,11 +216,13 @@ class WatchlistManager:
                     dans_zone   = prix < sh
                     ecart_seuil = round(prix - sh, 2)
 
+            pea = _pea_eligible(ticker, info)
             return {
                 "ticker":         ticker,
                 "nom":            item["nom"],
                 "bourse":         item["bourse"],
-                "pea_eligible":   ticker not in _PEA_INELIGIBLE,
+                "pea_eligible":   pea,
+                "pays":           info.get("country"),
                 "score":          analysis["score"],
                 "signal":         analysis["signal"].upper(),   # BUY | HOLD | SELL
                 "stages":         analysis["stages"],
@@ -181,7 +250,7 @@ class WatchlistManager:
                 "ticker":       ticker,
                 "nom":          item["nom"],
                 "bourse":       item["bourse"],
-                "pea_eligible": ticker not in _PEA_INELIGIBLE,
+                "pea_eligible": _pea_eligible(ticker, {}),
                 "erreur":       str(e),
                 "timestamp":    ts,
             }

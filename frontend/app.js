@@ -1441,9 +1441,10 @@
         ? `<span title="${these.replace(/"/g, '&quot;')}" style="font-size:11px;color:var(--muted);cursor:help">${theseShort}</span>`
         : '<span style="color:var(--muted);font-size:10px">—</span>';
 
+      const peaTitle = a.pays ? `Pays : ${a.pays}` : 'Éligibilité détectée automatiquement via pays yfinance';
       const peaBadge = a.pea_eligible === false
-        ? '<span title="Non éligible PEA depuis 2022 — CTO uniquement" style="font-size:9px;font-weight:700;background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;padding:1px 5px;border-radius:3px;margin-left:4px;white-space:nowrap">CTO</span>'
-        : '';
+        ? `<span title="CTO uniquement — ${peaTitle}" style="font-size:9px;font-weight:700;background:#7c3aed22;color:#a78bfa;border:1px solid #7c3aed55;padding:1px 5px;border-radius:3px;margin-left:4px;white-space:nowrap">CTO</span>`
+        : `<span title="Éligible PEA — ${peaTitle}" style="font-size:9px;font-weight:700;background:#14532d22;color:#4ade80;border:1px solid #4ade8055;padding:1px 5px;border-radius:3px;margin-left:4px;white-space:nowrap">PEA</span>`;
 
       // Seuil d'achat
       const seuilDev = a.seuil_devise ? ({EUR:'€', USD:'$', NOK:' NOK'}[a.seuil_devise] || a.seuil_devise) : '';
