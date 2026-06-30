@@ -168,6 +168,17 @@ class ComiteSelection:
                         con.execute(ddl)
                 if "montant" in existing:
                     con.execute("ALTER TABLE decisions_agd DROP COLUMN montant")
+                # Migration statut : colonne VALIDE/INVALIDE + marquage décisions de test
+                if "statut" not in existing:
+                    con.execute("ALTER TABLE decisions_agd ADD COLUMN statut TEXT DEFAULT 'VALIDE'")
+                    _TICKERS_TEST = ('BNP.PA', 'DBK.DE', 'LLOY.L', 'ABN.AS', '0941.HK', 'YAR.OL')
+                    placeholders = ','.join('?' * len(_TICKERS_TEST))
+                    con.execute(
+                        f"UPDATE decisions_agd "
+                        f"SET statut = 'INVALIDE — score fictif (test script)' "
+                        f"WHERE ticker IN ({placeholders})",
+                        _TICKERS_TEST,
+                    )
         except Exception as e:
             logger.warning("[Comite] init_db: %s", e)
 
@@ -569,8 +580,45 @@ class ComiteSelection:
             return {"erreur": str(e)}
 
     def historique(self, n: int = 20) -> list[dict]:
-        with self._lock:
-            return list(reversed(self._historique))[:n]
+        try:
+            import sqlite3
+            with sqlite3.connect(str(_DB_PATH)) as con:
+                rows = con.execute("""
+                    SELECT ts, ticker, decision, nb_oui,
+                           vote_research, motif_research,
+                           vote_cio, motif_cio,
+                           vote_fiscaliste, motif_fiscaliste,
+                           conditions, donnees,
+                           COALESCE(statut, 'VALIDE') AS statut
+                    FROM decisions_agd
+                    ORDER BY id DESC
+                    LIMIT ?
+                """, (n,)).fetchall()
+            result = []
+            for r in rows:
+                try:
+                    donnees = json.loads(r[11]) if r[11] else {}
+                except Exception:
+                    donnees = {}
+                result.append({
+                    "timestamp": r[0],
+                    "ticker":    r[1],
+                    "decision":  r[2],
+                    "nb_oui":    r[3],
+                    "votes": [
+                        {"votant": "Research",   "vote": r[4], "motif": r[5]},
+                        {"votant": "CIO",        "vote": r[6], "motif": r[7]},
+                        {"votant": "Fiscaliste", "vote": r[8], "motif": r[9]},
+                    ],
+                    "conditions": json.loads(r[10]) if r[10] else [],
+                    "donnees":   donnees,
+                    "statut":    r[12],
+                })
+            return result
+        except Exception as e:
+            logger.warning("[Comite] historique SQLite: %s — fallback RAM", e)
+            with self._lock:
+                return list(reversed(self._historique))[:n]
 
     def etat(self) -> dict:
         return {

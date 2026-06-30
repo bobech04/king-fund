@@ -1864,16 +1864,20 @@
         <thead><tr><th>Date</th><th>Ticker</th><th>Décision</th><th>Score</th><th>Votes</th></tr></thead>
         <tbody>${list.slice().reverse().slice(0, 20).map(d => {
           const dec = d.decision || d.verdict || '';
-          const ok  = dec.startsWith('BUY') || (d.nb_oui >= 2);
-          const col = ok ? 'var(--green)' : (dec === 'VETO' ? 'var(--red)' : '#facc15');
+          const invalide = (d.statut || '').startsWith('INVALIDE');
+          const ok  = !invalide && (dec.startsWith('BUY') || (d.nb_oui >= 2));
+          const col = invalide ? 'var(--muted)' : (ok ? 'var(--green)' : (dec === 'VETO' ? 'var(--red)' : '#facc15'));
           const ts  = d.timestamp || d.date || '';
           const sc  = (d.donnees || {}).score ?? d.score;
-          return `<tr>
+          const badgeInvalide = invalide
+            ? `<span class="badge-invalide" title="${(d.statut || '').replace(/"/g, '&quot;')}">⚠ test</span>`
+            : '';
+          return `<tr class="${invalide ? 'decision-invalide' : ''}">
             <td style="font-size:11px;color:var(--muted)">${ts.replace('T', ' ').slice(0, 16)}</td>
-            <td style="font-weight:700">${d.ticker || '—'}</td>
-            <td style="color:${col};font-weight:700">${dec || '—'}</td>
+            <td style="font-weight:700">${d.ticker || '—'}${badgeInvalide}</td>
+            <td style="color:${col};font-weight:700">${invalide ? 'INVALIDE' : (dec || '—')}</td>
             <td>${sc != null ? (+sc).toFixed(1) : '—'}</td>
-            <td style="font-size:11px">${d.nb_oui != null ? d.nb_oui + '/3' : '—'}</td>
+            <td style="font-size:11px">${invalide ? '<span style="font-size:10px;color:var(--muted)">score fictif</span>' : (d.nb_oui != null ? d.nb_oui + '/3' : '—')}</td>
           </tr>`;
         }).join('')}</tbody>
       </table></div>`;
