@@ -1621,6 +1621,27 @@
       </tr>`;
     }).join('');
 
+    // Bloc RSI/MACD
+    const rm = data.rsi_macd || {};
+    const rmSigColor = rm.signal === 'ENTREE_OPTIMALE' ? '#4ade80'
+      : rm.signal === 'SURACHAT' ? '#f87171'
+      : rm.signal === 'PARTIEL'  ? '#facc15' : 'var(--muted)';
+    const rmSigLabel = rm.signal === 'ENTREE_OPTIMALE' ? '🎯 Entrée optimale'
+      : rm.signal === 'SURACHAT' ? '🔴 Surachat — attendre'
+      : rm.signal === 'PARTIEL'  ? '🟡 Signal partiel'
+      : rm.signal === 'NORMAL'   ? '⚪ Pas de signal fort' : '—';
+    const rsiColor = rm.rsi != null ? (rm.rsi < 40 ? '#4ade80' : rm.rsi > 70 ? '#f87171' : 'var(--fg)') : 'var(--muted)';
+    const macdColor = rm.macd_histogram != null ? (rm.macd_histogram < 0 ? '#4ade80' : '#f87171') : 'var(--muted)';
+    const rsiMacdHtml = rm.rsi != null ? `
+      <div style="padding:10px 16px;background:var(--bg3);border-top:1px solid var(--border);display:flex;gap:20px;flex-wrap:wrap;align-items:center">
+        <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em">RSI(14) + MACD(12,26,9)</div>
+        <div style="display:flex;gap:16px;align-items:center">
+          <span style="font-size:13px">RSI : <strong style="color:${rsiColor}">${rm.rsi}</strong></span>
+          <span style="font-size:13px">Histo MACD : <strong style="color:${macdColor}">${rm.macd_histogram > 0 ? '+' : ''}${rm.macd_histogram}</strong></span>
+          <span style="font-size:12px;font-weight:700;color:${rmSigColor}">${rmSigLabel}</span>
+        </div>
+      </div>` : '';
+
     const addBtnHtml = inWl ? '' : `
       <div style="padding:12px 16px;border-top:1px solid var(--border)">
         <button class="btn btn-sm" id="btn-add-wl-${ticker}"
@@ -1639,12 +1660,13 @@
         </button>
       </div>` : '';
 
+    const nbCriteres = stages.filter(s => s.name !== 'Score final').length;
     resultEl.innerHTML = `
       <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">
         <div style="display:flex;align-items:center;gap:16px;padding:16px;background:var(--bg2);flex-wrap:wrap">
           <div>
             <div style="font-size:20px;font-weight:700;color:var(--fg)">${data.symbol || ticker}</div>
-            <div style="font-size:11px;color:var(--muted);margin-top:2px">Pipeline 17 critères · Graham · Buffett · Damodaran</div>
+            <div style="font-size:11px;color:var(--muted);margin-top:2px">Pipeline ${nbCriteres} critères · Graham · Buffett · Damodaran · RSI/MACD</div>
           </div>
           <div style="margin-left:auto;display:flex;gap:20px;align-items:center">
             <div style="text-align:center">
@@ -1657,8 +1679,9 @@
         <div style="padding:6px 16px;background:var(--bg3);font-size:10px;color:var(--muted);border-top:1px solid var(--border)">
           <span style="color:${statutColor}">●</span> ${disc}
         </div>
+        ${rsiMacdHtml}
         <div style="padding:16px">
-          <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.07em">17 Critères détaillés</div>
+          <div style="font-size:11px;font-weight:600;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.07em">${nbCriteres} Critères détaillés</div>
           <div style="overflow-x:auto">
             <table class="data-table" style="font-size:12px">
               <thead><tr>

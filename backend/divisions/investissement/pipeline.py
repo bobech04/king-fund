@@ -285,22 +285,77 @@ class InvestmentPipeline:
         return _clamp((s_high + s_tgt) / 2)
 
     # ------------------------------------------------------------------
-    # Étape 17 — Agrégation : score final sur 10
+    # Étape 17 — RSI(14) + MACD(12,26,9) : signal d'entrée technique
     # ------------------------------------------------------------------
 
-    def _s17_score_final(self, stage_scores: list[float]) -> float:
-        """Étape 17 — Score final sur 10 (moyenne pondérée des 16 étapes).
+    def _compute_rsi_macd(self, symbol: str) -> dict:
+        """Calcule RSI(14) et MACD(12,26,9) depuis l'historique yfinance (3 mois)."""
+        try:
+            hist = yf.Ticker(symbol).history(period="3mo")["Close"].dropna()
+            if len(hist) < 30:
+                return {}
+
+            # RSI(14) — méthode Wilder (EWM com=13)
+            delta    = hist.diff()
+            gain     = delta.clip(lower=0)
+            loss     = -delta.clip(upper=0)
+            avg_gain = gain.ewm(com=13, adjust=False).mean()
+            avg_loss = loss.ewm(com=13, adjust=False).mean()
+            rs       = avg_gain / (avg_loss + 1e-10)
+            rsi      = 100 - (100 / (1 + rs))
+            rsi_val  = float(rsi.iloc[-1])
+
+            # MACD(12,26,9)
+            ema12     = hist.ewm(span=12, adjust=False).mean()
+            ema26     = hist.ewm(span=26, adjust=False).mean()
+            macd_line = ema12 - ema26
+            sig_line  = macd_line.ewm(span=9, adjust=False).mean()
+            histogram = macd_line - sig_line
+            hist_val  = float(histogram.iloc[-1])
+            macd_val  = float(macd_line.iloc[-1])
+
+            rsi_oversold = rsi_val < 40
+            macd_neg     = hist_val < 0
+
+            if rsi_oversold and macd_neg:
+                signal = "ENTREE_OPTIMALE"
+            elif rsi_val > 70:
+                signal = "SURACHAT"
+            elif rsi_oversold or macd_neg:
+                signal = "PARTIEL"
+            else:
+                signal = "NORMAL"
+
+            return {
+                "rsi":            round(rsi_val,  2),
+                "macd_line":      round(macd_val, 4),
+                "macd_histogram": round(hist_val, 4),
+                "signal":         signal,
+            }
+        except Exception as e:
+            logger.debug(f"RSI/MACD [{symbol}]: {e}")
+            return {}
+
+    # ------------------------------------------------------------------
+    # Étape 18 — Agrégation : score final sur 10
+    # ------------------------------------------------------------------
+
+    def _s18_score_final(self, stage_scores: list[float]) -> float:
+        """Étape 18 — Score final sur 10 (17 étapes : 16 fondamentaux/macro + 1 RSI/MACD).
         Pondérations :
-          Fondamentaux 1–10 : poids 0.60  (60 %)
-          Macro/Risque 11–16 : poids 0.40  (40 %)
+          Fondamentaux 1–10 : poids 0.55  (55 %)
+          Macro/Risque 11–16 : poids 0.35  (35 %)
+          Technique RSI/MACD 17 : poids 0.10  (10 %)
         """
         fundamental = stage_scores[:10]    # étapes 1–10
         macro_risk  = stage_scores[10:16]  # étapes 11–16
+        technique   = stage_scores[16:17]  # étape 17 RSI+MACD
 
         avg_fund = sum(fundamental) / len(fundamental) if fundamental else 0.0
         avg_mac  = sum(macro_risk)  / len(macro_risk)  if macro_risk  else 0.0
+        avg_tech = sum(technique)   / len(technique)   if technique   else 0.0
 
-        composite = avg_fund * 0.60 + avg_mac * 0.40   # dans [-1, +1]
+        composite = avg_fund * 0.55 + avg_mac * 0.35 + avg_tech * 0.10
         return round((composite + 1.0) * 5.0, 2)       # mapping [-1,+1] → [0,10]
 
     # ------------------------------------------------------------------
@@ -309,17 +364,35 @@ class InvestmentPipeline:
 
     def analyze(self, symbol: str, prices: dict | None = None) -> dict:
         """
-        Analyse complète du ticker en 17 étapes.
+        Analyse complète du ticker en 17 étapes (16 fondamentaux/macro + 1 RSI/MACD).
 
         Retourne :
-            score   — float 0–10
-            signal  — "buy" | "hold" | "sell"
-            stages  — liste de 17 dicts {name, score, details}
+            score      — float 0–10
+            signal     — "buy" | "hold" | "sell"
+            stages     — liste de 18 dicts {name, score}
+            rsi_macd   — {rsi, macd_line, macd_histogram, signal}
         """
         if prices is None:
             prices = {}
 
         info = self._info(symbol)
+
+        # Calcul RSI/MACD en amont (évite double fetch yfinance)
+        rsi_macd = self._compute_rsi_macd(symbol)
+
+        def _rsi_macd_stage(info, _d=rsi_macd):
+            """Étape 17 — Signal optimal si RSI < 40 ET histogramme MACD < 0."""
+            if not _d:
+                return 0.0
+            rsi_oversold = _d.get("rsi", 50) < 40
+            macd_neg     = _d.get("macd_histogram", 0) < 0
+            if rsi_oversold and macd_neg:
+                return 1.0
+            if _d.get("rsi", 50) > 70:
+                return -0.5
+            if rsi_oversold or macd_neg:
+                return 0.3
+            return 0.0
 
         stage_fns = [
             ("Cercle de compétence",  self._s01_cercle_competence),
@@ -338,6 +411,7 @@ class InvestmentPipeline:
             ("Catalyseurs",           self._s14_catalyseurs),
             ("Thèse Klarman",         self._s15_these_klarman),
             ("Plan sortie Marks",     self._s16_plan_sortie_marks),
+            ("RSI + MACD",            _rsi_macd_stage),
         ]
 
         raw_scores: list[float] = []
@@ -352,17 +426,18 @@ class InvestmentPipeline:
             raw_scores.append(s)
             stages_out.append({"name": name, "score": round(s, 3)})
 
-        final = self._s17_score_final(raw_scores)
+        final = self._s18_score_final(raw_scores)
         stages_out.append({"name": "Score final", "score": final})
 
         signal = "buy" if final >= 7.0 else ("sell" if final < 4.0 else "hold")
 
         logger.info(f"Pipeline [{symbol}] → {final:.1f}/10 ({signal})")
         return {
-            "symbol": symbol,
-            "score":  final,
-            "signal": signal,
-            "stages": stages_out,
+            "symbol":   symbol,
+            "score":    final,
+            "signal":   signal,
+            "stages":   stages_out,
+            "rsi_macd": rsi_macd,
         }
 
 
