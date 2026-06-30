@@ -1138,7 +1138,7 @@ def get_cio_allocation():
 
         # Allocations par régime — thèse Bertez MMT inflationniste :
         # obligations ↓25→12 | or ↑15→22 | commodités ↑2→8
-        # MMT_INFLATION : bucket dédié actions_eu_energie_infra (TTE.PA ENGIE.PA VIE.PA SU.PA VPK.AS)
+        # MMT_INFLATION : bucket dédié actions_eu_energie_infra (TTE.PA ENGI.PA VIE.PA SU.PA VPK.AS)
         _alloc = {
             "RISK_ON": {
                 "actions_us": 40, "actions_eu": 20, "obligations": 15,
@@ -1163,7 +1163,7 @@ def get_cio_allocation():
 
         _tickers = {
             "MMT_INFLATION": {
-                "actions_eu_energie_infra": ["TTE.PA", "ENGIE.PA", "VIE.PA", "SU.PA", "VPK.AS", "GTT.PA"],
+                "actions_eu_energie_infra": ["TTE.PA", "ENGI.PA", "VIE.PA", "SU.PA", "VPK.AS", "GTT.PA"],
                 "or": ["GLD", "GC=F"],
                 "commodites": ["XLE", "CL=F"],
             },

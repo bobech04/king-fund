@@ -44,7 +44,7 @@ WATCHLIST_DIV = [
     ("TTE.PA",  300.0,  "TotalEnergies"),
     ("AIR.PA",  200.0,  "Airbus"),
     ("VIE.PA",  150.0,  "Veolia"),
-    ("ENGIE.PA",200.0,  "Engie"),
+    ("ENGI.PA", 200.0,  "Engie"),
     ("VPK.AS",  200.0,  "Vopak"),
     ("GTT.PA",  150.0,  "GTT"),
     ("XYL",     150.0,  "Xylem"),
