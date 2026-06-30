@@ -1981,7 +1981,9 @@ def _job_alertes_prix():
     """Surveillance seuils prix d'entrée — toutes les 30 min entre 08h–20h."""
     try:
         from divisions.gerant_delegue.agent_alertes_prix import get_agent_alertes_prix
-        get_agent_alertes_prix().verifier_seuils()
+        agent = get_agent_alertes_prix()
+        agent.verifier_seuils()
+        agent.verifier_seuils_watchlist()  # seuils d'achat personnalisés watchlist
     except Exception as exc:
         logger.debug("[SCHEDULER] Alertes prix: %s", exc)
 

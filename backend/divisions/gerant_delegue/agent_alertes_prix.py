@@ -1,5 +1,5 @@
 """
-Agent Alertes Prix — surveille 4 seuils d'entrée, alerte Telegram 1x/jour/ticker max.
+Agent Alertes Prix — surveille seuils d'entrée, alerte Telegram 1x/jour/ticker max.
 """
 from __future__ import annotations
 import json
@@ -14,7 +14,8 @@ import yfinance as yf
 logger = logging.getLogger(__name__)
 
 # Dossier de persistance anti-spam
-_ETAT_FILE = Path(__file__).resolve().parents[2] / "data" / "alertes_prix_etat.json"
+_ETAT_FILE    = Path(__file__).resolve().parents[2] / "data" / "alertes_prix_etat.json"
+_SEUILS_ACHAT = Path(__file__).resolve().parents[2] / "data" / "seuils_achat.json"
 
 SEUILS: list[dict[str, Any]] = [
     {"ticker": "VPK.AS", "nom": "Vopak",             "seuil": 44.0,  "devise": "EUR", "type": "SOUS"},
@@ -162,6 +163,82 @@ class AgentAlertesPrix:
                 "type":            s["type"],
                 "derniere_alerte": self._alertes_jour.get(s["ticker"]),
             })
+        return resultats
+
+    # ── Seuils d'achat watchlist (seuils_achat.json) ────────────────
+
+    def verifier_seuils_watchlist(self) -> list[dict[str, Any]]:
+        """Vérifie les seuils d'achat personnalisés de la watchlist.
+        Envoie Telegram '🎯 SEUIL ATTEINT' si le prix est dans la zone d'achat.
+        Anti-spam 1x/jour/ticker.
+        """
+        from . import notifier
+
+        # Charge les seuils depuis le fichier
+        try:
+            if not _SEUILS_ACHAT.exists():
+                return []
+            seuils = json.loads(_SEUILS_ACHAT.read_text("utf-8"))
+        except Exception as e:
+            logger.warning("[AlertesPrix] Chargement seuils_achat.json: %s", e)
+            return []
+
+        resultats = []
+        _NOM_DEV = {"EUR": "€", "USD": "$", "NOK": " NOK"}
+
+        for s in seuils:
+            ticker = s.get("ticker", "")
+            nom    = s.get("nom", ticker)
+            sh     = s.get("seuil_haut")
+            sb     = s.get("seuil_bas")
+            devise = s.get("devise", "")
+            sym    = _NOM_DEV.get(devise, devise)
+            key    = f"wl_{ticker}"  # clé anti-spam distincte des seuils classiques
+
+            try:
+                info = yf.Ticker(ticker).info or {}
+                prix = _safe(info.get("currentPrice")) or _safe(info.get("regularMarketPrice"))
+                if prix is None:
+                    resultats.append({"ticker": ticker, "statut": "ERREUR", "erreur": "prix indisponible"})
+                    continue
+
+                # Détermination de la zone d'achat
+                dans_zone = False
+                if sb is not None and sh is not None:
+                    dans_zone = sb <= prix <= sh
+                    label = f"{sb}–{sh}{sym}"
+                elif sh is not None:
+                    dans_zone = prix <= sh
+                    label = f"< {sh}{sym}"
+                else:
+                    label = "—"
+
+                statut = "SEUIL_ATTEINT" if dans_zone else "OK"
+
+                with self._lock:
+                    if dans_zone and self._alertes_jour.get(key) != date.today().isoformat():
+                        notifier.alerte(
+                            f"🎯 SEUIL ATTEINT : {ticker}",
+                            f"<b>{nom}</b> ({ticker}) à <b>{prix:.2f}{sym}</b>\n"
+                            f"Zone d'achat : {label}",
+                            niveau="critique",
+                        )
+                        self._alertes_jour[key] = date.today().isoformat()
+                        self._sauver_etat()
+
+                resultats.append({
+                    "ticker":        ticker,
+                    "nom":           nom,
+                    "prix_actuel":   round(prix, 2),
+                    "seuil_label":   label,
+                    "dans_zone":     dans_zone,
+                    "statut":        statut,
+                    "derniere_alerte": self._alertes_jour.get(key),
+                })
+            except Exception as e:
+                logger.warning("[AlertesPrix] seuil_watchlist %s: %s", ticker, e)
+                resultats.append({"ticker": ticker, "statut": "ERREUR", "erreur": str(e)})
+
         return resultats
 
 
