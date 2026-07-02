@@ -2550,6 +2550,15 @@
     } else if (signauxEl) {
       signauxEl.innerHTML = '';
     }
+    const regimeCriseMsg = $('fm-regime-crise-msg');
+    if (regimeCriseMsg) {
+      if (regimeNom === 'CRISE_LIQUIDITE' && data.confiance === 'FORTE') {
+        regimeCriseMsg.style.display = 'block';
+        regimeCriseMsg.textContent = "🚨 Régime CRISE_LIQUIDITE actif — seuils d'achat temporairement abaissés, discipline recommandée.";
+      } else {
+        regimeCriseMsg.style.display = 'none';
+      }
+    }
 
     // ── Indicateurs liquidité macro ───────────────────────────────────────────
     const liq = data.fred_liquidite || {};

@@ -2321,6 +2321,21 @@ class AgentFluxMacro:
             }
         return {"timestamp": None, "nb_anomalies": 0, "confiance": None, "nb_sources": 0, "regime": None}
 
+    def regime_actuel(self) -> dict[str, Any]:
+        """
+        Régime de marché courant + niveau de confiance, depuis le cache.
+        Destiné aux autres agents (ex: AgentAlertesPrix) qui doivent réagir
+        au régime CRISE_LIQUIDITE sans redéclencher un scan complet.
+        """
+        cache     = self._cache or {}
+        regime    = cache.get("regime", {}).get("regime", "NORMAL")
+        confiance = cache.get("confiance")
+        return {
+            "regime":                regime,
+            "confiance":             confiance,
+            "crise_liquidite_forte": regime == "CRISE_LIQUIDITE" and confiance == "FORTE",
+        }
+
     # ── Rapports Flash / Hebdo ───────────────────────────────────────────────
 
     def generer_rapport_flash(self, anomalie: dict | None = None) -> dict:

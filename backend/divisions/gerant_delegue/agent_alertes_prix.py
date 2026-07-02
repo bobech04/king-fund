@@ -26,6 +26,25 @@ SEUILS: list[dict[str, Any]] = [
 
 _NOM_DEVISE = {"EUR": "€", "USD": "$", "NOK": "kr"}
 
+# ── Seuils accélérés — régime CRISE_LIQUIDITE (Agent Flux Macro) ──────────
+# Milieu de la fourchette 5-10% demandée (ex: Engie 27-28€ → 25-26€ pendant la crise).
+_REDUCTION_CRISE_LIQUIDITE_PCT = 0.07
+
+NOTE_CRISE_LIQUIDITE = (
+    "⚠️ Contexte CRISE_LIQUIDITE actif — la baisse peut s'amplifier, "
+    "patience recommandée avant d'acheter même si le seuil est atteint."
+)
+
+
+def _regime_crise_liquidite_forte() -> bool:
+    """Interroge l'Agent Flux Macro (cache) — True si régime CRISE_LIQUIDITE confirmé confiance FORTE."""
+    try:
+        from divisions.research.agent_flux_macro import get_agent_flux_macro
+        return bool(get_agent_flux_macro().regime_actuel().get("crise_liquidite_forte"))
+    except Exception as e:
+        logger.debug("[AlertesPrix] régime flux macro indisponible: %s", e)
+        return False
+
 
 def _safe(v, default: float | None = None) -> float | None:
     if v is None:
@@ -72,6 +91,7 @@ class AgentAlertesPrix:
     def verifier_seuils(self) -> list[dict[str, Any]]:
         """Vérifie chaque seuil, envoie alertes Telegram si déclenché. Retourne l'état complet."""
         from . import notifier
+        crise = _regime_crise_liquidite_forte()
         resultats = []
         for s in SEUILS:
             ticker  = s["ticker"]
@@ -80,6 +100,11 @@ class AgentAlertesPrix:
             devise  = s["devise"]
             symbole = _NOM_DEVISE.get(devise, devise)
             type_   = s["type"]
+            # Seuils accélérés : abaisse temporairement le seuil BUY pendant CRISE_LIQUIDITE
+            seuil_effectif = (
+                round(seuil * (1 - _REDUCTION_CRISE_LIQUIDITE_PCT), 2)
+                if crise and type_ == "SOUS" else seuil
+            )
             try:
                 info        = yf.Ticker(ticker).info or {}
                 prix        = _safe(info.get("currentPrice")) or _safe(info.get("regularMarketPrice"))
@@ -89,12 +114,12 @@ class AgentAlertesPrix:
                 if prix is not None and prev_close is not None and prev_close > 0:
                     variation_pct = (prix - prev_close) / prev_close * 100
 
-                # Évaluation du seuil
+                # Évaluation du seuil (seuil_effectif = seuil normal hors CRISE_LIQUIDITE)
                 declenche = False
                 if type_ == "SOUS" and prix is not None:
-                    declenche = prix < seuil
+                    declenche = prix < seuil_effectif
                 elif type_ == "BAISSE_JOUR" and variation_pct is not None:
-                    declenche = variation_pct < seuil
+                    declenche = variation_pct < seuil_effectif
 
                 statut = "ALERTE" if declenche else "OK"
                 derniere_alerte = self._alertes_jour.get(ticker)
@@ -105,14 +130,14 @@ class AgentAlertesPrix:
                         if type_ == "SOUS":
                             corps = (
                                 f"Prix actuel : <b>{prix:.2f}{symbole}</b> "
-                                f"(seuil BUY : {seuil}{symbole})\n"
-                                f"Variation : {variation_pct:+.2f}%" if variation_pct is not None
-                                else f"Prix actuel : <b>{prix:.2f}{symbole}</b> (seuil : {seuil}{symbole})"
+                                f"(seuil BUY : {seuil_effectif}{symbole}"
+                                + (f", normal {seuil}{symbole}" if crise else "") + ")"
+                                + (f"\nVariation : {variation_pct:+.2f}%" if variation_pct is not None else "")
+                                + (f"\n\n{NOTE_CRISE_LIQUIDITE}" if crise else "")
                             )
                             notifier.alerte(
                                 f"BUY Signal — {nom} ({ticker})",
-                                f"Prix actuel : <b>{prix:.2f}{symbole}</b> (seuil BUY : {seuil}{symbole})" +
-                                (f"\nVariation : {variation_pct:+.2f}%" if variation_pct is not None else ""),
+                                corps,
                                 niveau="critique",
                             )
                         else:  # BAISSE_JOUR
@@ -129,11 +154,14 @@ class AgentAlertesPrix:
                     "ticker":           ticker,
                     "nom":              nom,
                     "seuil":            seuil,
+                    "seuil_effectif":   seuil_effectif,
                     "devise":           devise,
                     "type":             type_,
                     "prix_actuel":      round(prix, 2) if prix is not None else None,
                     "variation_jour_pct": round(variation_pct, 2) if variation_pct is not None else None,
                     "statut":           statut,
+                    "regime_crise_liquidite": crise and type_ == "SOUS",
+                    "note":             NOTE_CRISE_LIQUIDITE if (declenche and crise and type_ == "SOUS") else None,
                     "derniere_alerte":  derniere_alerte,
                     "timestamp":        datetime.now(timezone.utc).isoformat(),
                 })
@@ -185,6 +213,7 @@ class AgentAlertesPrix:
 
         resultats = []
         _NOM_DEV = {"EUR": "€", "USD": "$", "NOK": " NOK"}
+        crise = _regime_crise_liquidite_forte()
 
         for s in seuils:
             ticker = s.get("ticker", "")
@@ -195,6 +224,13 @@ class AgentAlertesPrix:
             sym    = _NOM_DEV.get(devise, devise)
             key    = f"wl_{ticker}"  # clé anti-spam distincte des seuils classiques
 
+            # Seuils accélérés : abaisse temporairement la zone d'achat pendant CRISE_LIQUIDITE
+            if crise:
+                sh_eff = round(sh * (1 - _REDUCTION_CRISE_LIQUIDITE_PCT), 2) if sh is not None else None
+                sb_eff = round(sb * (1 - _REDUCTION_CRISE_LIQUIDITE_PCT), 2) if sb is not None else None
+            else:
+                sh_eff, sb_eff = sh, sb
+
             try:
                 info = yf.Ticker(ticker).info or {}
                 prix = _safe(info.get("currentPrice")) or _safe(info.get("regularMarketPrice"))
@@ -204,12 +240,12 @@ class AgentAlertesPrix:
 
                 # Détermination de la zone d'achat
                 dans_zone = False
-                if sb is not None and sh is not None:
-                    dans_zone = sb <= prix <= sh
-                    label = f"{sb}–{sh}{sym}"
-                elif sh is not None:
-                    dans_zone = prix <= sh
-                    label = f"< {sh}{sym}"
+                if sb_eff is not None and sh_eff is not None:
+                    dans_zone = sb_eff <= prix <= sh_eff
+                    label = f"{sb_eff}–{sh_eff}{sym}"
+                elif sh_eff is not None:
+                    dans_zone = prix <= sh_eff
+                    label = f"< {sh_eff}{sym}"
                 else:
                     label = "—"
 
@@ -217,12 +253,13 @@ class AgentAlertesPrix:
 
                 with self._lock:
                     if dans_zone and self._alertes_jour.get(key) != date.today().isoformat():
-                        notifier.alerte(
-                            f"🎯 SEUIL ATTEINT : {ticker}",
+                        corps = (
                             f"<b>{nom}</b> ({ticker}) à <b>{prix:.2f}{sym}</b>\n"
-                            f"Zone d'achat : {label}",
-                            niveau="critique",
+                            f"Zone d'achat : {label}"
+                            + (f" (normal : {sb}–{sh}{sym})" if crise and sb is not None and sh is not None else "")
+                            + (f"\n\n{NOTE_CRISE_LIQUIDITE}" if crise else "")
                         )
+                        notifier.alerte(f"🎯 SEUIL ATTEINT : {ticker}", corps, niveau="critique")
                         self._alertes_jour[key] = date.today().isoformat()
                         self._sauver_etat()
 
@@ -233,6 +270,8 @@ class AgentAlertesPrix:
                     "seuil_label":   label,
                     "dans_zone":     dans_zone,
                     "statut":        statut,
+                    "regime_crise_liquidite": crise,
+                    "note":          NOTE_CRISE_LIQUIDITE if (dans_zone and crise) else None,
                     "derniere_alerte": self._alertes_jour.get(key),
                 })
             except Exception as e:
