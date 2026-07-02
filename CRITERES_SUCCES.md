@@ -1,4 +1,7 @@
-# CRITERES_SUCCES.md — Phase test (2-3 mois)
+# CRITERES_SUCCES.md — Phase test (prolongée jusqu'au 30 juillet 2026)
+
+> **Prolongation J30 → J60 (mise à jour 30/06/2026)** — raisons : bugs critiques corrigés le 30/06/2026,
+> Raspberry Pi pas encore en place, régime macro CRISE_LIQUIDITE actif. Détail dans `PHASE_TEST.md`.
 
 ## 1. Opérationnel (le plus important — GO/NO-GO réel)
 
@@ -8,6 +11,12 @@
 - Les sauvegardes/persistance SQLite fonctionnent (pas de perte de données après redémarrage)
 
 > **→ NO-GO sur MODE=RÉEL si un de ces points échoue de façon répétée.**
+
+### Conditions Go/No-Go MODE=RÉEL — mises à jour au 30/06/2026 (toutes requises)
+
+1. **Raspberry Pi stable 7 jours consécutifs** — hébergement cible en place et fiable
+2. **Régime macro repassé à SEREIN** — sortie confirmée du régime CRISE_LIQUIDITE (Agent Flux Macro)
+3. **0 bug critique pendant 30 jours consécutifs**
 
 ---
 

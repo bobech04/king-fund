@@ -2,6 +2,22 @@
 
 ## Durée : 2-3 mois en MODE=SIMULATION · Objectif : confiance suffisante pour MODE=RÉEL
 
+> ## ⏳ Prolongation phase test — J30 → J60 (mise à jour 30/06/2026)
+>
+> **Nouvelle échéance : 30 juillet 2026** (au lieu de J30 initial).
+>
+> **Raison de la prolongation :**
+> - Bugs critiques corrigés le 30/06/2026 — délai d'observation post-correction nécessaire
+> - Raspberry Pi (hébergement cible) pas encore en place
+> - Régime macro **CRISE_LIQUIDITE** actif — pas le contexte pour évaluer sereinement un passage MODE=RÉEL
+>
+> **Conditions Go/No-Go MODE=RÉEL (toutes requises) :**
+> 1. Raspberry Pi stable **7 jours** consécutifs (hébergement cible en place et fiable)
+> 2. Régime macro de retour à **SEREIN** (sortie confirmée de CRISE_LIQUIDITE)
+> 3. **0 bug critique** pendant **30 jours** consécutifs
+>
+> Voir `CRITERES_SUCCES.md` pour le détail des critères qualitatifs inchangés.
+
 ---
 
 ## Avant J0 — Checklist pré-lancement (une seule fois)
@@ -191,17 +207,22 @@ Si `false` : vérifier que le token/chat_id sont corrects dans `.env`.
 
 ## Fin de phase — Décision GO / NO-GO
 
-À l'issue des 2-3 mois, relire `CRITERES_SUCCES.md` de haut en bas.
+À l'issue de la phase test (échéance **30 juillet 2026**, prolongée depuis J30 → J60 — voir encadré en tête de document), relire `CRITERES_SUCCES.md` de haut en bas.
 
-La seule vraie question est la **section 6** :
+**Conditions Go/No-Go MODE=RÉEL (toutes requises depuis la prolongation du 30/06/2026) :**
+1. Raspberry Pi stable 7 jours consécutifs
+2. Régime macro repassé à SEREIN (sortie de CRISE_LIQUIDITE)
+3. 0 bug critique pendant 30 jours consécutifs
+
+Si les 3 conditions ci-dessus sont remplies, la seule vraie question reste la **section 6** de `CRITERES_SUCCES.md` :
 
 > *Comprends-tu ce que fait le système à tout moment ?*  
 > *Fais-tu confiance pour basculer MODE=RÉEL avec de l'argent qui compte pour ta retraite ?*
 
 Si **OUI** sur les deux → passer en MODE=RÉEL (modifier `config.py` ou `.env` selon l'implémentation).
 
-Si **NON** → noter précisément ce qui manque en confiance (un agent ? une alerte ? une incompréhension ?) et traiter ce point avant de basculer. Pas de délai imposé.
+Si **NON** (ou si une des 3 conditions ci-dessus échoue) → noter précisément ce qui manque en confiance (un agent ? une alerte ? une incompréhension ?) et traiter ce point avant de basculer. Pas de délai imposé au-delà du 30/07/2026.
 
 ---
 
-*Créé le 12 juin 2026*
+*Créé le 12 juin 2026 — Prolongé le 30 juin 2026 (J30 → J60, échéance 30 juillet 2026)*
